@@ -503,7 +503,7 @@ export default function NominaPage() {
             {pagoReciente && (
                 <div id="printable-receipt" style={{ padding: 20, border: '1px dashed #ccc', background: '#fff' }}>
                     <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                        <Title level={4} style={{ margin: 0 }}>Academia Crystal</Title>
+                        <Title level={4} style={{ margin: 0 }}>La Cosmetikera</Title>
                         <Text type="secondary">Comprobante de Pago a Profesor</Text>
                     </div>
                     <div style={{ borderBottom: '1px solid #eee', marginBottom: 10 }}></div>

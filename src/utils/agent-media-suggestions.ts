@@ -100,7 +100,7 @@ function buildTrustCaption(asset: MarketingAssetCandidate): string {
     return `${description.slice(0, 120)}${description.length > 120 ? "..." : ""}`;
   }
 
-  return "Así vivimos las clases en Academia Crystal ✨";
+  return "Asi se vive La Cosmetikera ✨";
 }
 
 // Patrones que NUNCA deben disparar una imagen

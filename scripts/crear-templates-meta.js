@@ -56,7 +56,7 @@ const TEMPLATES = [
     body: {
       text: 'Hola {{1}},\n\n¡Tu inscripción ha sido confirmada! 🎓\n\nCurso: {{2}}\nFecha de inicio: {{3}}\nHorario: {{4}}\nMensualidad: ${{5}}\nInstructor: {{6}}\nFecha de pago: {{7}}\n\nEsperamos verte pronto. 😊'
     },
-    footer: 'Academia Crystal Diamante'
+    footer: 'La Cosmetikera'
   },
   {
     name: 'pago_recibido',
@@ -65,7 +65,7 @@ const TEMPLATES = [
     body: {
       text: 'Hola {{1}},\n\n✅ Tu pago ha sido recibido correctamente.\n\nReferencia: {{2}}\nMonto: ${{3}}\nFecha: {{4}}\nConcepto: {{5}}\nCurso: {{6}}\nVigencia: {{7}}\nPróxima clase: {{8}}\n\nGracias por tu confianza. 💚'
     },
-    footer: 'Academia Crystal Diamante'
+    footer: 'La Cosmetikera'
   },
   {
     name: 'recordatorio_pago',
@@ -74,7 +74,7 @@ const TEMPLATES = [
     body: {
       text: 'Hola {{1}},\n\n⏰ Recordatorio: Tu pago de {{2}} vence el {{3}}.\n\nMonto: ${{4}}\nCurso: {{5}}\n\nEfectúa el pago a tiempo para continuar con tus clases.\n\n¿Preguntas? Contacta con nosotros.'
     },
-    footer: 'Academia Crystal Diamante'
+    footer: 'La Cosmetikera'
   },
   {
     name: 'formulario_interes',
@@ -83,7 +83,7 @@ const TEMPLATES = [
     body: {
       text: 'Hola {{1}},\n\nGracias por tu interés en {{2}}. 🙏\n\n📍 Ciudad: {{3}}\n💡 Beneficios principales:\n• {{4}}\n• {{5}}\n• {{6}}\n• {{7}}\n\n📅 Fecha de inicio: {{8}}\n🎯 Cupos disponibles: {{9}}\n\n🔗 Más info: {{10}}\n📞 Soporte: {{11}}\n\n¡Hablamos pronto! 😊'
     },
-    footer: 'Academia Crystal Diamante'
+    footer: 'La Cosmetikera'
   },
   {
     name: 'bienvenida_nuevo_estudiante',
@@ -92,7 +92,7 @@ const TEMPLATES = [
     body: {
       text: 'Bienvenido {{1}},\n\n¡Nos alegra que empieces con nosotros! 🎉\n\nCurso: {{2}}\nPróximas clases:\n• {{3}}\n• {{4}}\n• {{5}}\n\nHorario: {{6}}\n📍 Ubicación: {{7}}\nSalón: {{8}}\n👨‍🏫 Instructor: {{9}}\n\nEsperamos tu asistencia. ¡Mucho éxito! 💪'
     },
-    footer: 'Academia Crystal Diamante'
+    footer: 'La Cosmetikera'
   },
   {
     name: 'recordatorio_clase',
@@ -101,7 +101,7 @@ const TEMPLATES = [
     body: {
       text: 'Hola {{1}},\n\n⏰ ¡Tu clase comienza en 1 hora!\n\n📚 Curso: {{2}}\n⏰ Hora: {{3}}\n📍 Ubicación: {{4}}\n👨‍🏫 Instructor: {{5}}\n\nNo olvides asistir. 😊'
     },
-    footer: 'Academia Crystal Diamante'
+    footer: 'La Cosmetikera'
   },
   {
     name: 'certificado_disponible',
@@ -110,7 +110,7 @@ const TEMPLATES = [
     body: {
       text: 'Felicitaciones {{1}},\n\n🏆 ¡Tu certificado está disponible!\n\nCurso: {{2}}\n\n📥 Descarga digital: {{3}}\n📅 Disponible desde: {{4}}\n⏰ Horario de atención: {{5}}\n📍 Dirección: {{6}}\n\n🎓 Ceremonia de grados:\n📅 Fecha: {{7}}\n⏰ Hora: {{8}}\n📍 Lugar: {{9}}\n💵 Copias adicionales: {{10}}\n\n¡Estamos orgullosos de tu logro! 🎉'
     },
-    footer: 'Academia Crystal Diamante'
+    footer: 'La Cosmetikera'
   }
 ];
 

@@ -6,7 +6,7 @@ export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 const isProd = process.env.NODE_ENV === 'production';
 
 function formatMsg(level: LogLevel, ...args: any[]) {
-  const prefix = `[${level.toUpperCase()}][AcademiaCrystal]`;
+  const prefix = `[${level.toUpperCase()}][LaCosmetikera]`;
   return [prefix, ...args];
 }
 

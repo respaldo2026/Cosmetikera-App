@@ -11,7 +11,7 @@ const definitions = {
         descripcion: "Confirma al estudiante que su inscripción fue registrada y explica próximos pasos.",
         variables: ["nombre", "curso"],
         fallback:
-            "Hola {{nombre}}, confirmamos tu inscripción al curso {{curso}}. Te contactaremos con los siguientes pasos. Equipo Academia Crystal.",
+            "Hola {{nombre}}, confirmamos tu registro para {{curso}}. Te contactaremos con los siguientes pasos. Equipo La Cosmetikera.",
     },
     pago_confirmado: {
         nombre: "pago_confirmado",
@@ -53,7 +53,7 @@ const definitions = {
         descripcion: "Da la bienvenida al profesor y comparte acceso a la app con su usuario.",
         variables: ["nombre", "enlace_portal", "usuario"],
         fallback:
-            "Hola {{nombre}}, tu cuenta de profesor en Academia Crystal Diamante fue activada.\n\nIngresa a la plataforma: {{enlace_portal}}\nUsuario registrado: {{usuario}}\n\nEste mensaje corresponde a la activación de tu acceso.",
+            "Hola {{nombre}}, tu cuenta en La Cosmetikera fue activada.\n\nIngresa a la plataforma: {{enlace_portal}}\nUsuario registrado: {{usuario}}\n\nEste mensaje corresponde a la activacion de tu acceso.",
     },
     pago_inscripcion_pendiente: {
         nombre: "pago_inscripcion_pendiente",

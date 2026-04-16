@@ -7706,7 +7706,7 @@ export interface components {
             id: string;
             /**
              * Format: text
-             * @default Academia Crystal Diamante
+             * @default La Cosmetikera
              */
             nombre_academia: string;
             /** Format: text */

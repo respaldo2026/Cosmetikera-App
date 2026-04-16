@@ -571,7 +571,7 @@ export default function CajaPage() {
 
       const ticketData = {
         academia: {
-          nombre: configTicket?.nombre_academia || "Academia Crystal Diamante",
+          nombre: configTicket?.nombre_academia || "La Cosmetikera",
           ruc: configTicket?.ruc || undefined,
           logoUrl: configTicket?.logo_url || undefined,
           telefono: configTicket?.telefono || "",
@@ -1012,7 +1012,7 @@ export default function CajaPage() {
                     
                     const ticketData = {
                       academia: {
-                        nombre: configTicket?.nombre_academia || "Academia Crystal Diamante",
+                        nombre: configTicket?.nombre_academia || "La Cosmetikera",
                         ruc: configTicket?.ruc || undefined,
                         logoUrl: configTicket?.logo_url || undefined,
                         telefono: configTicket?.telefono || "",

@@ -18,7 +18,7 @@ try {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
   
-  // Gradiente de fondo (púrpura/dorado como Academia Crystal)
+  // Gradiente de fondo para La Cosmetikera
   const gradient = ctx.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, '#6b2c91');
   gradient.addColorStop(1, '#c88141');
@@ -30,12 +30,12 @@ try {
   ctx.font = 'bold 72px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Academia Crystal', width / 2, height / 2 - 60);
+  ctx.fillText('La Cosmetikera', width / 2, height / 2 - 60);
   
   // Texto secundario
   ctx.font = '48px Arial';
   ctx.fillStyle = '#f0d696';
-  ctx.fillText('Diamante', width / 2, height / 2 + 40);
+  ctx.fillText('Admin + POS', width / 2, height / 2 + 40);
   
   // Subtítulo
   ctx.font = '32px Arial';

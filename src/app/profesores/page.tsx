@@ -153,7 +153,7 @@ export default function ProfesoresCards() {
                                             style={{ backgroundColor: "#25D366", color: "#fff", border: "none" }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                enviarWhatsapp(profesor.telefono, `Hola ${profesor.nombre_completo}, te contacto desde Academia Crystal.`);
+                                                enviarWhatsapp(profesor.telefono, `Hola ${profesor.nombre_completo}, te contacto desde La Cosmetikera.`);
                                             }}
                                         >
                                             WhatsApp

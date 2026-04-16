@@ -2712,8 +2712,8 @@ function buildIntentFocusedDirectResponse(
     if (alreadyGreeted) {
       return `${greeting} 😊 ¿En qué te puedo ayudar?`;
     }
-    const academyName = academy?.nombre || "Academia Crystal Diamante";
-    return `${greeting}, bienvenid@ a *${academyName}* 💎\n\n¿En qué te puedo ayudar hoy? Puedo contarte sobre nuestros cursos, fechas de inicio, precios e inscripciones 🙌`;
+    const academyName = academy?.nombre || "La Cosmetikera";
+    return `${greeting}, bienvenid@ a *${academyName}* ✨\n\n¿En qué te puedo ayudar hoy? Puedo contarte sobre productos, servicios, promociones, puntos y compras 🙌`;
   }
 
   if (isOutOfCaliConstraintMessage(message)) {
@@ -3337,7 +3337,7 @@ async function buildLinkAccessDirectResponse(
   userMessage: string,
   history: Array<{ user: string; agent: string }>
 ): Promise<string | null> {
-  const appUrl = "https://app.crystaldiamante.com";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_PORTAL_ESTUDIANTE_URL || "";
   const isLinkIntent = hasLinkOrAppAccessIntent(userMessage);
   const hasLinkContext = hasRecentLinkSupportContext(history);
 

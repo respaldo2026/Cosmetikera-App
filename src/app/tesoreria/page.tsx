@@ -135,7 +135,7 @@ export default function TesoreriaPage() {
 
                 const ticketData = {
                     academia: {
-                        nombre: configAcademia?.nombre_academia || "Academia Crystal Diamante",
+                        nombre: configAcademia?.nombre_academia || "La Cosmetikera",
                         ruc: configAcademia?.ruc || undefined,
                         logoUrl: configAcademia?.logo_url || undefined,
                         telefono: configAcademia?.telefono || undefined,
@@ -529,7 +529,7 @@ export default function TesoreriaPage() {
 
             const ticketData = {
                 academia: {
-                    nombre: configAcademia?.nombre_academia || "Academia Crystal Diamante",
+                    nombre: configAcademia?.nombre_academia || "La Cosmetikera",
                     ruc: configAcademia?.ruc || undefined,
                     logoUrl: configAcademia?.logo_url || undefined,
                     telefono: configAcademia?.telefono || undefined,

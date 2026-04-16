@@ -816,8 +816,8 @@ export default function ConfiguracionPage() {
         <Divider orientation="left">Información General</Divider>
         <Row gutter={[16, 8]}>
           <Col xs={24} md={12}>
-            <Form.Item label="Nombre de la Academia" name="nombre_academia" rules={[{ required: true }]}>
-              <Input placeholder="Academia Crystal" />
+            <Form.Item label="Nombre del negocio" name="nombre_academia" rules={[{ required: true }]}>
+              <Input placeholder="La Cosmetikera" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -827,26 +827,26 @@ export default function ConfiguracionPage() {
           </Col>
           <Col span={24}>
             <Form.Item label="Dirección" name="direccion">
-              <TextArea rows={2} placeholder="Dirección completa de la academia" />
+              <TextArea rows={2} placeholder="Direccion completa de la tienda" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-              label="Teléfono / WhatsApp Admisiones"
+              label="Telefono / WhatsApp principal"
               name="telefono"
-              extra="Este número se usa en el portal estudiantil para la opción 'Hablar con Admisiones'."
+              extra="Este numero se usa en la app para ventas, soporte y fidelizacion de clientes."
             >
               <Input placeholder="+57 301 203 8582" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item label="Email" name="email" rules={[{ type: "email" }]}>
-              <Input placeholder="info@academiacrystal.com" />
+              <Input placeholder="hola@lacosmetikera.com" />
             </Form.Item>
           </Col>
           <Col span={24}>
             <Form.Item label="Sitio Web" name="sitio_web">
-              <Input placeholder="https://www.academiacrystal.com" />
+              <Input placeholder="https://www.lacosmetikera.com" />
             </Form.Item>
           </Col>
         </Row>
@@ -1423,7 +1423,7 @@ export default function ConfiguracionPage() {
           <Form.Item label="Información Adicional" name="informacion">
             <TextArea 
               rows={4} 
-              placeholder="Ej: Banco: Bancolombia | Cuenta: 123456789 | Titular: Academia Crystal | CCI/CLABE: 098765432..."
+              placeholder="Ej: Banco: Bancolombia | Cuenta: 123456789 | Titular: La Cosmetikera | CCI/CLABE: 098765432..."
             />
           </Form.Item>
           <Form.Item label="Activo" name="activo" valuePropName="checked" initialValue={true}>

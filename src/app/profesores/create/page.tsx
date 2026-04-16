@@ -13,7 +13,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 
 const PORTAL_PROFESOR_URL =
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://app.crystaldiamante.com";
+    (typeof window !== "undefined" ? window.location.origin : "");
 
 export default function ProfesorCreate() {
     const { list } = useNavigation(); // Para redirigir manualmente

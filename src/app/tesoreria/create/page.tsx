@@ -313,7 +313,7 @@ export default function PagoCreate() {
 
             const ticketData = {
                 academia: {
-                    nombre: configTicket?.nombre_academia ?? "Academia Crystal",
+                    nombre: configTicket?.nombre_academia ?? "La Cosmetikera",
                     ruc: configTicket?.ruc ?? undefined,
                     logoUrl: configTicket?.logo_url ?? undefined,
                     telefono: configTicket?.telefono ?? configTicket?.whatsapp ?? undefined,

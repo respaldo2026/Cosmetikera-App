@@ -1,5 +1,5 @@
 <!-- Auto-generated guidance for AI coding agents working on this repo -->
-# Copilot instructions — academia-crystal
+# Copilot instructions — la-cosmetikera
 
 Purpose
 - Give concise, actionable context so an AI can make safe, repo-consistent changes.
@@ -10,6 +10,7 @@ Quick start / build
 
 Big picture
 - This is a Next.js 13 (app directory) + Refine admin app using Ant Design UI.
+- The product target is La Cosmetikera: an administrative app and point-of-sale system with customer loyalty workflows.
 - Data & auth are handled via Supabase. There is a server/client split for auth:
   - Server-side helpers: `src/utils/supabase/server.ts`, `src/providers/auth-provider/auth-provider.server.ts`.
   - Browser helpers: `src/utils/supabase/client.ts`, `src/providers/auth-provider/auth-provider.client.ts`.

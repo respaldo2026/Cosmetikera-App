@@ -62,7 +62,7 @@ const formatearMensajePersuasivo = (mensaje: string): string => {
             return linea;
         });
 
-    const header = `${EMOJI.sparkle} *ACADEMIA CRYSTAL* ${EMOJI.sparkle}`;
+    const header = `${EMOJI.sparkle} *LA COSMETIKERA* ${EMOJI.sparkle}`;
     const titulo = `${EMOJI.pin} *INFORMACIÓN IMPORTANTE*`;
     const separador = "====================";
     const cta = `${EMOJI.rocket} *¡RESERVA TU CUPO HOY!*`;

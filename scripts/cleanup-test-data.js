@@ -8,8 +8,13 @@
 const { createClient } = require('@supabase/supabase-js');
 const readline = require('readline');
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iflkiypxyxnrvwldbkzk.supabase.co';
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmbGtpeXBjeXhuUnZ3bGRia3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk3ODA4MjMsImV4cCI6MjAyNTM1NjgyM30.LDt0qGTbA-75a-S6RqZSJVbWrk8MbQzYnPlZj5xpA0w';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY en el entorno.');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -62,7 +67,7 @@ async function getTableCounts() {
 }
 
 async function main() {
-  console.log('\n🗑️  SCRIPT DE LIMPIEZA - Academia Crystal\n');
+  console.log('\n🗑️  SCRIPT DE LIMPIEZA - La Cosmetikera\n');
   console.log('Este script eliminará TODOS los datos de las tablas.\n');
 
   // Mostrar conteos actuales

@@ -1,7 +1,12 @@
 const { createClient } = require("@supabase/supabase-js");
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://xqcsftjkvcrbcetrdulq.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhx Y3NmdGprdmNyYmNldHJkdWxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2ODA0MzQsImV4cCI6MjA1MTI1NjQzNH0.5Y9gJ8Ke-nqV_2h8RqQXH8vZOZXlZ8YjZKZRqGJXKZo";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+if (!SUPABASE_URL) {
+  console.error("\n❌ ERROR: Falta NEXT_PUBLIC_SUPABASE_URL");
+  console.log("Define NEXT_PUBLIC_SUPABASE_URL antes de ejecutar este script.\n");
+  process.exit(1);
+}
 
 // IMPORTANTE: Necesitas la Service Role Key (no la anon key)
 // Esta la encuentras en: Supabase Dashboard → Settings → API → service_role key

@@ -92,7 +92,7 @@ export const DiplomaPDF = ({ estudiante, curso, fechaFin, folio }: DiplomaProps)
         
         {/* TÍTULO */}
         <Text style={styles.header}>CERTIFICADO DE EXCELENCIA</Text>
-        <Text style={styles.subHeader}>La Academia Crystal otorga el presente reconocimiento a:</Text>
+        <Text style={styles.subHeader}>La Cosmetikera otorga el presente reconocimiento a:</Text>
 
         {/* NOMBRE ESTUDIANTE */}
         <Text style={styles.studentName}>{estudiante}</Text>
@@ -121,7 +121,7 @@ export const DiplomaPDF = ({ estudiante, curso, fechaFin, folio }: DiplomaProps)
 
         {/* SEGURIDAD */}
         <Text style={styles.verification}>
-          Folio de Verificación Único: {folio} | Generado digitalmente por Academia Crystal App
+          Folio de Verificación Unico: {folio} | Generado digitalmente por La Cosmetikera App
         </Text>
 
       </View>

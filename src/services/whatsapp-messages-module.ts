@@ -717,7 +717,7 @@ export async function enviarBienvenidaPortalProfesor(
   }
 
   const mensaje = [
-    `Hola ${datos.nombre}, tu cuenta de profesor en Academia Crystal Diamante fue activada.`,
+    `Hola ${datos.nombre}, tu cuenta en La Cosmetikera fue activada.`,
     '',
     `Ingresa a la plataforma: ${datos.enlacePortal}`,
     `Usuario registrado: ${datos.usuario}`,

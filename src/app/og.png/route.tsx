@@ -6,7 +6,7 @@ export async function GET() {
   return new ImageResponse(
     <div
       style={{
-        background: 'linear-gradient(135deg, #6b2c91 0%, #c88141 100%)',
+        background: 'linear-gradient(135deg, #111827 0%, #d81b87 55%, #f59e0b 100%)',
         width: '100%',
         height: '100%',
         display: 'flex',
@@ -25,7 +25,7 @@ export async function GET() {
           textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
         }}
       >
-        ★ Academia Crystal ★
+        La Cosmetikera
       </div>
 
       <div
@@ -36,7 +36,7 @@ export async function GET() {
           marginBottom: '30px',
         }}
       >
-        Diamante
+        Admin + POS
       </div>
 
       <div
@@ -48,7 +48,7 @@ export async function GET() {
           lineHeight: '1.4',
         }}
       >
-        Programas de Belleza y Estética Profesional
+        Belleza, ventas y fidelizacion de clientes
       </div>
 
       <div
@@ -60,7 +60,7 @@ export async function GET() {
           paddingTop: '30px',
         }}
       >
-        ✓ Certificados • Especialización • Formación Profesional
+        ✓ Punto de venta • Clientes frecuentes • Gestion diaria
       </div>
     </div>,
     {

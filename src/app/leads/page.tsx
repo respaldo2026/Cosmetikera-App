@@ -76,7 +76,7 @@ const plantillaOptions = [
     key: "bienvenida",
     titulo: "Bienvenida",
     cuerpo:
-      "Hola {nombre}! Soy del equipo de Academia Crystal. Gracias por tu interés en {programa}. ¿Te gustaría que te enviemos el detalle del programa y horarios?",
+      "Hola {nombre}! Soy del equipo de La Cosmetikera. Gracias por tu interes en {programa}. ¿Quieres que te comparta detalle, disponibilidad y beneficios?",
   },
   {
     key: "seguimiento",
@@ -110,7 +110,7 @@ const normalizePhone = (value?: string | null) => {
 };
 
 const buildMailTo = (lead: Lead, mensaje: string) => {
-  const subject = encodeURIComponent(`Info ${lead.interes || "Academia Crystal"}`);
+  const subject = encodeURIComponent(`Info ${lead.interes || "La Cosmetikera"}`);
   const body = encodeURIComponent(mensaje);
   return `mailto:${lead.email || ""}?subject=${subject}&body=${body}`;
 };

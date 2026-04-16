@@ -9,7 +9,7 @@ export function LoginLanding({ children }: { children: ReactNode }) {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
   const [mounted, setMounted] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [nombreAcademia, setNombreAcademia] = useState<string>("Academia Crystal Diamante");
+  const [nombreAcademia, setNombreAcademia] = useState<string>("La Cosmetikera");
 
   useEffect(() => {
     setMounted(true);

@@ -822,7 +822,7 @@ Formamos profesionales en belleza y estética.
             const fechaTicketISO = pagoActualizado.fecha_pago ?? fechaPagoISO;
             const ticketData = {
               academia: {
-                nombre: configAcademia.nombre_academia ?? "Academia Crystal",
+                nombre: configAcademia.nombre_academia ?? "La Cosmetikera",
                 ruc: configAcademia.ruc ?? undefined,
                 logoUrl: configAcademia.logo_url ?? undefined,
                 telefono: configAcademia.telefono ?? configAcademia.whatsapp ?? undefined,

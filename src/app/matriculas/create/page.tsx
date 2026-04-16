@@ -22,7 +22,7 @@ const formatoCOP = (valor: number) =>
 const PORTAL_ESTUDIANTE_URL =
     process.env.NEXT_PUBLIC_PORTAL_ESTUDIANTE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://app.academiacrystal.com";
+    (typeof window !== "undefined" ? window.location.origin : "");
 
 export default function MatriculaCreate() {
     const router = useRouter();
@@ -638,7 +638,7 @@ export default function MatriculaCreate() {
 
                 const ticketData = {
                     academia: {
-                        nombre: configAcademia?.nombre_academia || "Academia Crystal Diamante",
+                        nombre: configAcademia?.nombre_academia || "La Cosmetikera",
                         ruc: configAcademia?.ruc || undefined,
                         logoUrl: configAcademia?.logo_url || undefined,
                         telefono: configAcademia?.telefono || configAcademia?.whatsapp || undefined,
@@ -1075,7 +1075,7 @@ export default function MatriculaCreate() {
                     >
                         <div ref={printRef}>
                             <div style={{ textAlign: "center", marginBottom: 30 }}>
-                                <Title level={3}>Academia Crystal Diamante</Title>
+                                <Title level={3}>La Cosmetikera</Title>
                                 <Text>Recibo de Inscripción</Text>
                                 <br />
                                 <Text type="secondary">Fecha: {dayjs().format("DD/MM/YYYY")}</Text>

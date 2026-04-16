@@ -482,7 +482,7 @@ export default function StudentDetailView() {
       message.warning("El estudiante no tiene teléfono registrado");
       return;
     }
-    const mensaje = `Hola ${perfil.nombre_completo}, te contacto desde Academia Crystal.`;
+    const mensaje = `Hola ${perfil.nombre_completo}, te contacto desde La Cosmetikera.`;
     enviarWhatsapp(perfil.telefono, mensaje);
   };
 
@@ -532,7 +532,7 @@ export default function StudentDetailView() {
 
       const ticketData = {
         academia: {
-          nombre: configAcademia?.nombre_academia || "Academia Crystal Diamante",
+          nombre: configAcademia?.nombre_academia || "La Cosmetikera",
           ruc: configAcademia?.ruc || undefined,
           logoUrl: configAcademia?.logo_url || undefined,
           telefono: configAcademia?.telefono || configAcademia?.whatsapp || undefined,

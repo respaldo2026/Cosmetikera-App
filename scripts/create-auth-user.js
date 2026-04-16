@@ -1,8 +1,13 @@
 const { createClient } = require("@supabase/supabase-js");
 const readline = require("readline");
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://xqcsftjkvcrbcetrdulq.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjendmc3h3cGl0YXN1dHNxcWxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzExNjk1NDQsImV4cCI6MjA0Njc0NTU0NH0.gHjPQvLX6pxcA2C4YYLXz4jZuJ5KTlvSQUvC8KPl3G0";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error("Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY en el entorno.");
+  process.exit(1);
+}
 
 const rl = readline.createInterface({
   input: process.stdin,

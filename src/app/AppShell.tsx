@@ -575,7 +575,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
   const { permisos, loading: permisosLoading } = useRolesPermissions();
   const { mode } = useColorMode();
   const pathname = usePathname();
-  const [brandingName, setBrandingName] = useState("Crystal App");
+  const [brandingName, setBrandingName] = useState("La Cosmetikera");
   const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
 
   const isDarkMode = mode === "dark";

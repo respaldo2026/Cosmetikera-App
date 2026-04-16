@@ -1197,7 +1197,7 @@ export default function MarketingCenterPage() {
                     <Form.Item name="persona_bio" label="Bio / personalidad" tooltip="Contexto breve sobre quién es y cómo ayuda">
                       <TextArea
                         rows={3}
-                        placeholder="Asistente de la Academia Crystal, experto en cursos, pagos y WhatsApp corporativo. Transparente, amable y directo."
+                        placeholder="Asistente de La Cosmetikera, experto en ventas, fidelizacion, pagos y WhatsApp corporativo. Transparente, amable y directo."
                         disabled={loadingAgentPrompt}
                       />
                     </Form.Item>

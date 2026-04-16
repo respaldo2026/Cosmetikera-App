@@ -652,7 +652,7 @@ function buildAgentPrompt(
   contextualDirective: string = ""
 ): string {
   const persona = settings?.persona_name || "Dany";
-  const bio = settings?.persona_bio || "Asistente de la Academia Crystal.";
+  const bio = settings?.persona_bio || "Asistente de La Cosmetikera, enfocado en ventas, soporte y fidelizacion.";
   const style = settings?.speaking_style || "";
   const systemPromptTemplate = (settings?.system_prompt || "").trim();
   const fallback = settings?.fallback_response || "";

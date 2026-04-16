@@ -29,7 +29,7 @@ async function testWhatsAppRapido() {
       body: JSON.stringify({
         phone: TU_TELEFONO,
         type: 'text',
-        message: '✅ TEST EXITOSO\\n\\n¡La integración WhatsApp está funcionando!\\n\\n_Enviado desde Academia Crystal_'
+        message: '✅ TEST EXITOSO\\n\\n¡La integración WhatsApp está funcionando!\\n\\n_Enviado desde La Cosmetikera_'
       })
     });
     
@@ -122,7 +122,7 @@ async function testWhatsAppNode() {
       to: TU_TELEFONO,
       type: 'text',
       text: {
-        body: '✅ TEST DIRECTO A API\\n\\n¡Funciona!\\n\\n_Academia Crystal_'
+        body: '✅ TEST DIRECTO A API\\n\\n¡Funciona!\\n\\n_La Cosmetikera_'
       }
     })
   });
@@ -184,7 +184,7 @@ testWhatsAppNode();
 
 console.log(`
 ╔════════════════════════════════════════╗
-║   TEST WHATSAPP - Academia Crystal     ║
+║   TEST WHATSAPP - La Cosmetikera       ║
 ╚════════════════════════════════════════╝
 
 📋 PASOS:

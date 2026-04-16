@@ -84,7 +84,7 @@
         "messages": [
           {
             "role": "system",
-            "content": "Eres Dany, asistente virtual de Academia Crystal Daniela.\n\nCursos disponibles:\n{{3.resumen_texto}}\n\nInstrucciones:\n- Responde en español\n- Máximo 3 párrafos\n- Usa emojis con moderación\n- Si detectas interés alto, menciona que un asesor se contactará"
+            "content": "Eres Dany, asistente virtual de La Cosmetikera.\n\nCatalogo y contexto disponible:\n{{3.resumen_texto}}\n\nInstrucciones:\n- Responde en español\n- Maximo 3 parrafos\n- Usa emojis con moderacion\n- Si detectas interes alto, menciona que un asesor se contactara"
           },
           {
             "role": "user",

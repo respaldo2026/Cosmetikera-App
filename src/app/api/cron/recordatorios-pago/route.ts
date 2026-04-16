@@ -33,7 +33,7 @@ Te recordamos que tu cuota de ${fecha} está próxima a vencer.
 
 Puedes pagar en línea o en nuestra oficina. ¡Gracias!
 
-_Academia Crystal_`;
+_La Cosmetikera_`;
 
   try {
     const templateVariables = [

@@ -89,7 +89,7 @@ setTimeout(() => {
       → Y: whatsapp_business_management
 
    ❌ 3. El token ES PARA OTRA APLICACIÓN
-      → Verifica que el token sea de la app de Academia Crystal
+    → Verifica que el token sea de la app de La Cosmetikera
       → No de otra app o de Facebook Login
 
    ❌ 4. PHONE_NUMBER_ID ESTÁ MAL

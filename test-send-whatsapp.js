@@ -24,7 +24,7 @@ function sendTextMessage() {
         type: 'text',
         text: {
             preview_url: true,
-            body: '¡Hola! Este es un mensaje de prueba desde Academia Crystal. 🎓'
+            body: '¡Hola! Este es un mensaje de prueba desde La Cosmetikera. ✨'
         }
     });
 
