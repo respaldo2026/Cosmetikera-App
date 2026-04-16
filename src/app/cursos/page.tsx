@@ -253,7 +253,7 @@ export default function CursosList() {
                 <TeamOutlined style={{ fontSize: 20, color: "#1890ff" }} />
                 <div style={{ width: "100%" }}>
                   <Text strong>Capacidad</Text>
-                  <div>{`${inscritos}/${capacidad || 0} estudiantes`}</div>
+                  <div>{`${inscritos}/${capacidad || 0} clientes`}</div>
                   <Tooltip title={`Cupos libres: ${Math.max((capacidad || 0) - inscritos, 0)}`}>
                     <Progress
                       percent={ocupacion}
@@ -272,7 +272,7 @@ export default function CursosList() {
 
           <Row gutter={[16, 16]}>
             <Col xs={24} md={12}>
-              <Text type="secondary">Profesor asignado</Text>
+              <Text type="secondary">Colaborador asignado</Text>
               <div>{grupo.profesor?.nombre_completo || "Por definir"}</div>
             </Col>
             <Col xs={24} md={12}>
@@ -302,9 +302,9 @@ export default function CursosList() {
         >
           <div>
             <Title level={isMobile ? 3 : 2} style={{ marginBottom: 0 }}>
-              Grupos académicos
+              Aperturas y grupos
             </Title>
-            {!isMobile && <Text type="secondary">Revisa los grupos activos y los próximos lanzamientos en un solo lugar.</Text>}
+            {!isMobile && <Text type="secondary">Revisa las aperturas activas y los próximos lanzamientos en un solo lugar.</Text>}
           </div>
           <Space size={isMobile ? 8 : 12}>
             <Button 

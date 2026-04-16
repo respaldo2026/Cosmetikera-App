@@ -52,7 +52,7 @@ export default function ProgramasPage() {
           setProgramas(data);
         }
       } catch (error) {
-        message.error("Error al cargar programas");
+        message.error("Error al cargar categorías");
         console.error(error);
       } finally {
         setLoading(false);
@@ -75,14 +75,14 @@ export default function ProgramasPage() {
             .update(payload)
             .eq("id", editingPrograma.id);
           if (error) throw error;
-          message.success("Programa actualizado correctamente");
+          message.success("Categoría actualizada correctamente");
         } else {
           // Crear
           const { error } = await supabaseBrowserClient
             .from("programas")
             .insert([payload]);
           if (error) throw error;
-          message.success("Programa creado correctamente");
+          message.success("Categoría creada correctamente");
         }
         await handleCloseModal({ refresh: true });
       } catch (error: any) {
@@ -132,10 +132,10 @@ export default function ProgramasPage() {
 
         if (gruposActivos && gruposActivos.length > 0) {
           modal.warning({
-            title: "No se puede desactivar el programa",
+            title: "No se puede desactivar la categoría",
             content: (
               <div>
-                <p>Este programa tiene <strong>{gruposActivos.length} grupo(s) activo(s)</strong>:</p>
+                <p>Esta categoría tiene <strong>{gruposActivos.length} grupo(s) activo(s)</strong>:</p>
                 <ul style={{ maxHeight: 200, overflow: 'auto', marginTop: 10 }}>
                   {gruposActivos.map((g: any) => (
                     <li key={g.id}>{g.nombre}</li>
@@ -161,16 +161,16 @@ export default function ProgramasPage() {
 
       // Confirmación antes de cambiar estado
       modal.confirm({
-        title: nuevoEstado ? "Activar programa" : "Desactivar programa",
+        title: nuevoEstado ? "Activar categoría" : "Desactivar categoría",
         content: nuevoEstado ? (
-          <p>¿Deseas activar el programa <strong>{programa.nombre}</strong>?</p>
+          <p>¿Deseas activar la categoría <strong>{programa.nombre}</strong>?</p>
         ) : (
           <div>
-            <p>¿Deseas desactivar el programa <strong>{programa.nombre}</strong>?</p>
+            <p>¿Deseas desactivar la categoría <strong>{programa.nombre}</strong>?</p>
             <p style={{ marginTop: 10 }}>Al desactivar:</p>
             <ul style={{ marginTop: 5 }}>
-              <li>El programa desaparecerá de la lista principal</li>
-              <li>No podrás crear nuevos grupos de este programa</li>
+              <li>La categoría desaparecerá de la lista principal</li>
+              <li>No podrás crear nuevos grupos de esta categoría</li>
               <li>Los grupos existentes seguirán funcionando</li>
               <li>Todo el historial se mantiene intacto</li>
               <li>Podrás reactivarlo cuando quieras</li>
@@ -187,7 +187,7 @@ export default function ProgramasPage() {
             .eq("id", programa.id);
           
           if (error) throw error;
-          message.success(`Programa ${nuevoEstado ? "activado" : "desactivado"} correctamente`);
+          message.success(`Categoría ${nuevoEstado ? "activada" : "desactivada"} correctamente`);
           cargarProgramas();
         },
       });
@@ -199,16 +199,16 @@ export default function ProgramasPage() {
 
   const handleDeletePrograma = async (programa: any) => {
     if (programa.activo) {
-      message.warning("Solo se pueden eliminar programas inactivos.");
+      message.warning("Solo se pueden eliminar categorías inactivas.");
       return;
     }
 
     modal.confirm({
-      title: "Eliminar programa permanentemente",
+      title: "Eliminar categoría permanentemente",
       content: (
         <div>
           <p>
-            Esta acción eliminará el programa <strong>{programa.nombre}</strong> de forma permanente.
+            Esta acción eliminará la categoría <strong>{programa.nombre}</strong> de forma permanente.
           </p>
           <p style={{ marginTop: 10, color: "#ff4d4f" }}>
             Esta acción no se puede deshacer.
@@ -228,7 +228,7 @@ export default function ProgramasPage() {
         if (gruposError) throw gruposError;
 
         if (grupos && grupos.length > 0) {
-          message.error("No se puede eliminar: este programa tiene grupos asociados.");
+          message.error("No se puede eliminar: esta categoría tiene grupos asociados.");
           return;
         }
 
@@ -238,7 +238,7 @@ export default function ProgramasPage() {
           .eq("id", programa.id);
 
         if (error) throw error;
-        message.success("Programa eliminado correctamente");
+        message.success("Categoría eliminada correctamente");
         await cargarProgramas();
       },
     });
@@ -354,7 +354,7 @@ export default function ProgramasPage() {
                   items: [
                     {
                       key: "gestor",
-                      label: "Gestionar Pensum",
+                      label: "Gestionar contenido",
                       icon: <BookOutlined />,
                       onClick: () => handleAction("gestor", programa),
                     },
@@ -518,7 +518,7 @@ export default function ProgramasPage() {
       dataIndex: "nombre",
       key: "nombre",
       render: (text: string, record: any) => {
-        const nombre = text || "Programa";
+        const nombre = text || "Categoría";
         const inicial = nombre.trim().charAt(0).toUpperCase() || "?";
         const customEmoji = (record?.emoji || "").trim();
 
@@ -627,7 +627,7 @@ export default function ProgramasPage() {
         const menuItems = [
           {
             key: "gestor",
-            label: "Gestionar Pensum/Material",
+            label: "Gestionar contenido",
             icon: <BookOutlined />,
             onClick: () => handleAction("gestor", record),
           },
@@ -696,10 +696,10 @@ export default function ProgramasPage() {
                     📚
                   </div>
                   <div>
-                    <Title level={isMobile ? 4 : 2} style={{ margin: 0 }}>Programas Académicos</Title>
+                    <Title level={isMobile ? 4 : 2} style={{ margin: 0 }}>Categorías de servicios</Title>
                     {!isMobile && (
                       <Text type="secondary" style={{ fontSize: 13 }}>
-                        Gestiona tu catálogo de cursos y programas educativos
+                        Gestiona tu catálogo de servicios y categorías
                       </Text>
                     )}
                   </div>
@@ -748,7 +748,7 @@ export default function ProgramasPage() {
                     boxShadow: "0 2px 8px rgba(24, 144, 255, 0.3)",
                   }}
                 >
-                  {isMobile ? "Nuevo" : "Nuevo Programa"}
+                  {isMobile ? "Nuevo" : "Nueva categoría"}
                 </Button>
               </Space>
             </Col>

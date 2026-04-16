@@ -56,7 +56,7 @@ export default function NominaPage() {
 
     const columnasNomina = useMemo(
         () => [
-            { title: 'Profesor', dataIndex: 'nombre_completo' },
+            { title: 'Colaborador', dataIndex: 'nombre_completo' },
             {
                 title: 'Valor Hora',
                 dataIndex: 'valor_hora',
@@ -231,16 +231,16 @@ export default function NominaPage() {
 
     const pagarClaseIndividual = useCallback((clase: any) => {
         Modal.confirm({
-            title: '¿Pagar esta clase?',
+            title: '¿Pagar esta sesión?',
             content: (
                 <div>
-                    <p>Profesor: <b>{clase.perfiles?.nombre_completo}</b></p>
-                    <p>Curso: <b>{clase.cursos?.nombre || '—'}</b></p>
+                    <p>Colaborador: <b>{clase.perfiles?.nombre_completo}</b></p>
+                    <p>Servicio: <b>{clase.cursos?.nombre || '—'}</b></p>
                     <p>Fecha: <b>{formatDate(clase.fecha)}</b></p>
                     <p>Horas: <b>{clase.horas_dictadas}</b> | Total: <b>$ {Number(clase.total_estimado || 0).toLocaleString()}</b></p>
                 </div>
             ),
-            okText: 'Pagar clase',
+            okText: 'Pagar sesión',
             cancelText: 'Cancelar',
             onOk: async () => {
                 try {
@@ -257,7 +257,7 @@ export default function NominaPage() {
                             total_horas: clase.horas_dictadas,
                             fecha_inicio_periodo: clase.fecha,
                             fecha_fin_periodo: clase.fecha,
-                            observaciones: `Pago clase individual - ${clase.cursos?.nombre || 'Clase'} (${metodoNomina})`
+                            observaciones: `Pago sesión individual - ${clase.cursos?.nombre || 'Sesión'} (${metodoNomina})`
                         })
                         .select()
                         .single();
@@ -269,7 +269,7 @@ export default function NominaPage() {
                         .eq("id", clase.id)
                         .eq("estado_pago", "pendiente");
 
-                    message.success("Clase pagada y descontada del pendiente");
+                    message.success("Sesión pagada y descontada del pendiente");
 
                     if (clase.perfiles?.telefono) {
                         await enviarWhatsappConPlantilla(
@@ -304,7 +304,7 @@ export default function NominaPage() {
                 render: (val: string) => formatDate(val),
             },
             {
-                title: 'Profesor',
+                title: 'Colaborador',
                 dataIndex: 'profesor_id',
                 render: (_: any, record: any) => record.perfiles?.nombre_completo || 'Sin nombre',
             },
@@ -369,7 +369,7 @@ export default function NominaPage() {
 
   return (
     <div style={{ padding: isMobile ? 12 : isTablet ? 16 : 24 }}>
-        <Title level={isMobile ? 4 : 3}><CalculatorOutlined /> {isMobile ? "Liquidación" : "Liquidación de Profesores"}</Title>
+        <Title level={isMobile ? 4 : 3}><CalculatorOutlined /> {isMobile ? "Liquidación" : "Liquidación de equipo"}</Title>
         
         <Card style={{ marginBottom: 20 }}>
             <Row gutter={[16, 16]} align="middle">
@@ -412,12 +412,12 @@ export default function NominaPage() {
             }}
         />
 
-                <Card style={{ marginTop: 20 }} title="📋 Registro Diario Detallado de Clases Trabajadas">
+                <Card style={{ marginTop: 20 }} title="📋 Registro diario detallado de sesiones trabajadas">
                     <Space direction="vertical" style={{ width: '100%' }}>
                         {!isMobile && (
                           <Alert
-                              message="Este es el registro DIARIO DETALLADO de cada clase dictada"
-                              description="Cada fila representa una clase trabajada con fecha específica, profesor, curso, horas y tema. Este historial permanece incluso después de pagar."
+                              message="Este es el registro DIARIO DETALLADO de cada sesión trabajada"
+                              description="Cada fila representa una sesión trabajada con fecha específica, colaborador, servicio, horas y tema. Este historial permanece incluso después de pagar."
                               type="info"
                               showIcon
                               style={{ marginBottom: 16 }}
@@ -427,7 +427,7 @@ export default function NominaPage() {
                             dataSource={clasesPendientes}
                             rowKey="id"
                             loading={loading}
-                            locale={{ emptyText: "No hay clases pendientes en este rango" }}
+                            locale={{ emptyText: "No hay sesiones pendientes en este rango" }}
                             columns={isMobile ? columnasClases.filter((col: any) => 
                               ['Fecha', 'Profesor', 'Horas', 'A Pagar', 'Acción'].includes(col.title)
                             ) : columnasClases}
@@ -451,7 +451,7 @@ export default function NominaPage() {
         >
             {profesorSeleccionado && (
                 <div>
-                    <p>Vas a registrar el pago para: <b>{profesorSeleccionado.nombre_completo}</b></p>
+                    <p>Vas a registrar el pago para el colaborador: <b>{profesorSeleccionado.nombre_completo}</b></p>
                     <ul>
                         <li>Periodo: {formatDate(rangoFechas[0])} al {formatDate(rangoFechas[1])}</li>
                         <li>Horas: {profesorSeleccionado.total_horas}</li>
@@ -504,11 +504,11 @@ export default function NominaPage() {
                 <div id="printable-receipt" style={{ padding: 20, border: '1px dashed #ccc', background: '#fff' }}>
                     <div style={{ textAlign: 'center', marginBottom: 20 }}>
                         <Title level={4} style={{ margin: 0 }}>La Cosmetikera</Title>
-                        <Text type="secondary">Comprobante de Pago a Profesor</Text>
+                        <Text type="secondary">Comprobante de Pago a Colaborador</Text>
                     </div>
                     <div style={{ borderBottom: '1px solid #eee', marginBottom: 10 }}></div>
                     <p><strong>Fecha:</strong> {dayjs(pagoReciente.fecha_pago).format("DD/MM/YYYY HH:mm")}</p>
-                    <p><strong>Profesor:</strong> {pagoReciente.nombre_profesor}</p>
+                    <p><strong>Colaborador:</strong> {pagoReciente.nombre_profesor}</p>
                     <p><strong>ID Pago:</strong> {pagoReciente.id?.slice(0,8)}</p>
                     <div style={{ background: '#f5f5f5', padding: 10, borderRadius: 4, margin: '10px 0' }}>
                         <p style={{ margin: 0 }}><strong>Detalle:</strong></p>

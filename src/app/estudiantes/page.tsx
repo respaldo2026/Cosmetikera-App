@@ -359,7 +359,7 @@ export default function EstudiantesList() {
 
     return (
         <List
-            title={isMobile ? "Estudiantes" : "Gestión de Estudiantes"}
+            title={isMobile ? "Clientes" : "Gestión de clientes"}
             headerButtons={<CreateButton resource="perfiles" />}
         >
             <Tabs
@@ -396,7 +396,7 @@ export default function EstudiantesList() {
             {isMobile ? (
                 <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                     {filteredDataSource.length === 0 && (
-                        <Text type="secondary">Sin estudiantes para mostrar</Text>
+                        <Text type="secondary">Sin clientes para mostrar</Text>
                     )}
                     {filteredDataSource.map((record: any) => {
                         const mats = obtenerMatriculasVigentes(record);
@@ -510,7 +510,7 @@ export default function EstudiantesList() {
                 {/* 1. Estudiante (Foto + Nombre) */}
                 <Table.Column 
                     dataIndex="nombre_completo" 
-                    title="Estudiante"
+                    title="Cliente"
                     render={(value, record: any) => (
                         <Space>
                             <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#87d068' }} />
@@ -574,7 +574,7 @@ export default function EstudiantesList() {
                 {/* 3. Cursos Inscritos (¡NUEVO!) */}
                 {!isMobile && (
                     <Table.Column 
-                        title="Cursos Activos"
+                        title="Servicios activos"
                         render={(_, record: any) => {
                             const matriculas = obtenerMatriculasVigentes(record);
                             if (matriculas.length === 0) return <Tag>Ninguno</Tag>;

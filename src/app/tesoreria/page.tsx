@@ -130,7 +130,7 @@ export default function TesoreriaPage() {
             try {
                 const estudianteId = String(pago?.estudiante_id || pago?.matriculas?.estudiante_id || "");
                 const perfil = perfilesMap.get(estudianteId);
-                const cursoNombre = pago?.matriculas?.cursos?.nombre || "Curso";
+                const cursoNombre = pago?.matriculas?.cursos?.nombre || "Servicio";
                 const periodoLegible = pago?.periodo_pagado || `Cuota ${pago?.numero_cuota ?? ""}`.trim();
 
                 const ticketData = {
@@ -147,7 +147,7 @@ export default function TesoreriaPage() {
                         ticketCampos: configAcademia?.ticket_campos || undefined,
                     },
                     estudiante: {
-                        nombre: perfil?.nombre_completo || "Estudiante",
+                        nombre: perfil?.nombre_completo || "Cliente",
                         identificacion: perfil?.identificacion || undefined,
                         telefono: perfil?.telefono || undefined,
                     },
@@ -477,11 +477,11 @@ export default function TesoreriaPage() {
 
         const telefono = record.perfiles?.telefono;
         if (!telefono) {
-            message.warning("El estudiante no tiene teléfono/WhatsApp registrado");
+            message.warning("El cliente no tiene teléfono/WhatsApp registrado");
             return;
         }
 
-        const nombre = record.perfiles?.nombre_completo || "estudiante";
+        const nombre = record.perfiles?.nombre_completo || "cliente";
         const concepto = record.concepto || "pago";
         const monto = Number(record.monto || 0);
         const montoTexto = formatoCOP(monto);
@@ -523,7 +523,7 @@ export default function TesoreriaPage() {
                     .maybeSingle()
                 : { data: null as any };
 
-            const cursoNombre = (pago as any)?.matriculas?.cursos?.nombre || "Curso";
+            const cursoNombre = (pago as any)?.matriculas?.cursos?.nombre || "Servicio";
             const periodoLegible = pago?.periodo_pagado || `Cuota ${pago?.numero_cuota ?? ""}`.trim();
             const fechaPagoLegible = pago?.fecha_pago ? dayjs(pago.fecha_pago).format("DD/MM/YYYY") : dayjs().format("DD/MM/YYYY");
 
@@ -541,7 +541,7 @@ export default function TesoreriaPage() {
                     ticketCampos: configAcademia?.ticket_campos || undefined,
                 },
                 estudiante: {
-                    nombre: perfil?.nombre_completo || record?.perfiles?.nombre_completo || "Estudiante",
+                    nombre: perfil?.nombre_completo || record?.perfiles?.nombre_completo || "Cliente",
                     identificacion: perfil?.identificacion || undefined,
                     telefono: perfil?.telefono || record?.perfiles?.telefono || undefined,
                 },
@@ -701,7 +701,7 @@ export default function TesoreriaPage() {
                         bodyStyle={{ padding: isMobile ? 12 : 24 }}
                     >
                         <Statistic
-                            title="Ingresos de caja (matrículas + mensualidades)"
+                            title="Ingresos de caja (ventas + cobros)"
                             value={formatoCOP(totalIngresosCaja)}
                             valueStyle={{ color: "#3f8600", fontSize: isMobile ? 16 : 22 }}
                             prefix={<DollarCircleOutlined />}
@@ -715,7 +715,7 @@ export default function TesoreriaPage() {
                         bodyStyle={{ padding: isMobile ? 12 : 24 }}
                     >
                         <Statistic
-                            title="Salidas reales (profesores + gastos)"
+                            title="Salidas reales (equipo + gastos)"
                             value={formatoCOP(totalSalidasReales)}
                             valueStyle={{ color: "#cf1322", fontSize: isMobile ? 16 : 22 }}
                             prefix={<DollarCircleOutlined />}

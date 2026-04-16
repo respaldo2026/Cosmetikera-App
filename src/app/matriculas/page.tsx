@@ -196,7 +196,7 @@ export default function MatriculasList() {
                 const pagosPagados = pagosData?.filter((p: any) => p.estado === 'pagado').length || 0;
                 
                 modal.confirm({
-                    title: 'Esta matrícula tiene registros asociados',
+                    title: 'Este registro tiene datos asociados',
                     width: 600,
                     content: (
                         <div>
@@ -224,7 +224,7 @@ export default function MatriculasList() {
                     ),
                     okText: pagosCount > 0 ? 'Eliminar pagos y continuar' : 'Eliminar asistencias y continuar',
                     okType: 'danger',
-                    cancelText: 'Cancelar Matrícula',
+                    cancelText: 'Cancelar inscripción',
                     onOk: async () => {
                         try {
                             // Primero eliminar todos los pagos
@@ -265,7 +265,7 @@ export default function MatriculasList() {
                                 antMessage.error('Error eliminando matrícula: ' + errorMatricula.message);
                                 console.error('Error deleting matricula:', errorMatricula);
                             } else {
-                                antMessage.success('Matrícula y todos sus registros eliminados correctamente');
+                                antMessage.success('Registro y todos sus datos eliminados correctamente');
                                 router.refresh();
                             }
                         } catch (err: any) {
@@ -283,7 +283,7 @@ export default function MatriculasList() {
 
             // No hay datos relacionados, eliminar directamente
             modal.confirm({
-                title: 'Eliminar Matrícula',
+                title: 'Eliminar registro',
                 content: 'Esta acción no se puede deshacer. ¿Deseas continuar?',
                 okText: 'Eliminar',
                 okType: 'danger',
@@ -295,7 +295,7 @@ export default function MatriculasList() {
                             antMessage.error(error.message || 'No se pudo eliminar');
                             console.error('Delete error:', error);
                         } else {
-                            antMessage.success('Matrícula eliminada');
+                            antMessage.success('Registro eliminado');
                             router.refresh();
                         }
                     } catch (err: any) {
@@ -311,9 +311,9 @@ export default function MatriculasList() {
 
     const handleCancelar = async (record: any) => {
         modal.confirm({
-            title: 'Cancelar Matrícula',
-            content: 'Esto marcará la matrícula como "cancelado" y conservará el historial. ¿Confirmas?',
-            okText: 'Cancelar matrícula',
+            title: 'Cancelar inscripción',
+            content: 'Esto marcará el registro como "cancelado" y conservará el historial. ¿Confirmas?',
+            okText: 'Cancelar inscripción',
             cancelText: 'Volver',
             async onOk() {
                 try {
@@ -326,7 +326,7 @@ export default function MatriculasList() {
                         antMessage.error(error.message || 'No se pudo cancelar');
                         console.error('Cancel error:', error);
                     } else {
-                        antMessage.success('Matrícula cancelada');
+                        antMessage.success('Inscripción cancelada');
                         
                         // Notificar por WhatsApp si el estudiante lo permite
                         try {
@@ -345,7 +345,7 @@ export default function MatriculasList() {
                                     perfil.telefono,
                                     "matricula_cancelada",
                                     {
-                                        nombre_estudiante: perfil.nombre_completo ?? "Estudiante",
+                                        nombre_estudiante: perfil.nombre_completo ?? "Cliente",
                                         nombre_curso: curso?.nombre ?? "curso",
                                     },
                                 );
@@ -418,14 +418,14 @@ export default function MatriculasList() {
 
     return (
         <>
-        <List title="Gestión de Matrículas">
+        <List title="Registros de inscripción">
             <Tabs
                 activeKey={activeTab}
                 onChange={setActiveTab}
                 size={isMobile ? "small" : "middle"}
                 tabBarGutter={isMobile ? 8 : 16}
                 items={[
-                { key: 'nuevo', label: 'Nueva Matrícula' },
+                { key: 'nuevo', label: 'Nuevo registro' },
                 { key: 'activos', label: `Activos (${activosCount})` },
                 { key: 'graduados', label: `Graduados (${graduadosCount})` },
                 { key: 'desertores', label: `Desertores (${desertoresCount})` },
@@ -438,7 +438,7 @@ export default function MatriculasList() {
                         <Col xs={24} md={8}>
                             <Card title="Activos" variant="outlined">
                                 <Space direction="vertical">
-                                    <Text>Estudiantes actualmente cursando.</Text>
+                                    <Text>Clientes con servicios activos.</Text>
                                     <Tag color="processing">{activosCount} matrícula(s)</Tag>
                                     <Button onClick={() => setActiveTab('activos')}>Ver listado</Button>
                                 </Space>
@@ -465,7 +465,7 @@ export default function MatriculasList() {
                     </Row>
                     <Space direction={isMobile ? "vertical" : "horizontal"} style={{ width: "100%" }}>
                         <CreateButton type="primary" size={isMobile ? "middle" : "large"} icon={<FileTextOutlined />} block={isMobile}>
-                            Crear nueva matrícula
+                            Crear nuevo registro
                         </CreateButton>
                         <Select
                             options={programaFilterSelect.options}
