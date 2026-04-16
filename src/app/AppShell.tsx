@@ -81,7 +81,7 @@ const allResources = [
     edit: "/estudiantes/edit/:id",
     show: "/estudiantes/show/:id",
     meta: {
-      label: "Estudiantes",
+      label: "Clientes",
       icon: <UserOutlined />,
     },
   },
@@ -93,7 +93,7 @@ const allResources = [
     edit: "/profesores/edit/:id",
     show: "/profesores/show/:id",
     meta: {
-      label: "Profesores",
+      label: "Equipo",
       icon: <SolutionOutlined />,
     },
   },
@@ -102,7 +102,7 @@ const allResources = [
     name: "programas",
     list: "/programas",
     meta: {
-      label: "Programas",
+      label: "Categorías",
       icon: <BookOutlined />,
     },
   },
@@ -114,7 +114,7 @@ const allResources = [
     edit: "/cursos/edit/:id",
     show: "/cursos/show/:id",
     meta: {
-      label: "Grupos",
+      label: "Servicios",
       icon: <UsergroupAddOutlined />,
     },
   },
@@ -150,7 +150,7 @@ const allResources = [
     name: "catalogo",
     list: "/catalogo",
     meta: {
-      label: "Catálogo cursos",
+      label: "Catálogo comercial",
       icon: <BarsOutlined />,
     },
   },
@@ -162,7 +162,7 @@ const allResources = [
     edit: "/matriculas/edit/:id",
     show: "/matriculas/show/:id",
     meta: {
-      label: "Matrículas",
+      label: "Ventas y registros",
       icon: <FileTextOutlined />,
     },
   },
@@ -178,7 +178,7 @@ const allResources = [
   },
   {
     key: "caja",
-    name: "caja",
+            label: "Portal clientes",
     list: "/caja",
     meta: {
       label: "Caja / POS",

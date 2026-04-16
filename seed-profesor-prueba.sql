@@ -19,7 +19,7 @@ INSERT INTO perfiles (
 ) VALUES (
     'a1b2c3d4-e5f6-7890-abcd-ef1234567890', -- ID único (cámbialo si ya existe)
     'Ana María López García',
-    'ana.lopez@academiacrystal.com',
+    'ana.lopez@lacosmetikera.com',
     '+57 300 123 4567',
     '1234567890',
     'profesor',
@@ -169,7 +169,7 @@ WHERE c.nombre = 'Diseño de Uñas Avanzado - PRUEBA';
 -- 1. Ir a Supabase Dashboard > Authentication > Users
 -- 2. Click en "Add user" > "Create new user"
 -- 3. Usar estos datos:
---    Email: ana.lopez@academiacrystal.com
+--    Email: ana.lopez@lacosmetikera.com
 --    Password: Profesor123! (o la que prefieras)
 --    User UID: a1b2c3d4-e5f6-7890-abcd-ef1234567890 (el mismo ID del perfil)
 -- 4. Confirmar email automáticamente
@@ -188,7 +188,7 @@ WHERE c.nombre = 'Diseño de Uñas Avanzado - PRUEBA';
 --     role
 -- ) VALUES (
 --     'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
---     'ana.lopez@academiacrystal.com',
+--     'ana.lopez@lacosmetikera.com',
 --     crypt('Profesor123!', gen_salt('bf')),
 --     NOW(),
 --     NOW(),

@@ -6,19 +6,19 @@ export interface ModuleDefinition {
 }
 
 export const MODULES: ModuleDefinition[] = [
-  { key: "cursos", label: "Cursos" },
-  { key: "estudiantes", label: "Estudiantes" },
-  { key: "matriculas", label: "Matrículas" },
+  { key: "cursos", label: "Servicios" },
+  { key: "estudiantes", label: "Clientes" },
+  { key: "matriculas", label: "Ventas y registros" },
   { key: "asistencias", label: "Asistencias" },
-  { key: "profesores", label: "Profesores" },
+  { key: "profesores", label: "Equipo" },
   { key: "tesoreria", label: "Tesorería/Pagos" },
   { key: "caja", label: "Caja / POS" },
   { key: "nomina", label: "Nómina" },
   { key: "perfiles", label: "Perfiles" },
   { key: "leads", label: "Leads" },
-  { key: "catalogo", label: "Catálogo cursos" },
+  { key: "catalogo", label: "Catálogo comercial" },
   { key: "inventario", label: "Inventario" },
   { key: "planificador", label: "Planificador" },
-  { key: "portal-estudiante", label: "Portal Estudiante" },
+  { key: "portal-estudiante", label: "Portal clientes" },
   { key: "configuracion", label: "Configuración" },
 ];

@@ -1,5 +1,5 @@
 -- ================================================
--- SCHEMA COMPLETO - ACADEMIA CRYSTAL DIAMANTE
+-- SCHEMA COMPLETO - LA COSMETIKERA
 -- ================================================
 -- Ejecuta este script COMPLETO en Supabase SQL Editor
 -- antes de ejecutar seed-data.sql

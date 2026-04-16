@@ -59,7 +59,7 @@ Tu inscripción al curso *{{nombre_curso}}* ha sido confirmada exitosamente.
 
 ¡Nos vemos pronto en clase! 📚
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'nombre_curso', 'fecha_inicio', 'horario', 'mensualidad', 'instructor', 'fecha_pago'],
 'inscripciones',
 true)
@@ -85,7 +85,7 @@ Te recordamos que tu cuota de *{{mes}}* está próxima a vencer.
 
 Puedes pagar en línea o en nuestra oficina. ¡Gracias!
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'mes', 'monto', 'fecha_vencimiento', 'nombre_curso'],
 'pagos',
 true)
@@ -116,7 +116,7 @@ Hola {{nombre}}, confirmamos que recibimos tu pago.
 
 ¡Gracias por tu puntualidad! 🙌
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'referencia_pago', 'monto', 'fecha_pago', 'concepto', 'nombre_curso', 'fecha_vigencia', 'fecha_proxima_clase'],
 'pagos',
 true)
@@ -161,7 +161,7 @@ Te enviamos la información del curso *{{nombre_curso}}*:
 
 ¿Tienes preguntas? ¡Estamos para ayudarte!
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'nombre_curso', 'descripcion_curso', 'duracion', 'horario', 'modalidad', 'requisitos', 'costo_inscripcion', 'costo_mensualidad', 'duracion_meses', 'cupos_disponibles', 'que_incluye', 'fecha_proxima_cohorte', 'fecha_cierre_inscripcion', 'link_inscripcion'],
 'informacion',
 true)
@@ -195,7 +195,7 @@ Gracias por tu interés en *{{curso_interes}}* en {{ciudad}}.
 
 💬 ¿Tienes dudas? Escríbenos al {{telefono_soporte}}
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'curso_interes', 'ciudad', 'beneficio_principal', 'beneficio_1', 'beneficio_2', 'beneficio_3', 'fecha_inicio', 'cupos', 'link_catalogo', 'telefono_soporte'],
 'leads',
 true)
@@ -219,7 +219,7 @@ Nos encantaría resolver tus dudas. Las inscripciones cierran el {{fecha_cierre}
 
 ¿Te gustaría agendar una llamada? 📞
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'curso_interes', 'fecha_cierre'],
 'leads',
 true)
@@ -255,7 +255,7 @@ Tu certificado del curso *{{nombre_curso}}* ya está disponible.
 
 ¡Estamos muy orgullosos de ti! 🌟
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'nombre_curso', 'link_certificado_digital', 'fecha_disponible', 'horario_atencion', 'direccion_oficina', 'fecha_ceremonia', 'hora_ceremonia', 'lugar_ceremonia', 'costo_copias'],
 'certificados',
 true)
@@ -295,7 +295,7 @@ Salón: {{numero_salon}}
 
 ¡Nos vemos pronto! 🚀
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'nombre_curso', 'fecha_proxima_clase_1', 'fecha_proxima_clase_2', 'fecha_proxima_clase_3', 'horario', 'direccion_clases', 'numero_salon', 'nombre_instructor'],
 'estudiantes',
 true)
@@ -321,7 +321,7 @@ Hola {{nombre}}, tu clase de *{{nombre_curso}}* comienza pronto.
 
 ¡Te esperamos! 📚
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'nombre_curso', 'hora_clase', 'ubicacion', 'nombre_instructor'],
 'clases',
 true)
@@ -356,7 +356,7 @@ Las inscripciones para *{{nombre_curso}}* cierran en *{{dias_restantes}} días*.
 
 ¡No te quedes fuera! ⚡
 
-_Academia Crystal Diamante_',
+_La Cosmetikera_',
 ARRAY['nombre', 'nombre_curso', 'dias_restantes', 'fecha_cierre', 'fecha_inicio', 'cupos_restantes', 'costo_total', 'fecha_descuento', 'link_inscripcion', 'telefono_soporte'],
 'inscripciones',
 true)
@@ -608,3 +608,4 @@ FROM plantillas_whatsapp;
 -- SIGUIENTE PASO: Ir a tu app y probar el módulo
 -- Ver archivo: test-whatsapp-basico.js
 -- ============================================
+

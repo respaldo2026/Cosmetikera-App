@@ -1,6 +1,6 @@
 -- ---------------------------------------------------------------------------
--- 💎 MIGRACIÓN MAESTRA ACADEMIA CRYSTAL - 2026
--- Consolida: Pagos, Programas, Pensum, Materiales, Portal Estudiante y Nómina
+-- MIGRACIÓN MAESTRA LA COSMETIKERA - 2026
+-- Consolida: Pagos, Programas, Pensum, Materiales, Portal Cliente y Nómina
 -- ---------------------------------------------------------------------------
 
 -- 1. ESTRUCTURA ACADÉMICA (PROGRAMAS Y CURSOS)

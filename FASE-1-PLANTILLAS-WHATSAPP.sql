@@ -20,7 +20,7 @@ VALUES
 (
   'inscripcion_confirmada',
   'Se envía cuando un estudiante se inscribe en un curso',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *INSCRIPCIÓN CONFIRMADA*
 ====================
 
@@ -50,7 +50,7 @@ Debes hacer tu primer pago de ${{mensualidad}} antes del {{fecha_pago}}
 » *RESPONDE ESTE MENSAJE* si tienes dudas
 
 Saludos,
-📱 Academia Crystal Diamante',
+📱 La Cosmetikera',
   ARRAY['nombre','nombre_curso','fecha_inicio','horario','mensualidad','instructor','fecha_pago'],
   'transaccional',
   true
@@ -63,7 +63,7 @@ VALUES
 (
   'recordatorio_pago',
   'Recordatorio de cuota próxima a vencer o vencida',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *RECORDATORIO DE PAGO*
 ====================
 
@@ -89,7 +89,7 @@ De lo contrario, realiza el pago lo antes posible para no perder tu cupo.
 » O contáctanos al +57 300 123 4567
 
 Saludos,
-📱 Academia Crystal Diamante',
+📱 La Cosmetikera',
   ARRAY['nombre','mes','monto','fecha_vencimiento','nombre_curso'],
   'marketing',
   true
@@ -102,7 +102,7 @@ VALUES
 (
   'pago_recibido',
   'Confirmación cuando se recibe un pago',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *PAGO CONFIRMADO*
 ====================
 
@@ -130,7 +130,7 @@ Hola {{nombre}},
 » O contáctanos en WhatsApp
 
 ¡Gracias por tu confianza!
-📱 Academia Crystal Diamante',
+📱 La Cosmetikera',
   ARRAY['nombre','referencia_pago','monto','fecha_pago','concepto','nombre_curso','fecha_vigencia','fecha_proxima_clase'],
   'transaccional',
   true
@@ -143,7 +143,7 @@ VALUES
 (
   'informacion_curso',
   'Envía información detallada de un curso al solicitante',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *INFORMACIÓN DEL CURSO*
 ====================
 
@@ -179,7 +179,7 @@ Te compartimos la información del curso que te interesa:
 » O RESPONDE ESTE MENSAJE para más información
 
 Saludos,
-📱 Academia Crystal Diamante',
+📱 La Cosmetikera',
   ARRAY['nombre','nombre_curso','descripcion_curso','duracion','horario','modalidad','requisitos','costo_inscripcion','costo_mensualidad','duracion_meses','cupos_disponibles','que_incluye','fecha_proxima_cohorte','fecha_cierre_inscripcion','link_inscripcion'],
   'marketing',
   true
@@ -192,7 +192,7 @@ VALUES
 (
   'formulario_interes',
   'Lead interesado desde redes sociales (enviado por Make)',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *¡TENEMOS UNA OPORTUNIDAD PERFECTA PARA TI!*
 ====================
 
@@ -218,7 +218,7 @@ Te cuento que somos la mejor opción en {{ciudad}} para {{beneficio_principal}}
 
 ¿Preguntas? Estamos para ayudarte 😊
 
-Academia Crystal Diamante
+La Cosmetikera
 📱 {{telefono_soporte}}',
   ARRAY['nombre','curso_interes','ciudad','beneficio_principal','beneficio_1','beneficio_2','beneficio_3','fecha_inicio','cupos','link_catalogo','telefono_soporte'],
   'marketing',
@@ -232,7 +232,7 @@ VALUES
 (
   'seguimiento_leads',
   'Seguimiento automático para leads que no respondieron (Make)',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *ESPERA, TENEMOS UN DESCUENTO PARA TI*
 ====================
 
@@ -262,7 +262,7 @@ De ${{costo_original}} a solo ${{costo_con_descuento}}
 » O llama al {{telefono_soporte}}
 
 No dejes pasar esta oportunidad,
-Academia Crystal Diamante 💎',
+La Cosmetikera 💎',
   ARRAY['nombre','curso_interes','descuento','costo_original','costo_con_descuento','fecha_expiracion','contenido_curso','link_inscripcion','telefono_soporte'],
   'marketing',
   true
@@ -275,7 +275,7 @@ VALUES
 (
   'certificado_disponible',
   'Notificación cuando el certificado está listo',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *¡TU CERTIFICADO ESTÁ LISTO!* 🎉
 ====================
 
@@ -308,7 +308,7 @@ Tu certificado está listo y disponible de dos formas:
 » Costo por copia: ${{costo_copias}}
 
 ¡Esperamos verte en la ceremonia!
-Academia Crystal Diamante 💎',
+La Cosmetikera 💎',
   ARRAY['nombre','nombre_curso','link_certificado_digital','fecha_disponible','horario_atencion','direccion_oficina','fecha_ceremonia','hora_ceremonia','lugar_ceremonia','costo_copias'],
   'transaccional',
   true
@@ -321,7 +321,7 @@ VALUES
 (
   'bienvenida_nuevo_estudiante',
   'Primer mensaje de bienvenida después de inscripción confirmada',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *¡BIENVENIDO!*
 ====================
 
@@ -354,7 +354,7 @@ Salón: {{numero_salon}}
 » Necesitas cambiar el horario
 
 ¡Nos vemos en la primera clase!
-Academia Crystal Diamante 💎',
+La Cosmetikera 💎',
   ARRAY['nombre','nombre_curso','fecha_proxima_clase_1','fecha_proxima_clase_2','fecha_proxima_clase_3','horario','direccion_clases','numero_salon','nombre_instructor'],
   'transaccional',
   true
@@ -395,7 +395,7 @@ VALUES
 (
   'cierre_inscripcion',
   'Alerta de cierre próximo de inscripciones',
-  '★ *ACADEMIA CRYSTAL* ★
+  '★ *LA COSMETIKERA* ★
 • *⚠️ CIERRE DE INSCRIPCIONES PRÓXIMO*
 ====================
 
@@ -425,7 +425,7 @@ Hola {{nombre}},
 » O llama: {{telefono_soporte}}
 
 No pierdas esta oportunidad,
-Academia Crystal Diamante 💎',
+La Cosmetikera 💎',
   ARRAY['nombre','nombre_curso','dias_restantes','fecha_cierre','fecha_inicio','cupos_restantes','costo_total','fecha_descuento','link_inscripcion','telefono_soporte'],
   'marketing',
   true
@@ -436,3 +436,4 @@ SELECT nombre, tipo, activa, created_at
 FROM public.plantillas_whatsapp 
 ORDER BY created_at DESC 
 LIMIT 10;
+

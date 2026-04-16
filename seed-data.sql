@@ -1,5 +1,5 @@
 -- ================================================
--- DATOS DE PRUEBA - ACADEMIA CRYSTAL DIAMANTE
+-- DATOS DE PRUEBA - LA COSMETIKERA
 -- ================================================
 -- Ejecuta este script en Supabase SQL Editor
 -- ================================================
@@ -32,7 +32,7 @@ ON CONFLICT (perfil_id) DO NOTHING;
 -- 2. CONFIGURACIÓN
 INSERT INTO configuracion (id, nombre_academia, nit, direccion, telefono, email, ciudad, moneda, mensaje_factura, sitio_web, instagram)
 VALUES
-('99999999-9999-9999-9999-999999999999', 'Academia Crystal Diamante', '900123456-7', 'Calle Principal #45-67', '6011234567', 'info@crystaldiamond.edu.co', 'Bogotá', 'COP', 'Gracias por confiar en nosotros', 'https://crystaldiamond.edu.co', '@crystaldiamond')
+('99999999-9999-9999-9999-999999999999', 'La Cosmetikera', '900123456-7', 'Calle Principal #45-67', '6011234567', 'hola@lacosmetikera.com', 'Bogotá', 'COP', 'Gracias por confiar en La Cosmetikera', 'https://lacosmetikera.com', '@lacosmetikera')
 ON CONFLICT (id) DO UPDATE SET
 nombre_academia = EXCLUDED.nombre_academia,
 nit = EXCLUDED.nit;

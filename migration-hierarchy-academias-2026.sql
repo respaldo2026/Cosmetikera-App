@@ -169,12 +169,12 @@ DECLARE
     v_nivel_jerarquico TEXT;
     v_permisos JSONB;
 BEGIN
-    -- Obtener ID de la academia por defecto (Crystal Diamante)
-    SELECT id INTO v_academia_id FROM academias WHERE nombre = 'Academia Crystal Diamante' LIMIT 1;
+    -- Obtener ID de la empresa por defecto (La Cosmetikera)
+    SELECT id INTO v_academia_id FROM academias WHERE nombre = 'La Cosmetikera' LIMIT 1;
     
     -- Si no existe, usar NULL (se puede configurar luego)
     IF v_academia_id IS NULL THEN
-        RAISE WARNING 'No se encontró Academia Crystal Diamante, asignando NULL';
+        RAISE WARNING 'No se encontró La Cosmetikera, asignando NULL';
     END IF;
     
     -- Extraer datos de raw_user_meta_data
@@ -191,7 +191,7 @@ BEGIN
     -- Obtener permisos por defecto para el nivel
     v_permisos := obtener_permisos_por_nivel(v_nivel_jerarquico);
     
-    -- Crear perfil (asignar automáticamente a Crystal Diamante)
+    -- Crear perfil (asignar automáticamente a La Cosmetikera)
     INSERT INTO public.perfiles (
         id,
         nombre_completo,
@@ -222,31 +222,31 @@ CREATE TRIGGER trigger_handle_new_user
     FOR EACH ROW
     EXECUTE FUNCTION handle_new_user();
 
--- PASO 8: CREAR ACADEMIA POR DEFECTO (Academia Crystal Diamante)
+-- PASO 8: CREAR EMPRESA POR DEFECTO (La Cosmetikera)
 -- ========================================================
--- Esta academia será la única por ahora
--- Más adelante podremos soportar multi-academia
+-- Esta empresa será la única por ahora
+-- Más adelante podremos soportar multi-sucursal
 
 DO $$
 DECLARE
     v_academy_id UUID;
 BEGIN
-    -- Verificar si ya existe la academia
-    SELECT id INTO v_academy_id FROM academias WHERE nombre = 'Academia Crystal Diamante' LIMIT 1;
+    -- Verificar si ya existe la empresa
+    SELECT id INTO v_academy_id FROM academias WHERE nombre = 'La Cosmetikera' LIMIT 1;
     
     IF v_academy_id IS NULL THEN
         INSERT INTO academias (nombre, nit, ciudad, email, pais, moneda)
         VALUES (
-            'Academia Crystal Diamante',
+            'La Cosmetikera',
             '123456789',
             'Medellín',
-            'info@academiacrystal.com',
+            'hola@lacosmetikera.com',
             'Colombia',
             'COP'
         );
-        RAISE NOTICE 'Academia Crystal Diamante creada exitosamente';
+        RAISE NOTICE 'La Cosmetikera creada exitosamente';
     ELSE
-        RAISE NOTICE 'Academia Crystal Diamante ya existe con ID: %', v_academy_id;
+        RAISE NOTICE 'La Cosmetikera ya existe con ID: %', v_academy_id;
     END IF;
 END $$;
 

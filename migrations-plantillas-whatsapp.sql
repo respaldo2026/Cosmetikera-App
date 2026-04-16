@@ -68,7 +68,7 @@ VALUES
     (
         'bienvenida',
         'Mensaje de bienvenida a nuevo estudiante',
-        '¡Bienvenido/a a Academia Crystal Diamante, {{nombre}}! Estamos felices de tenerte con nosotros en el curso "{{curso}}". Cualquier duda estamos para ayudarte.',
+        '¡Bienvenido/a a La Cosmetikera, {{nombre}}! Gracias por confiar en nosotros. Tu servicio o programa "{{curso}}" quedó registrado y estamos listos para ayudarte.',
         ARRAY['nombre', 'curso'],
         true
     ),

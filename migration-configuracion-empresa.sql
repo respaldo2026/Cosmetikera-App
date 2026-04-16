@@ -57,14 +57,14 @@ INSERT INTO configuracion_empresa (
     pais,
     descripcion
 ) VALUES (
-    'Academia Crystal',
+    'La Cosmetikera',
     '',
     '',
-    'contacto@academiacrystal.com',
+    'hola@lacosmetikera.com',
     '',
     'Bogotá',
     'Colombia',
-    'Academia de excelencia educativa'
+    'Tienda de belleza con gestión administrativa, punto de venta y fidelización'
 )
 ON CONFLICT (id) DO NOTHING;
 

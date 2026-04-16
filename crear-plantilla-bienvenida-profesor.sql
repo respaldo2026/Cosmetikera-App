@@ -5,7 +5,7 @@ INSERT INTO public.plantillas_whatsapp (nombre, descripcion, plantilla, tipo, ac
 SELECT
   'bienvenida_portal_profesor',
   'Bienvenida al profesor con acceso a la app y usuario de ingreso',
-  'Hola {{nombre}}, tu cuenta de profesor en Academia Crystal Diamante fue activada.\n\nIngresa a la plataforma: {{enlace_portal}}\nUsuario registrado: {{usuario}}\n\nEste mensaje corresponde a la activación de tu acceso.',
+  'Hola {{nombre}}, tu cuenta de equipo en La Cosmetikera fue activada.\n\nIngresa a la plataforma: {{enlace_portal}}\nUsuario registrado: {{usuario}}\n\nEste mensaje corresponde a la activación de tu acceso.',
   'personalizado',
   true
 WHERE NOT EXISTS (
@@ -18,7 +18,7 @@ WHERE NOT EXISTS (
 -- UPDATE public.plantillas_whatsapp
 -- SET
 --   descripcion = 'Bienvenida al profesor con acceso a la app y usuario de ingreso',
---   plantilla = 'Hola {{nombre}}, tu cuenta de profesor en Academia Crystal Diamante fue activada.\n\nIngresa a la plataforma: {{enlace_portal}}\nUsuario registrado: {{usuario}}\n\nEste mensaje corresponde a la activación de tu acceso.',
+--   plantilla = 'Hola {{nombre}}, tu cuenta de equipo en La Cosmetikera fue activada.\n\nIngresa a la plataforma: {{enlace_portal}}\nUsuario registrado: {{usuario}}\n\nEste mensaje corresponde a la activación de tu acceso.',
 --   activa = true,
 --   updated_at = now()
 -- WHERE nombre = 'bienvenida_portal_profesor';

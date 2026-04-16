@@ -19,13 +19,13 @@ export default function PermisosRolPage() {
 
   // Memoizar la lista de módulos
   const modulos = useMemo(() => [
-    { key: "estudiantes", label: "Estudiantes" },
-    { key: "profesores", label: "Profesores" },
-    { key: "cursos", label: "Cursos/Grupos" },
-    { key: "catalogo", label: "Catálogo cursos" },
+    { key: "estudiantes", label: "Clientes" },
+    { key: "profesores", label: "Equipo" },
+    { key: "cursos", label: "Servicios/Categorías" },
+    { key: "catalogo", label: "Catálogo comercial" },
     { key: "leads", label: "Leads" },
     { key: "planificador", label: "Planificador" },
-    { key: "matriculas", label: "Matrículas" },
+    { key: "matriculas", label: "Ventas y registros" },
     { key: "nomina", label: "Nómina" },
     { key: "tesoreria", label: "Tesorería" },
     { key: "caja", label: "Caja / POS" },
