@@ -446,4 +446,5 @@ ORDER BY total_pendiente DESC;
 
 ---
 
-**Desarrollado para Academia Crystal Diamante** 💎✨
+**Desarrollado para La Cosmetikera** 💎✨
+

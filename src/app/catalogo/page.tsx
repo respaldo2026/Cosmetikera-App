@@ -213,10 +213,10 @@ export default function CatalogoCursosPage() {
         <Space direction="vertical" size={12} style={{ position: "relative", zIndex: 1 }}>
           <Tag color="#c084fc" style={{ width: "fit-content" }}>Catálogo premium</Tag>
           <Title level={2} style={{ color: "#f8fafc", margin: 0 }}>
-            Programas listos para compartir por WhatsApp
+            Servicios listos para compartir por WhatsApp
           </Title>
           <Paragraph style={{ color: "#cbd5e1", maxWidth: 720, marginBottom: 0 }}>
-            Envía la ficha del programa a un interesado en un clic. Cada envío queda guardado como lead para que el equipo de ventas haga seguimiento.
+            Envía la ficha del servicio o categoría a un interesado en un clic. Cada envío queda guardado como lead para que el equipo comercial haga seguimiento.
           </Paragraph>
         </Space>
       </Card>
@@ -275,18 +275,18 @@ export default function CatalogoCursosPage() {
                     </Space>
 
                     <Paragraph style={{ color: "#cbd5e1", margin: 0 }} ellipsis={{ rows: 2 }}>
-                      {programa.descripcion || "Programa diseñado para potenciar tu carrera."}
+                      {programa.descripcion || "Servicio diseñado para impulsar tu experiencia y resultados."}
                     </Paragraph>
 
                     <Space size={8} wrap>
-                      <Tag icon={<ClockCircleOutlined />} color="geekblue">{programa.total_clases ? `${programa.total_clases} clases` : "Ritmo flexible"}</Tag>
+                      <Tag icon={<ClockCircleOutlined />} color="geekblue">{programa.total_clases ? `${programa.total_clases} sesiones` : "Agenda flexible"}</Tag>
                       <Tag icon={<DollarOutlined />} color="green">Mensualidad {mensualidad}</Tag>
-                      <Tag icon={<BookOutlined />} color="purple">Inscripción {inscripcion}</Tag>
+                      <Tag icon={<BookOutlined />} color="purple">Registro {inscripcion}</Tag>
                     </Space>
 
                     {proximos.length > 0 ? (
                       <Space direction="vertical" size={4} style={{ width: "100%" }}>
-                        <Text style={{ color: "#cbd5e1" }}>Próximos grupos</Text>
+                        <Text style={{ color: "#cbd5e1" }}>Próximas aperturas</Text>
                         <Space direction="vertical" size={6} style={{ width: "100%" }}>
                           {proximos.slice(0, 2).map((g) => (
                             <Card
@@ -296,7 +296,7 @@ export default function CatalogoCursosPage() {
                               style={{ background: "#111827", border: "1px solid #1f2937" }}
                             >
                               <Space style={{ width: "100%", justifyContent: "space-between", alignItems: "center" }}>
-                                <Text style={{ color: "#e2e8f0" }}>{g.nombre || "Grupo"}</Text>
+                                <Text style={{ color: "#e2e8f0" }}>{g.nombre || "Servicio"}</Text>
                                 <Space size={8}>
                                   <Tag color="purple" style={{ margin: 0 }}>{(g.estado || "").toUpperCase()}</Tag>
                                   <Text style={{ color: "#94a3b8" }}>{g.fecha_inicio ? dayjs(g.fecha_inicio).format("DD MMM") : "Próximamente"}</Text>
@@ -315,7 +315,7 @@ export default function CatalogoCursosPage() {
                     <Space style={{ width: "100%", justifyContent: "space-between", marginTop: "auto" }}>
                       <Space size={8}>
                         <Tag color="#22c55e">Incluye seguimiento</Tag>
-                        <Tag color="#a855f7">Certificado</Tag>
+                        <Tag color="#a855f7">Beneficios</Tag>
                       </Space>
                       <Button
                         type="primary"
@@ -334,7 +334,7 @@ export default function CatalogoCursosPage() {
       </Space>
 
       <Modal
-        title={`Compartir ${selectedPrograma?.nombre ?? "programa"}`}
+        title={`Compartir ${selectedPrograma?.nombre ?? "servicio"}`}
         open={shareOpen}
         onCancel={() => setShareOpen(false)}
         onOk={() => form.submit()}

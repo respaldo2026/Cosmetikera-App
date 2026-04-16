@@ -76,7 +76,7 @@
 
 ## 🎯 RECOMENDACIÓN FINAL
 
-Para **Academia Crystal**, sugiero:
+Para **La Cosmetikera**, sugiero:
 
 ### **Corto Plazo (Esta semana):**
 ✅ **Mantener wa.me activo**
@@ -131,4 +131,5 @@ Para **Academia Crystal**, sugiero:
 ---
 
 **¿Cuál prefieres?**
+
 

@@ -44,7 +44,7 @@ Gracias por tu interés en {{curso_interes}} en {{ciudad}}.
 📚 Ver catálogo: {{link_catalogo}}
 💬 Dudas: {{telefono_soporte}}
 
-_Academia Crystal_
+_La Cosmetikera_
 ```
 
 **Cambios**:
@@ -253,4 +253,5 @@ ORDER BY total DESC;
 
 Todo compilado, sin errores, con manejo de fallos robusto.
 Cuando llegue el número real aprobado, cambiar solo 2 variables en `.env.local` y todo sigue funcionando.
+
 

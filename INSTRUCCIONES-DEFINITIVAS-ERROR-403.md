@@ -13,7 +13,7 @@ El script SQL **NO** se ejecuta en tu computadora. Debe ejecutarse en **Supabase
 1. Abre tu navegador
 2. Ve a: **https://supabase.com/dashboard/sign-in**
 3. Inicia sesión con tu cuenta
-4. Selecciona el proyecto: **academia-crystal** (xqcsftjkvcrbcetrdulq)
+4. Selecciona el proyecto: **Cosmetikera App** (xqcsftjkvcrbcetrdulq)
 
 ### ✅ PASO 2: Abrir SQL Editor
 
@@ -53,9 +53,9 @@ WHERE tablename = 'cursos';
 
 ### ✅ PASO 4: Recargar la Aplicación
 
-1. **Cierra TODAS las pestañas** de tu aplicación (app.crystaldiamante.com)
+1. **Cierra TODAS las pestañas** de tu aplicación (app.lacosmetikera.com)
 2. **Abre una NUEVA PESTAÑA**
-3. Ve a: https://app.crystaldiamante.com
+3. Ve a: https://app.lacosmetikera.com
 4. **Inicia sesión** de nuevo
 5. Ve a **Cursos** → **Crear nuevo grupo**
 6. **Intenta crear el grupo**
@@ -126,3 +126,4 @@ Comparte:
 3. Tu email registrado en Supabase
 
 Así puedo verificar los permisos de tu usuario específico.
+

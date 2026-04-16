@@ -1,4 +1,4 @@
-# 🔴 AUDITORÍA EXHAUSTIVA Y PROFUNDA - ACADEMIA CRYSTAL
+# 🔴 AUDITORÍA EXHAUSTIVA Y PROFUNDA - LA COSMETIKERA
 **Fecha:** 11 de Enero 2026  
 **Nivel de Severidad:** CRÍTICO (4 Issues), ALTO (8 Issues), MEDIO (12 Issues)  
 **Puntaje Revisado:** 6.5/10 ⚠️ (Bajado de 9.7/10 por problemas encontrados)
@@ -729,4 +729,5 @@ PERFORMANCE:
 - [src/app/page.tsx](src/app/page.tsx#L93-L129) - Subscriptions
 - [src/app/mi-oficina/page.tsx](src/app/mi-oficina/page.tsx#L108) - window.location.href
 - [src/providers/auth-provider/auth-provider.client.ts](src/providers/auth-provider/auth-provider.client.ts) - Auth provider
+
 

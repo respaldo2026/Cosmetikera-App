@@ -1,4 +1,4 @@
-# 🚀 PRÓXIMOS PASOS - WhatsApp Academia Crystal
+# 🚀 PRÓXIMOS PASOS - WhatsApp La Cosmetikera
 
 **Creado:** 2 de febrero de 2026  
 **Estado actual:** ✅ Módulo creado, proyecto compila  
@@ -61,7 +61,7 @@
 
 1. **Asegúrate que el servidor está corriendo**
    ```powershell
-   cd "c:\Users\PORTATIL 2\Academia Crystal Diamante - OFICINA\academia-crystal"
+   cd "c:\Users\PORTATIL 2\La Cosmetikera - OFICINA\Cosmetikera App"
    npm run dev
    ```
 
@@ -83,7 +83,7 @@
        body: JSON.stringify({
          phone: '+573001234567', // ⚠️ REEMPLAZA CON TU NÚMERO
          type: 'text',
-         message: '✅ TEST EXITOSO\\n\\n¡Funciona!\\n\\n_Academia Crystal_'
+         message: '✅ TEST EXITOSO\\n\\n¡Funciona!\\n\\n_La Cosmetikera_'
        })
      });
      const data = await response.json();
@@ -224,3 +224,4 @@ Abre: [SQL-WHATSAPP-COMPLETO-EJECUTAR-AHORA.sql](./SQL-WHATSAPP-COMPLETO-EJECUTA
 ---
 
 *Última actualización: 2 de febrero de 2026, 15:50*
+

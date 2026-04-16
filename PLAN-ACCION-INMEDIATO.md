@@ -1,4 +1,4 @@
-# 🎬 PLAN DE ACCIÓN INMEDIATO - ACADEMIA CRYSTAL
+# 🎬 PLAN DE ACCIÓN INMEDIATO - LA COSMETIKERA
 
 **Fecha:** 10 Enero 2026  
 **Objetivo:** Pasar de 95% a 100% listo para producción en 3 días
@@ -359,7 +359,7 @@ Esto garantiza poder recuperar en caso de problema
 #### TAREA 6: Deploy a Staging (1 hora) 🚀
 
 ```bash
-# En terminal (en carpeta academia-crystal)
+# En terminal (en carpeta Cosmetikera App)
 
 # 1. Commit de cambios
 git add .
@@ -547,7 +547,7 @@ STATUS: ✅ APROBADO PARA PRODUCCIÓN
 
 ## 🎊 CONCLUSIÓN
 
-Con este plan, tu Academia Crystal pasará de ser una aplicación funcional (95%) a **completamente lista para producción (100%)** en solo **3 días** con un **equipo mínimo**.
+Con este plan, La Cosmetikera pasará de tener una aplicación funcional (95%) a **completamente lista para producción (100%)** en solo **3 días** con un **equipo mínimo**.
 
 **Lo que lograrás:**
 ✅ Sistema seguro y auditado  
@@ -574,4 +574,5 @@ Cualquier pregunta, referirse a:
 **Versión:** 1.0  
 **Última actualización:** 10 Enero 2026  
 **Estado:** LISTA PARA EJECUTAR
+
 

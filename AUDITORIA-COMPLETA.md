@@ -1,4 +1,4 @@
-# 🔍 AUDITORÍA COMPLETA - ACADEMIA CRYSTAL APP
+# 🔍 AUDITORÍA COMPLETA - LA COSMETIKERA APP
 
 **Fecha**: 9 de Enero, 2026  
 **Versión**: Next.js 15 + Refine + Supabase  
@@ -642,7 +642,7 @@ xxl: >1600px (pantallas grandes)
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-NEXT_PUBLIC_PORTAL_ESTUDIANTE_URL=https://app.academiacrystal.com
+NEXT_PUBLIC_PORTAL_ESTUDIANTE_URL=https://app.lacosmetikera.com
 ```
 
 ### Scripts Disponibles
@@ -763,4 +763,5 @@ La app tiene una base sólida, está bien documentada y todos los flujos crític
 
 ---
 
-**Desarrollado con ❤️ para Academia Crystal Diamante**
+**Desarrollado con ❤️ para La Cosmetikera**
+

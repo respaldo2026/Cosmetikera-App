@@ -6,7 +6,7 @@ El código fue actualizado para soportar horarios de cursos, pero **la tabla nec
 
 ### 1. Abre Supabase Console
 - Ve a: https://supabase.com/dashboard
-- Selecciona tu proyecto `academia-crystal`
+- Selecciona tu proyecto `Cosmetikera App`
 
 ### 2. Ve a SQL Editor
 - Click en **SQL Editor** (menú lateral izquierdo)
@@ -51,3 +51,4 @@ Deberías ver las columnas con sus valores.
 ---
 
 **Nota**: Sin ejecutar esta migration, el formulario de editar cursos no funcionará correctamente.
+

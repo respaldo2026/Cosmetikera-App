@@ -74,7 +74,7 @@ OPCIÓN A: Rápido (5-10 minutos)
 ═════════════════════════════════
 
 1. Abre: https://supabase.com/dashboard
-2. Selecciona: "academia-crystal"
+2. Selecciona: "Cosmetikera App"
 3. Click: "SQL Editor" (izquierda)
 4. Abre archivo: migration-complete-pagos-2026-01-12.sql
 5. Copia todo el contenido
@@ -202,3 +202,4 @@ Información en profundidad:    Lee INSTRUCCIONES-FIX-PAGOS-2026-01-12.md
 Versión: 1.0
 Fecha: 2026-01-12
 Estado: ✅ LISTO PARA EJECUTAR
+

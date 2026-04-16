@@ -224,7 +224,7 @@ Prefer: return=representation
 Extrae `resumen_texto` y úsalo en el prompt de la IA:
 
 ```
-Eres Dany, asistente virtual de Academia Crystal.
+Eres Dany, asistente virtual de La Cosmetikera.
 
 Información de cursos disponibles:
 {{resumen_texto}}
@@ -511,7 +511,7 @@ ORDER BY visualizaciones DESC;
 ## 🎓 PROMPT SUGERIDO PARA LA IA
 
 ```
-Eres Dany, la asistente virtual de Academia Crystal Daniela, una institución educativa especializada en belleza y estética.
+Eres Dany, la asistente virtual de La Cosmetikera, una marca de belleza enfocada en ventas, atención y fidelización.
 
 Tu personalidad:
 - Amable, profesional y cercana
@@ -554,3 +554,4 @@ Si tienes dudas sobre la implementación:
 
 **Última actualización:** 7 de Febrero 2026  
 **Versión:** 1.0
+

@@ -56,7 +56,7 @@ node test-send-whatsapp.js
 import { sendWhatsAppTextMessage } from '@/services/whatsapp-api.service';
 
 // Enviar mensaje simple
-await sendWhatsAppTextMessage('573001234567', '¡Hola desde Academia Crystal!');
+await sendWhatsAppTextMessage('573001234567', '¡Hola desde La Cosmetikera!');
 ```
 
 ### Opción 2: Enviar plantilla
@@ -95,7 +95,7 @@ Nombre: inscripcion_confirmada
 Idioma: Español (es)
 Categoría: Marketing
 Texto:
-Hola {{1}}, ¡Bienvenido a Academia Crystal! 
+Hola {{1}}, ¡Bienvenido a La Cosmetikera! 
 Tu inscripción al curso de {{2}} ha sido confirmada.
 Inicio: {{3}}
 ```
@@ -206,3 +206,4 @@ Necesitarás:
 ---
 
 **¡La API está lista para usar! 🚀**
+

@@ -42,7 +42,7 @@ Tu inscripción al curso *{{2}}* ha sido confirmada exitosamente.
 
 ¡Nos vemos pronto en clase! 📚
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Variables** (orden IMPORTANTE):
@@ -82,7 +82,7 @@ Hola {{1}}, confirmamos que recibimos tu pago.
 
 ¡Gracias por tu puntualidad! 🙌
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Variables**:
@@ -116,7 +116,7 @@ Te recordamos que tu cuota de *{{2}}* está próxima a vencer.
 
 Puedes pagar en línea o en nuestra oficina. ¡Gracias!
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Variables**:
@@ -155,7 +155,7 @@ Gracias por tu interés en *{{2}}* en {{3}}.
 
 💬 ¿Dudas? {{11}}
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Variables**:
@@ -206,7 +206,7 @@ Salón: {{8}}
 
 ¡Nos vemos pronto! 🚀
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Variables**:
@@ -241,7 +241,7 @@ Hola {{1}}, tu clase de *{{2}}* comienza pronto.
 
 ¡Te esperamos! 📚
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Variables**:
@@ -282,7 +282,7 @@ Tu certificado del curso *{{2}}* ya está disponible.
 
 ¡Estamos muy orgullosos de ti! 🌟
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Variables**:
@@ -349,4 +349,5 @@ _Academia Crystal Diamante_
 ---
 
 **Próximo paso**: Una vez creados todos los templates, ejecutar script para usar en producción.
+
 

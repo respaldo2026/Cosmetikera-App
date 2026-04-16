@@ -146,7 +146,7 @@ DESPUÉS:
 ```
 1️⃣  Abre: https://supabase.com/dashboard
       ↓
-2️⃣  Selecciona tu proyecto "academia-crystal"
+2️⃣  Selecciona tu proyecto "Cosmetikera App"
       ↓
 3️⃣  Click en "SQL Editor" (izquierda)
       ↓
@@ -267,3 +267,4 @@ O si prefieres:
 ---
 
 **¡Listo en 10 minutos!** ⚡
+

@@ -37,7 +37,7 @@ Tu inscripción al curso *{{nombre_curso}}* ha sido confirmada exitosamente.
 
 ¡Nos vemos pronto en clase! 📚
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Cambios realizados**:
@@ -71,7 +71,7 @@ Hola {{nombre}}, confirmamos que recibimos tu pago.
 
 ¡Gracias por tu puntualidad! 🙌
 
-_Academia Crystal Diamante_
+_La Cosmetikera_
 ```
 
 **Cambios realizados**:
@@ -108,7 +108,7 @@ Te recordamos que tu cuota de {{mes}} está próxima a vencer.
 
 Puedes pagar en línea o en nuestra oficina. ¡Gracias!
 
-_Academia Crystal_
+_La Cosmetikera_
 ```
 
 **Para activar en Vercel**:
@@ -253,4 +253,5 @@ LISTO PARA: ✅ PRODUCCIÓN
 ---
 
 **Próximo**: Configurar cron en Vercel o pasar a Opción D (Make.com)
+
 

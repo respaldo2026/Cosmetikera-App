@@ -213,7 +213,7 @@ Estudiante → Crea Matrícula → INSERT EN pagos OK → 1+N pagos creados
 ## 💾 LISTA DE ARCHIVOS
 
 ```
-📁 academia-crystal/
+📁 Cosmetikera App/
 ├─ schema.sql (ACTUALIZADO)
 ├─ migration-complete-pagos-2026-01-12.sql (NUEVO) ⭐
 ├─ migration-fix-pagos-columnas-2026-01-12.sql (NUEVO, ALTERNATIVA)
@@ -240,4 +240,5 @@ Estudiante → Crea Matrícula → INSERT EN pagos OK → 1+N pagos creados
 **Riesgo:** Ninguno (solo se agregan columnas)  
 
 **¡HAZLO AHORA!** ⚡
+
 

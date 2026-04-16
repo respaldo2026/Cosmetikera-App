@@ -775,7 +775,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
           name: "mi-oficina",
           list: "/mi-oficina",
           meta: {
-            label: "Mi Oficina",
+            label: "Panel de equipo",
             icon: <HomeOutlined />,
           },
         },
@@ -789,7 +789,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
           name: "portal-estudiante",
           list: "/portal-estudiante",
           meta: {
-            label: "Mi Portal",
+            label: "Portal clientes",
             icon: <BookOutlined />,
           },
         },

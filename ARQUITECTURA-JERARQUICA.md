@@ -170,7 +170,7 @@ Nuevas columnas agregadas:
 ```sql
 -- En Supabase SQL Editor:
 INSERT INTO academias (nombre, nit, ciudad, email)
-VALUES ('Academia Crystal Diamante', '123456789', 'Medellín', 'info@academiacrystal.com')
+VALUES ('La Cosmetikera', '123456789', 'Medellín', 'info@lacosmetikera.com')
 RETURNING id;
 
 -- Copiar el ID y actualizar configuracion:
@@ -198,7 +198,7 @@ INSERT INTO perfiles (
 ) VALUES (
   gen_random_uuid(),
   'Juan Pérez - Director',
-  'director@academiacrystal.com',
+  'director@lacosmetikera.com',
   '1234567890',
   'administrativo',
   'director',
@@ -467,3 +467,4 @@ Para preguntas sobre esta implementación, revisar:
 1. `migration-hierarchy-academias-2026.sql` (estructura SQL)
 2. `src/app/configuracion/perfiles/page.tsx` (UI)
 3. `src/hooks/useRolePermissions.ts` (lógica de permisos)
+

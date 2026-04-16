@@ -486,12 +486,12 @@ export default function DashboardPage() {
         <Col xs={24} sm={12} lg={6}>
           <Card variant="borderless" style={{ background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)', boxShadow: '0 4px 12px rgba(21, 128, 61, 0.2)' }}>
             <Statistic
-              title={<span style={{ color: '#fff', fontWeight: 600 }}>Estudiantes Activos</span>}
+              title={<span style={{ color: '#fff', fontWeight: 600 }}>Clientes Activos</span>}
               value={stats.estudiantesActivos}
               valueStyle={{ color: '#fff', fontWeight: 'bold' }}
               prefix={<TeamOutlined style={{ color: '#fff' }} />}
               suffix={
-                <Badge count={`+${stats.estudiantesNuevos} nuevos`} style={{ backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 600 }} />
+                <Badge count={`+${stats.estudiantesNuevos} nuevos clientes`} style={{ backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 600 }} />
               }
             />
           </Card>
@@ -560,7 +560,7 @@ export default function DashboardPage() {
           <Col xs={24} sm={12} md={6}>
             <Card size="small" style={{ background: '#e6f4ff', borderColor: '#91caff' }}>
               <Statistic
-                title="Ingreso por Estudiante"
+                title="Ingreso por Cliente"
                 value={stats.ingresosPorEstudiante}
                 precision={0}
                 prefix="$"
@@ -585,7 +585,7 @@ export default function DashboardPage() {
             icon={<UserAddOutlined />}
             onClick={() => router.push('/matriculas/create')}
           >
-            Nueva Matrícula
+            Nueva venta
           </Button>
           <Button 
             size="large"
@@ -599,7 +599,7 @@ export default function DashboardPage() {
             icon={<BookOutlined />}
             onClick={() => router.push('/cursos/create')}
           >
-            Nuevo Grupo
+            Nuevo servicio
           </Button>
           <Button 
             size="large"
@@ -643,7 +643,7 @@ export default function DashboardPage() {
               title={
                 <Space>
                   <WarningOutlined style={{ color: '#ff4d4f' }} />
-                  Pagos Vencidos ({pagosVencidos.length})
+                  Cobros Vencidos ({pagosVencidos.length})
                 </Space>
               } 
               variant="borderless"
@@ -652,7 +652,7 @@ export default function DashboardPage() {
                 {pagosVencidos.slice(0, 5).map((pago: any) => (
                   <Card key={pago.id} size="small" style={{ background: '#fff1f0', borderColor: '#ffccc7' }}>
                     <Space direction="vertical" size={0}>
-                      <Text strong>{pago.perfiles?.nombre_completo || 'Estudiante'}</Text>
+                      <Text strong>{pago.perfiles?.nombre_completo || 'Cliente'}</Text>
                       <Text type="secondary">{pago.periodo_pagado}</Text>
                       <Space>
                         <Tag color="red">Vencido: {formatDate(pago.fecha_vencimiento)}</Tag>
@@ -661,7 +661,7 @@ export default function DashboardPage() {
                     </Space>
                   </Card>
                 ))}
-                <Button type="link" onClick={() => router.push('/tesoreria')}>Ver todos los pagos</Button>
+                <Button type="link" onClick={() => router.push('/tesoreria')}>Ver todos los cobros</Button>
               </Space>
             </Card>
           </Col>
@@ -710,9 +710,9 @@ export default function DashboardPage() {
       {/* Información Adicional */}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
-          <Card title="Pagos Recientes" variant="borderless">
+          <Card title="Ventas y Cobros Recientes" variant="borderless">
             {pagosRecientes.length === 0 ? (
-              <Empty description="No hay pagos recientes" />
+              <Empty description="No hay movimientos recientes" />
             ) : (
               <Space direction="vertical" style={{ width: '100%' }}>
                 {pagosRecientes.map((pago: any) => (
@@ -725,7 +725,7 @@ export default function DashboardPage() {
                     <Space>
                       <CheckCircleOutlined style={{ color: '#52c41a' }} />
                       <div>
-                        <Text strong>{pago.perfiles?.nombre_completo || 'Estudiante'}</Text>
+                        <Text strong>{pago.perfiles?.nombre_completo || 'Cliente'}</Text>
                         <br />
                         <Text type="secondary" style={{ fontSize: 12 }}>
                           {formatDate(pago.fecha_pago)} • {pago.metodo_pago || 'Efectivo'}
@@ -743,9 +743,9 @@ export default function DashboardPage() {
         </Col>
 
         <Col xs={24} lg={12}>
-          <Card title="Próximos Grupos a Iniciar" variant="borderless">
+          <Card title="Próximos Servicios a Activar" variant="borderless">
             {proximosCursos.length === 0 ? (
-              <Empty description="No hay grupos próximos" />
+              <Empty description="No hay servicios próximos" />
             ) : (
               <Space direction="vertical" style={{ width: '100%' }}>
                 {proximosCursos.map((curso: any) => {
@@ -775,13 +775,13 @@ export default function DashboardPage() {
         </Col>
       </Row>
 
-      {/* RENTABILIDAD POR PROGRAMA - Decisión Estratégica */}
+      {/* RENTABILIDAD POR CATEGORÍA - Decisión Estratégica */}
       {stats.rentabilidadPorPrograma.length > 0 && (
         <Card 
           title={
             <Space>
               <RiseOutlined style={{ color: '#52c41a' }} />
-              <span>Rentabilidad por Programa</span>
+              <span>Rentabilidad por Categoría</span>
               <Tag color="blue">Decisión Estratégica</Tag>
             </Space>
           }
@@ -798,10 +798,10 @@ export default function DashboardPage() {
                       style={{ backgroundColor: index === 0 ? '#52c41a' : index === 1 ? '#1890ff' : '#8c8c8c' }} 
                     />
                     <Text strong>{programa.nombre}</Text>
-                    <Tag>{programa.estudiantes} estudiantes</Tag>
+                    <Tag>{programa.estudiantes} clientes</Tag>
                   </Space>
                   <Space>
-                    <Text type="secondary">Promedio/estudiante:</Text>
+                    <Text type="secondary">Promedio/cliente:</Text>
                     <Text strong style={{ color: '#1890ff' }}>
                       ${programa.promedioPorEstudiante.toLocaleString()}
                     </Text>
@@ -821,8 +821,8 @@ export default function DashboardPage() {
             ))}
           </Space>
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 16 }}>
-            💡 Los programas con mayor promedio por estudiante tienen mejor rentabilidad. 
-            Considera expandir o replicar los más exitosos.
+            💡 Las categorías con mayor promedio por cliente tienen mejor rentabilidad.
+            Considera expandir o replicar las más exitosas.
           </Text>
         </Card>
       )}
@@ -832,7 +832,7 @@ export default function DashboardPage() {
         <Col xs={12} sm={6}>
           <Card variant="borderless" style={{ textAlign: 'center' }}>
             <Statistic
-              title="Cursos Activos"
+              title="Servicios Activos"
               value={stats.cursosActivos}
               prefix={<BookOutlined />}
               valueStyle={{ color: '#1890ff' }}
@@ -842,7 +842,7 @@ export default function DashboardPage() {
         <Col xs={12} sm={6}>
           <Card variant="borderless" style={{ textAlign: 'center' }}>
             <Statistic
-              title="Profesores"
+              title="Equipo"
               value={stats.profesores}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#722ed1' }}
@@ -864,7 +864,7 @@ export default function DashboardPage() {
         <Col xs={12} sm={6}>
           <Card variant="borderless" style={{ textAlign: 'center' }}>
             <Statistic
-              title="Nuevos Este Mes"
+              title="Clientes Nuevos"
               value={stats.estudiantesNuevos}
               prefix={<UserAddOutlined />}
               valueStyle={{ color: '#fa8c16' }}

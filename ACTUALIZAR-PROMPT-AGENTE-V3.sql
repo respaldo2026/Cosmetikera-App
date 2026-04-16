@@ -80,7 +80,7 @@ Para finalizar tu inscripción y reservar tu cupo, escribe directamente a nuestr
 
 Ellos te guiarán en el proceso de pago, confirmarán tu grupo y resolverán cualquier duda. ¡Nos vemos pronto en la academia! 💎✨"',
   
-  greeting = '¡Hola! ✨ Bienvenido a la Academia Crystal Diamante. Es un gusto saludarte.',
+  greeting = '¡Hola! ✨ Bienvenido a La Cosmetikera. Es un gusto saludarte.',
   
   fallback_response = 'Para darte el dato exacto, voy a consultar con el Director y te confirmo de inmediato',
   
@@ -99,3 +99,4 @@ SELECT
   updated_at
 FROM agent_settings
 WHERE id = 1;
+

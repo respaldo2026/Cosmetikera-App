@@ -163,7 +163,7 @@ export default function CajaPage() {
       setEstudiantes(data || []);
     } catch (error) {
       console.error("Error cargando estudiantes:", error);
-      messageApi.error("No se pudieron cargar los estudiantes");
+      messageApi.error("No se pudieron cargar los clientes");
     }
   }, [messageApi]);
 
@@ -467,7 +467,7 @@ export default function CajaPage() {
         form.setFieldsValue({ matricula_id: undefined });
       } catch (error) {
         console.error("Error cargando datos del estudiante:", error);
-        messageApi.error("Error al cargar datos del estudiante");
+        messageApi.error("Error al cargar datos del cliente");
       } finally {
         setLoading(false);
       }
@@ -652,10 +652,10 @@ export default function CajaPage() {
 
           const nombreCursoWhatsapp =
             cursosUnicos.length === 0
-              ? "Curso"
+              ? "Servicio"
               : cursosUnicos.length === 1
-              ? (cursosUnicos[0] ?? "Curso")
-              : "Varios cursos";
+              ? (cursosUnicos[0] ?? "Servicio")
+              : "Varios servicios";
 
           const conceptoPago = cuotasAPagar
             .map((cuota) => cuota.periodo_pagado || `Cuota ${cuota.numero_cuota ?? ""}`.trim())
@@ -796,7 +796,7 @@ export default function CajaPage() {
               Caja - Punto de Venta
             </Title>
             <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 16 }}>
-              Registro de pagos de estudiantes
+              Registro de cobros y pagos de clientes
             </Text>
           </div>
         </Space>
@@ -804,16 +804,16 @@ export default function CajaPage() {
 
       <Row gutter={24}>
         <Col xs={24} lg={14}>
-          <Card title="Información del Estudiante" style={{ marginBottom: 24 }}>
+          <Card title="Información del cliente" style={{ marginBottom: 24 }}>
             <Form form={form} layout="vertical">
               <Form.Item
                 name="estudiante_id"
-                label="Estudiante"
-                rules={[{ required: true, message: "Seleccione un estudiante" }]}
+                label="Cliente"
+                rules={[{ required: true, message: "Seleccione un cliente" }]}
               >
                 <Select
                   showSearch
-                  placeholder="Buscar estudiante..."
+                  placeholder="Buscar cliente..."
                   optionFilterProp="children"
                   filterOption={(input, option) =>
                     (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
@@ -826,7 +826,7 @@ export default function CajaPage() {
 
               {estudianteSeleccionado && (
                 <Alert
-                  message={`Estudiante: ${estudianteSeleccionado.nombre_completo}`}
+                  message={`Cliente: ${estudianteSeleccionado.nombre_completo}`}
                   description={
                     <div>
                       {estudianteSeleccionado.telefono && <div>Teléfono: {estudianteSeleccionado.telefono}</div>}
@@ -849,7 +849,7 @@ export default function CajaPage() {
             </Card>
           ) : (
             cuotas.length > 0 && (
-              <Card title="Cuotas Pendientes" style={{ marginBottom: 24 }}>
+              <Card title="Cobros pendientes" style={{ marginBottom: 24 }}>
                 <Table
                   rowSelection={rowSelection}
                   columns={cuotasColumns}
@@ -865,7 +865,7 @@ export default function CajaPage() {
 
         <Col xs={24} lg={10}>
           <Card
-            title="Resumen de Pago"
+            title="Resumen de cobro"
             style={{
               marginBottom: 24,
               position: "sticky",
@@ -873,7 +873,7 @@ export default function CajaPage() {
             }}
           >
             <Statistic
-              title="Total a Pagar"
+              title="Total a cobrar"
               value={totalAPagar}
               precision={0}
               prefix="$"
@@ -982,7 +982,7 @@ export default function CajaPage() {
                     fontWeight: "bold",
                   }}
                 >
-                  Registrar Pago
+                  Registrar cobro
                 </Button>
 
                 <Button

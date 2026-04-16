@@ -1,4 +1,4 @@
-# 🔐 Política de Integridad de Datos - Academia Crystal
+# 🔐 Política de Integridad de Datos - La Cosmetikera
 
 ## Eliminación de Cursos
 
@@ -76,3 +76,4 @@ Si necesitas eliminar un curso con datos por una razón válida:
 1. Documenta la razón
 2. Contacta al administrador del sistema
 3. Se revisarán los datos antes de proceder
+

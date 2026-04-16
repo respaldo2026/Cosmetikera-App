@@ -14,7 +14,7 @@
 ### PASO 1: Abre Supabase SQL Editor
 ```
 1. Ve a: https://supabase.com/dashboard
-2. Selecciona tu proyecto "academia-crystal"
+2. Selecciona tu proyecto "Cosmetikera App"
 3. Click izquierda en "SQL Editor"
 ```
 
@@ -135,3 +135,4 @@ Antes de continuar:
 **🎉 Una vez hecho esto, tu sistema de pagos volverá a funcionar correctamente.**
 
 Cualquier duda, revisa los archivos de documentación.
+

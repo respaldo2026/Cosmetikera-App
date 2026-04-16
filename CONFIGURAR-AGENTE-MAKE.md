@@ -94,7 +94,7 @@ El endpoint `/api/ai/chat` devuelve:
   "media_suggestion": {
     "type": "image",
     "mediaUrl": "https://...",
-    "caption": "Así vivimos las clases en Academia Crystal ✨",
+    "caption": "Así vivimos las clases en La Cosmetikera ✨",
     "sendBeforeText": true,
     "intent": "horario"
   },
@@ -322,3 +322,4 @@ Si después de seguir estos pasos las respuestas no cambian:
 ---
 
 **¡Con esto Make debería usar la personalidad configurada en Marketing Center!** 🎉
+

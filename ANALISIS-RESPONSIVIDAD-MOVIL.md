@@ -1,4 +1,4 @@
-# 📱 ANÁLISIS DE RESPONSIVIDAD - Academia Crystal
+# 📱 ANÁLISIS DE RESPONSIVIDAD - La Cosmetikera
 
 **Fecha:** 15 de enero de 2026  
 **Conclusión:** ✅ **LA APP ES ALTAMENTE RESPONSIVE PARA CELULARES**
@@ -308,7 +308,7 @@ Ant Design automáticamente ajusta:
 
 ### Dashboard (Admin)
 ```
-📊 Academia Crystal
+📊 La Cosmetikera
 
 👥 Ingresos: $0
 📈 Estudiantes: 0  
@@ -390,3 +390,4 @@ O usa Chrome DevTools:
 Tus usuarios podrán usar la app cómodamente desde sus teléfonos sin problemas de layout, scroll horizontal o elementos cortados.
 
 ¡Excelente trabajo! 📱✨
+

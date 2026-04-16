@@ -108,7 +108,7 @@ const categoriaOptions = [
   "promocional",
   "informativo",
   "legal",
-  "inscripción",
+  "ventas",
   "horarios",
   "precios",
 ];
@@ -117,32 +117,32 @@ const DEFAULT_AGENT_SYSTEM_PROMPT = `# System Prompt: Agente {{persona_name}} (v
 
 🧠 Identidad
 Eres {{persona_name}}, {{persona_bio}}.
-Tu objetivo es orientar con claridad y naturalidad para ayudar a la inscripción, sin sonar robótico.
+Tu objetivo es orientar con claridad y naturalidad para ayudar a la compra o reserva, sin sonar robótico.
 
 ## 1) Prioridad de conversación (OBLIGATORIO)
 1. Responde la intención ACTUAL del usuario.
 2. No repitas el mismo bloque si la persona ya avanzó.
-3. Si el usuario corrige ("eso no es..."), corrige de inmediato y no insistas en el programa anterior.
+3. Si el usuario corrige ("eso no es..."), corrige de inmediato y no insistas en el servicio anterior.
 4. Si el usuario dice "sí/ok/sii", continúa el tema pendiente (no reinicies información general).
 5. Si el usuario dice "gracias", responde corto y humano; puedes compartir redes para más info.
 
 ## 2) Estilo WhatsApp
 {{greeting_rule}}
 - Usa párrafos cortos y escaneables.
-- Usa negrita para datos clave (curso, precio, fecha, horario).
+- Usa negrita para datos clave (servicio, precio, fecha, horario).
 - Mantén tono cercano y profesional.
 - Estilo preferido: {{speaking_style}}
 
 ## 3) Reglas de negocio
 - No inventes datos. Si falta información, usa: "{{fallback_response}}".
-- Si piden precio: prioriza inscripción + mensualidad (no total salvo que lo pidan).
+- Si piden precio: prioriza registro, valor del servicio y opciones vigentes (no total salvo que lo pidan).
 - Si piden ubicación: responde dirección/referencia primero.
-- Si preguntan por un programa no disponible: dilo claro y ofrece alternativas reales.
+- Si preguntan por un servicio no disponible: dilo claro y ofrece alternativas reales.
 - Formato de hora en AM/PM.
 
 ## 4) Flujo comercial natural (sin rigidez)
 - No uses un guion fijo de 3 pasos.
-- Avanza según lo que la persona pregunte: precio, horario, ubicación, pensum, materiales o inscripción.
+- Avanza según lo que la persona pregunte: precio, horario, ubicación, detalles, materiales o compra.
 - Cierra con una sola pregunta de avance (máximo una).
 
 ## 5) Redes y cierre humano
@@ -151,12 +151,12 @@ Tu objetivo es orientar con claridad y naturalidad para ayudar a la inscripción
 - No fuerces venta tras un "gracias".
 
 ## 6) Contacto de admisiones
-📱 WhatsApp Admisiones: +57 301 203 8582
-Compártelo cuando haya intención clara de inscripción o cuando lo pidan.
+📱 WhatsApp Ventas: +57 301 203 8582
+Compártelo cuando haya intención clara de compra o reserva, o cuando lo pidan.
 
 ## 7) Reglas no negociables
 - Solo usa información explícita del contexto jerárquico.
-- Si un curso no aparece en contexto, di que no está disponible.
+- Si un servicio no aparece en contexto, di que no está disponible.
 - No inventes horarios, precios, fechas ni nombres.
 
 {{sales_protocol}}
@@ -334,7 +334,7 @@ export default function MarketingCenterPage() {
       setAssetsLoaded(true);
     } catch (error: any) {
       console.error("Error cargando assets:", error);
-      message.error("No se pudieron cargar los assets de marketing");
+      message.error("No se pudieron cargar los activos de marketing");
     } finally {
       setLoading(false);
     }
@@ -476,13 +476,13 @@ export default function MarketingCenterPage() {
           .eq("id", editingAsset.id);
 
         if (error) throw error;
-        message.success("Asset actualizado correctamente");
+        message.success("Activo actualizado correctamente");
       } else {
         // Crear
         const { error } = await supabaseBrowserClient.from("marketing_assets").insert(payload);
 
         if (error) throw error;
-        message.success("Asset creado correctamente");
+        message.success("Activo creado correctamente");
       }
 
       setModalVisible(false);
@@ -535,11 +535,11 @@ export default function MarketingCenterPage() {
         .eq("id", record.id);
 
       if (error) throw error;
-      message.success("Asset eliminado de la base de datos y Storage");
+      message.success("Activo eliminado de la base de datos y Storage");
       cargarAssets();
     } catch (error: any) {
       console.error("Error eliminando asset:", error);
-      message.error("No se pudo eliminar el asset");
+      message.error("No se pudo eliminar el activo");
     }
   };
 
@@ -603,7 +603,7 @@ export default function MarketingCenterPage() {
       setKeywordsDraft(draft);
     } catch (error) {
       console.error("Error cargando marketing_centro:", error);
-      message.error("No se pudieron cargar los cursos del Centro de Marketing");
+      message.error("No se pudieron cargar los servicios del Centro de Marketing");
     } finally {
       setLoadingCursosMarketing(false);
     }
@@ -859,13 +859,13 @@ export default function MarketingCenterPage() {
             return `- ${c.nombre}${programaNombre} | Inicio: ${inicio} | ${formatoHorario(c)}${cupos}`;
           })
           .join("\n")
-      : "(Sin cursos próximos)";
+      : "(Sin servicios próximos)";
 
     return [
-      "Contexto para IA: Programas y Cursos",
-      "Programas activos:",
+      "Contexto para IA: Categorías y Servicios",
+      "Categorías activas:",
       programasText,
-      "Próximos cursos:",
+      "Próximos servicios:",
       cursosText,
     ]
       .filter(Boolean)
@@ -988,7 +988,7 @@ export default function MarketingCenterPage() {
             <Button icon={<EditOutlined />} size="small" onClick={() => handleEdit(record)} />
           </Tooltip>
           <Popconfirm
-            title="¿Eliminar este asset?"
+            title="¿Eliminar este activo?"
             onConfirm={() => handleDelete(record)}
             okText="Sí"
             cancelText="No"
@@ -1087,11 +1087,11 @@ export default function MarketingCenterPage() {
           <Space align="center" wrap>
             <RobotOutlined style={{ fontSize: 32, color: "#fff" }} />
             <Title level={2} style={{ margin: 0, color: "#fff" }}>
-              Marketing Center
+              Centro de marketing
             </Title>
           </Space>
           <Text style={{ color: "#e6e6fa", fontSize: 16 }}>
-            Material publicitario para el Agente de IA (Dany)
+            Material comercial para el asistente IA (Dany)
           </Text>
         </Space>
       </Card>
@@ -1100,7 +1100,7 @@ export default function MarketingCenterPage() {
       <Row gutter={[12, 12]}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
-            <Statistic title="Total Assets" value={stats.total} prefix={<FileOutlined />} />
+            <Statistic title="Total activos" value={stats.total} prefix={<FileOutlined />} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
@@ -1244,7 +1244,7 @@ export default function MarketingCenterPage() {
                           <TextArea
                             id="agent-system-prompt"
                             rows={7}
-                            placeholder="Eres Dany, asistente de la academia..."
+                            placeholder="Eres Dany, asistente comercial de La Cosmetikera..."
                             disabled={loadingAgentPrompt}
                           />
                         </Form.Item>
@@ -1376,15 +1376,15 @@ export default function MarketingCenterPage() {
 
                   {mostrarContextoIA && (
                     <Card
-                      title="Contexto IA: Programas, cursos próximos y materiales"
+                      title="Contexto IA: categorías, servicios próximos y materiales"
                       bodyStyle={{ padding: isMobile ? "16px" : "20px", background: "#f7f9fc" }}
                       extra={
                         <Space wrap>
                           <Button icon={<ReloadOutlined />} size={isMobile ? "small" : "middle"} onClick={cargarProgramas}>
-                            Recargar programas
+                            Recargar categorías
                           </Button>
                           <Button icon={<ReloadOutlined />} size={isMobile ? "small" : "middle"} onClick={cargarCursosProximos}>
-                            Recargar cursos
+                            Recargar servicios
                           </Button>
                           <Button icon={<ReloadOutlined />} size={isMobile ? "small" : "middle"} onClick={cargarAssets}>
                             Recargar materiales
@@ -1397,11 +1397,11 @@ export default function MarketingCenterPage() {
                           type="info"
                           showIcon
                           message="Guía rápida"
-                          description="Recarga, revisa y copia el contexto para que el agente IA responda con datos actuales (programas, cursos, materiales)."
+                          description="Recarga, revisa y copia el contexto para que el agente IA responda con datos actuales (categorías, servicios y materiales)."
                         />
 
                         <Divider style={{ margin: "12px 0" }} plain>
-                          Programas y cursos
+                          Categorías y servicios
                         </Divider>
                         <Text
                           code
@@ -1436,13 +1436,13 @@ export default function MarketingCenterPage() {
                   )}
                 </Space>
 
-                {/* Cursos/Grupos (marketing_centro) */}
+                {/* Servicios/aperturas (marketing_centro) */}
                 <Card
-                  title="Cursos y grupos (Centro de Marketing)"
+                  title="Servicios y aperturas (Centro de Marketing)"
                   extra={
                     <Space wrap>
                       <Button icon={<ReloadOutlined />} size={isMobile ? "small" : "middle"} onClick={cargarMarketingCursos}>
-                        Recargar cursos
+                        Recargar servicios
                       </Button>
                     </Space>
                   }
@@ -1467,7 +1467,7 @@ export default function MarketingCenterPage() {
             children: (
               <Space direction="vertical" size="large" style={{ width: "100%" }}>
                 <Card
-                  title="Assets de Marketing"
+                  title="Activos de marketing"
                   extra={
                     <Space wrap>
                       <Input.Search

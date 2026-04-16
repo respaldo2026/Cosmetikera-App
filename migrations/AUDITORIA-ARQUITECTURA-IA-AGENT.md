@@ -2,7 +2,7 @@
 
 **Fecha:** 8 de Febrero, 2026  
 **Arquitecto:** Senior Database & AI Architecture  
-**Sistema:** Academia Crystal - Supabase + Make.com + WhatsApp IA Agent
+**Sistema:** La Cosmetikera - Supabase + Make.com + WhatsApp IA Agent
 
 ---
 
@@ -402,4 +402,5 @@ Voy a generar el archivo `CORREGIR-ARQUITECTURA-IA-2026.sql` con todas las corre
 ---
 
 **¿Necesitas que genere el SQL completo de correcciones ahora?**
+
 

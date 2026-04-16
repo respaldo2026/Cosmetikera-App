@@ -1,4 +1,4 @@
-# Estructura de Programas y Grupos - Academia Crystal
+# Estructura de Programas y Grupos - La Cosmetikera
 
 ## 📚 Conceptos
 
@@ -202,3 +202,4 @@ Si tienes dudas sobre la nueva estructura, consulta:
 - `src/app/programas/page.tsx` - Gestión de programas
 - `src/app/cursos/page.tsx` - Visualización de grupos por programa
 - `src/app/cursos/create/page.tsx` - Creación de grupos con selector de programa
+

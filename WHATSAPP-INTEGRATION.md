@@ -374,7 +374,7 @@ Cambia la URL en Make de `localhost:3001` a tu dominio real.
 
 ## 🎯 Casos de Uso Recomendados
 
-### Academia Crystal Diamante
+### La Cosmetikera
 
 1. **Envío de Pensum**: Imagen con el pensum del curso
 2. **Lista de Precios**: PDF con precios actualizados
@@ -385,3 +385,4 @@ Cambia la URL en Make de `localhost:3001` a tu dominio real.
 ---
 
 ¿Necesitas ayuda? Revisa los logs en la terminal o inspecciona las respuestas del endpoint.
+

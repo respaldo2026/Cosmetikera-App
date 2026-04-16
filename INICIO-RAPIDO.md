@@ -21,7 +21,7 @@ Copiar 1 archivo SQL → Pegar en Supabase → Click Run → LISTO ✅
 
 1. Ve a: https://supabase.com/dashboard
 2. Login
-3. Selecciona tu proyecto: **Academia Crystal**
+3. Selecciona tu proyecto: **La Cosmetikera**
 4. Lado izquierdo → **SQL Editor**
 5. Click en **+ New Query**
 
@@ -59,7 +59,7 @@ Copiar 1 archivo SQL → Pegar en Supabase → Click Run → LISTO ✅
 
 ## 📍 PASO 4: Prueba
 
-1. Abre tu app: https://academia-crystal.vercel.app (o tu URL)
+1. Abre tu app: https://tu-app.vercel.app (o tu URL)
 2. **Importante:** Limpia caché → Presiona **Ctrl+Shift+R**
 3. Login como admin
 4. Ir a: `/estudiantes`
@@ -200,3 +200,4 @@ Ahora puedes editar tus datos sin problemas.
 **Dificultad:** ⭐ Muy Fácil  
 **Riesgo:** 🟢 Ninguno  
 **Resultado:** ✅ 100% funcional  
+

@@ -65,7 +65,7 @@ La app usa **Ant Design Grid** con breakpoints inteligentes:
 ### Dashboard (375px ancho)
 ```
 ┌───────────────────────┐
-│  Academia Crystal     │
+│  La Cosmetikera     │
 ├───────────────────────┤
 │ 💰 $0                 │
 │ Ingresos Mes          │
@@ -211,3 +211,4 @@ No hay **nada que arreglar** en responsividad. La app está:
 **TU APP ESTÁ 100% LISTA PARA USUARIOS MÓVILES** 📱✨
 
 Pueden abrir la app en cualquier teléfono y funcionará perfectamente.
+

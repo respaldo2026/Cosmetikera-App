@@ -64,9 +64,9 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
 
   const getPortalLabel = () => {
     if (currentUser?.rol === "estudiante") {
-      return "Mi Portal";
+      return "Portal clientes";
     } else if (currentUser?.rol === "profesor") {
-      return "Mi Oficina";
+      return "Panel de equipo";
     }
     return null;
   };

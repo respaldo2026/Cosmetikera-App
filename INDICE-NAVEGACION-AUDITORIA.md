@@ -263,7 +263,7 @@ Ver: [AUDITORIA-EXHAUSTIVA-2026.md#oportunidades-de-mejora](AUDITORIA-EXHAUSTIVA
 
 ### Estructura de Carpetas
 ```
-academia-crystal/
+Cosmetikera App/
 ├─ src/
 │  ├─ app/                    ← Componentes por página
 │  ├─ providers/              ← Auth y Data providers
@@ -352,4 +352,5 @@ Tienes toda la información necesaria para:
 **Versión:** 1.0  
 **Última actualización:** 10 Enero 2026  
 **Estado:** ✅ AUDITORÍA COMPLETADA
+
 

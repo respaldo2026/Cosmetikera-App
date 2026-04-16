@@ -1,4 +1,4 @@
-# 📊 Estado WhatsApp - Academia Crystal Diamante
+# 📊 Estado WhatsApp - La Cosmetikera
 
 **Fecha:** 2 de febrero 2026  
 **Responsable:** Dev Team + Usuario  
@@ -131,7 +131,7 @@ await enviarFormularioInteres(telefono, leadId, {...})
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│            ACADEMIA CRYSTAL DIAMANTE                     │
+│            LA COSMETIKERA                              │
 ├─────────────────────────────────────────────────────────┤
 │                    Next.js App (3001)                    │
 │  - Matriculas  - Tesorería  - Catálogo  - Dashboard     │
@@ -247,3 +247,4 @@ Testing:           ⏳ 0% (después de templates)
 **¿Por dónde empezamos?**
 
 → Actualiza el Access Token y ejecuta `npm run templates:crear` 🚀
+

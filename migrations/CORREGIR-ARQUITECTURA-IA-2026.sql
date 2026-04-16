@@ -148,7 +148,7 @@ COMMENT ON TABLE public.faq IS
 INSERT INTO public.faq (pregunta, respuesta, categoria, keywords, prioridad) VALUES
 ('¿Aceptan pagos en cuotas?', 'Sí, aceptamos pagos hasta en 3 cuotas sin interés. También puedes pagar con tarjeta de crédito, Nequi, transferencia o efectivo.', 'pagos', ARRAY['cuotas', 'financiación', 'pago', 'mensualidades'], 10),
 ('¿Los cursos incluyen materiales?', 'Sí, todos nuestros cursos incluyen el kit completo de materiales y productos necesarios para practicar desde el primer día.', 'cursos', ARRAY['materiales', 'incluye', 'kit', 'productos'], 10),
-('¿Dan certificado al finalizar?', 'Sí, al completar el 80% de asistencia y aprobar las prácticas, recibes certificado oficial avalado por Academia Crystal Daniela.', 'certificacion', ARRAY['certificado', 'diploma', 'avalado'], 9),
+('¿Dan certificado al finalizar?', 'Sí, al completar el 80% de asistencia y aprobar las prácticas, recibes certificado oficial avalado por La Cosmetikera.', 'certificacion', ARRAY['certificado', 'diploma', 'avalado'], 9),
 ('¿Cuál es el horario de atención?', 'Nuestro horario de atención es de lunes a viernes de 8:00 AM a 6:00 PM, y sábados de 9:00 AM a 2:00 PM.', 'general', ARRAY['horario', 'atencion', 'abierto'], 5),
 ('¿Dónde están ubicados?', 'Estamos ubicados en [DIRECCIÓN COMPLETA]. Puedes llegar en TransMilenio o buses que pasan por la Avenida [NOMBRE].', 'general', ARRAY['ubicacion', 'direccion', 'donde'], 8),
 ('¿Puedo recuperar clases perdidas?', 'Sí, puedes recuperar clases perdidas en otros grupos del mismo curso o acceder a las grabaciones (si aplica). Debes avisar con anticipación.', 'cursos', ARRAY['recuperar', 'clases', 'perdidas', 'falta'], 7),
@@ -338,3 +338,4 @@ BEGIN
     RAISE NOTICE '   SELECT * FROM public.faq;';
     RAISE NOTICE '   SELECT * FROM public.vw_knowledge_base_completa LIMIT 5;';
 END $$;
+

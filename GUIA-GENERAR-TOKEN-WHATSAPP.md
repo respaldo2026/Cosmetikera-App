@@ -26,7 +26,7 @@ Inicio
 → Configuración 
 → Apps y Sitios Web 
 → Apps
-→ Buscar "Academia Crystal" (o tu app de WhatsApp)
+→ Buscar "La Cosmetikera" (o tu app de WhatsApp)
 ```
 
 ### 3️⃣ Generar Nuevo Access Token
@@ -46,7 +46,7 @@ Inicio
 **Opción B: Token desde la App**
 ```
 Apps y Sitios Web
-→ Academia Crystal (app)
+→ La Cosmetikera (app)
 → Configuración
 → Básica
 → Token de Acceso de Aplicación
@@ -84,7 +84,7 @@ Deberías ver:
 ```
 ✅ Conexión exitosa
    Número: +57XXXXXXXXX
-   Nombre: Academia Crystal
+   Nombre: La Cosmetikera
 ```
 
 ---
@@ -109,7 +109,7 @@ Deberías ver un rol como:
 ### ✅ La Aplicación de WhatsApp está aprobada
 ```
 Apps
-→ Academia Crystal (app)
+→ La Cosmetikera (app)
 → Configuración
 → Básica
 → Estado: Activa / En desarrollo
@@ -120,7 +120,7 @@ Apps
 WhatsApp Manager
 → Configuración
 → Cuentas de Negocio
-→ Academia Crystal (debería estar verde)
+→ La Cosmetikera (debería estar verde)
 ```
 
 ---
@@ -165,7 +165,7 @@ https://www.facebook.com/help/contact/support-tools
 ## 📝 Checklist Final
 
 - [ ] Accedí a https://business.facebook.com/
-- [ ] Encontré la app "Academia Crystal"
+- [ ] Encontré la app "La Cosmetikera"
 - [ ] Generé un nuevo Access Token Permanente
 - [ ] Seleccioné permisos de WhatsApp
 - [ ] Copié el token completo (sin espacios)
@@ -177,3 +177,4 @@ https://www.facebook.com/help/contact/support-tools
 
 **Última actualización**: 1 de febrero de 2026  
 **Estado**: Requiere nuevo token de Meta
+

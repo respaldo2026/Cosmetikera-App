@@ -200,7 +200,7 @@ const buildWhatsAppPreviewHtml = (threadLabel: string, messages: ChatBubbleItem[
   const bubbles = messages
     .map((item) => {
       const bubbleClass = item.role === "user" ? "bubble user" : "bubble agent";
-      const sender = item.role === "user" ? "Estudiante" : "Agente";
+      const sender = item.role === "user" ? "Cliente" : "Asistente";
       const content = formatWhatsAppTextToHtml(item.text);
       const time = dayjs(item.created_at).format("DD/MM/YYYY HH:mm");
 
@@ -815,10 +815,10 @@ export default function ConversacionesPage() {
         <Space direction="vertical" size="large" style={{ width: "100%" }}>
           <div>
             <h1 style={{ margin: 0, marginBottom: "8px" }}>
-              📞 Conversaciones del Agente
+              📞 Conversaciones del Asistente
             </h1>
             <p style={{ margin: 0, color: "#666" }}>
-              Visualiza todas las interacciones entre el agente de IA y los leads, con historial completo de preguntas y respuestas.
+              Visualiza todas las interacciones entre el asistente de IA y los leads, con historial completo de preguntas y respuestas.
             </p>
           </div>
 
@@ -826,7 +826,7 @@ export default function ConversacionesPage() {
           <Row gutter={16}>
             <Col xs={24} sm={8}>
               <Statistic
-                title="Total Conversaciones"
+                title="Total Interacciones"
                 value={stats.total}
                 prefix={<MessageOutlined />}
               />
@@ -933,8 +933,8 @@ export default function ConversacionesPage() {
           onChange={setActiveTab}
           items={[
             { key: "todos", label: `Todos (${tabCounts.all})` },
-            { key: "high", label: `Alta intencion (${tabCounts.high})` },
-            { key: "contact", label: `Pidio contacto (${tabCounts.contact})` },
+            { key: "high", label: `Alta intención (${tabCounts.high})` },
+            { key: "contact", label: `Pidió contacto (${tabCounts.contact})` },
             { key: "payment", label: `Medios de pago (${tabCounts.payment})` },
           ]}
           style={{ marginBottom: "12px" }}

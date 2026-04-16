@@ -46,7 +46,7 @@ Simply run the updated schema.sql from scratch and you're done!
 
 #### 1️⃣ Abrir Supabase SQL Editor
 - Ir a: https://supabase.com/dashboard
-- Seleccionar tu proyecto "academia-crystal"
+- Seleccionar tu proyecto "Cosmetikera App"
 - Click en **SQL Editor** (izquierda)
 
 #### 2️⃣ Ejecutar Migración
@@ -292,3 +292,4 @@ Verifica que existan todas las tablas requeridas en Supabase.
    - ❌ NO → El trigger no ejecutó, revisar error en `CREATE FUNCTION`
 
 Comparte el output de SQL en el chat.
+

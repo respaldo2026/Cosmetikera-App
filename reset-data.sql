@@ -1,5 +1,5 @@
 -- =====================================================
--- SCRIPT DE REINICIO DE DATOS - ACADEMIA CRYSTAL
+-- SCRIPT DE REINICIO DE DATOS - LA COSMETIKERA
 -- Elimina todos los datos existentes y crea datos de prueba
 -- =====================================================
 
@@ -113,7 +113,7 @@ INSERT INTO cursos (nombre, descripcion, duracion, duracion_horas, precio, preci
 INSERT INTO perfiles (nombre_completo, email, telefono, direccion, fecha_nacimiento, rol) VALUES
 (
   'Martha Cristina Rodríguez',
-  'martha.rodriguez@academia-crystal.com',
+  'martha.rodriguez@lacosmetikera.com',
   '3201234567',
   'Calle 45 #23-10, Bogotá',
   '1985-03-15',
@@ -121,7 +121,7 @@ INSERT INTO perfiles (nombre_completo, email, telefono, direccion, fecha_nacimie
 ),
 (
   'Diana Carolina López',
-  'diana.lopez@academia-crystal.com',
+  'diana.lopez@lacosmetikera.com',
   '3109876543',
   'Carrera 30 #12-45, Bogotá',
   '1990-07-22',
@@ -129,7 +129,7 @@ INSERT INTO perfiles (nombre_completo, email, telefono, direccion, fecha_nacimie
 ),
 (
   'Laura Marcela Gómez',
-  'laura.gomez@academia-crystal.com',
+  'laura.gomez@lacosmetikera.com',
   '3156543210',
   'Avenida 68 #80-23, Bogotá',
   '1988-11-08',
@@ -294,3 +294,4 @@ SELECT
   (SELECT COUNT(*) FROM matriculas) as total_matriculas,
   (SELECT COUNT(*) FROM asistencias) as total_asistencias,
   (SELECT COUNT(*) FROM pagos) as total_pagos;
+

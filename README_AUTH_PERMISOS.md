@@ -1,4 +1,4 @@
-# Flujos de Autenticación y Permisos — Academia Crystal
+# Flujos de Autenticación y Permisos — La Cosmetikera
 
 ## Autenticación
 - **Cliente:**
@@ -45,3 +45,4 @@ if (tienePermiso(user.rol, "tesoreria")) {
 ---
 
 > Actualiza este documento si cambian los flujos de auth o la lógica de permisos.
+

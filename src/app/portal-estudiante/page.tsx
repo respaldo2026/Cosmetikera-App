@@ -1704,11 +1704,11 @@ export default function PortalEstudiante() {
   const renderMaterialesCiclo = () => renderRutaAcademica("ciclo");
 
   const menuSecciones = [
-    { key: "1", label: "Mis Cursos", icon: <BookOutlined /> },
+    { key: "1", label: "Mis servicios", icon: <BookOutlined /> },
     { key: "2", label: "Financiero", icon: <DollarCircleOutlined /> },
-    { key: "3", label: "Lista de materiales", icon: <FileOutlined /> },
-    { key: "4", label: "Materiales del ciclo", icon: <BookOutlined /> },
-    { key: "5", label: "Pensum", icon: <BookOutlined /> },
+    { key: "3", label: "Insumos y materiales", icon: <FileOutlined /> },
+    { key: "4", label: "Materiales por etapa", icon: <BookOutlined /> },
+    { key: "5", label: "Ruta y contenidos", icon: <BookOutlined /> },
   ];
 
   const renderSeccionActiva = () => {
@@ -1716,7 +1716,7 @@ export default function PortalEstudiante() {
       return (
         <>
           {avancePorCurso.length === 0 ? (
-            <Empty description="No estás inscrito en ningún curso activo" />
+            <Empty description="No tienes servicios activos en este momento" />
           ) : (
             <Row gutter={16}>
               {avancePorCurso.map((curso: any, idx: number) => (
@@ -1732,7 +1732,7 @@ export default function PortalEstudiante() {
                             format={() => `${Number(curso.nota || 0)}/100`}
                           />
                           <Text type="secondary" style={{ display: "block", marginTop: 6, fontSize: 12 }}>
-                            Nota actual
+                            Avance actual
                           </Text>
                         </div>
                       </Col>
@@ -1746,7 +1746,7 @@ export default function PortalEstudiante() {
                             status={Number(curso.nota || 0) >= 70 ? "success" : "active"}
                           />
                           <Text type="secondary" style={{ display: "block", marginTop: 6, fontSize: 12 }}>
-                            Meta aprobatoria
+                            Meta de avance
                           </Text>
                         </div>
                       </Col>
@@ -1766,11 +1766,11 @@ export default function PortalEstudiante() {
                           <Text style={{ fontSize: 12, display: "block" }}>
                             {siguiente?.completado ? (
                               <>
-                                <strong>Plan completado:</strong> ya registraste asistencia en {siguiente?.vistos}/{siguiente?.total} clases del programa. Puedes repasar materiales del último tema.
+                                <strong>Ruta completada:</strong> ya registraste avance en {siguiente?.vistos}/{siguiente?.total} sesiones del servicio. Puedes repasar los materiales del último tema.
                               </>
                             ) : (
                               <>
-                                <strong>Siguiente Clase:</strong> {nombreTema} del {nombreCiclo}: {descripcionTema}. Verifica la lista de materiales para esta clase.
+                                <strong>Siguiente paso:</strong> {nombreTema} de {nombreCiclo}: {descripcionTema}. Verifica la lista de materiales para esta sesión.
                               </>
                             )}
                           </Text>
@@ -1781,7 +1781,7 @@ export default function PortalEstudiante() {
                           >
                             {siguiente?.completado
                               ? "Ver materiales del último tema"
-                              : "Ir a lista de materiales de esta clase"}
+                              : "Ir a materiales de esta sesión"}
                           </Button>
                         </div>
                       );
@@ -1990,16 +1990,16 @@ export default function PortalEstudiante() {
               {logoAcademia ? (
                 <img
                   src={logoAcademia}
-                  alt="Logo academia"
+                  alt="Logo del negocio"
                   className="academy-logo"
                 />
               ) : null}
               <div>
                 <Text style={{ display: "block", fontSize: isMobile ? 16 : 18, fontWeight: 600 }}>
-                  Te damos la Bienvenida
+                  Bienvenido de nuevo
                 </Text>
                 <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
-                  Portal de Estudiante
+                  Portal de clientes
                 </Text>
               </div>
             </Space>
@@ -2012,21 +2012,21 @@ export default function PortalEstudiante() {
                   items: [
                     {
                       key: "agente",
-                      label: "Hablar con Agente",
+                      label: "Hablar con soporte",
                       onClick: () =>
                         abrirWhatsapp(
                           whatsappAgente,
-                          `Hola, soy ${estudiante?.nombre_completo || "estudiante"}. Tengo una consulta sobre mis cursos en el portal.`
+                          `Hola, soy ${estudiante?.nombre_completo || "cliente"}. Tengo una consulta sobre mi portal.`
                         ),
                       disabled: !whatsappAgente,
                     },
                     {
                       key: "admisiones",
-                      label: "Hablar con Admisiones",
+                      label: "Hablar con ventas",
                       onClick: () =>
                         abrirWhatsapp(
                           whatsappAdmisiones,
-                          `Hola, soy ${estudiante?.nombre_completo || "estudiante"}. Necesito apoyo de Admisiones.`
+                          `Hola, soy ${estudiante?.nombre_completo || "cliente"}. Necesito apoyo comercial.`
                         ),
                       disabled: !whatsappAdmisiones,
                     },

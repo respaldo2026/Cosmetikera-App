@@ -1,4 +1,4 @@
-# 🚀 REPORTE PRE-DEPLOY - Academia Crystal
+# 🚀 REPORTE PRE-DEPLOY - La Cosmetikera
 **Fecha:** 15 de enero de 2026  
 **Versión:** 0.1.0  
 **Estado:** ✅ **LISTA PARA PRODUCCIÓN**
@@ -167,7 +167,7 @@ Asegurar que estas variables estén configuradas en el hosting (Vercel/Netlify):
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xqcsftjkvcrbcetrdulq.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-NEXT_PUBLIC_PORTAL_ESTUDIANTE_URL=https://app.academiacrystal.com
+NEXT_PUBLIC_PORTAL_ESTUDIANTE_URL=https://app.lacosmetikera.com
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (⚠️ SECRETO)
 ```
 
@@ -342,7 +342,7 @@ Todos los errores previos han sido corregidos:
 
 ## ✅ CONCLUSIÓN
 
-**La aplicación Academia Crystal está LISTA para PRODUCCIÓN.**
+**La aplicación La Cosmetikera está LISTA para PRODUCCIÓN.**
 
 ✅ Todos los flujos críticos funcionan correctamente  
 ✅ Seguridad implementada adecuadamente  
@@ -363,3 +363,4 @@ Si encuentras algún problema después del deploy:
 4. Revisar archivos de documentación en la raíz del proyecto
 
 **¡Éxito con el despliegue! 🚀**
+

@@ -6,7 +6,7 @@
 
 1. **Abrir Supabase Dashboard**
    - Ve a: https://supabase.com/dashboard
-   - Selecciona tu proyecto: `newsocialmedia20-create/academia-crystal`
+   - Selecciona tu proyecto: `newsocialmedia20-create/Cosmetikera App`
 
 2. **Ejecutar Migración SQL**
    ```
@@ -265,3 +265,4 @@ Si algo no funciona:
 **¡Listo para lanzar! 🚀**
 
 Una vez completados todos los pasos, tu Agente de IA (Dany) estará respondiendo automáticamente a los clientes por WhatsApp.
+

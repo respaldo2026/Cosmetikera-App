@@ -132,7 +132,7 @@ export default function ListAsistencias() {
 
   return (
     <List 
-      title="Control de Asistencias"
+      title="Seguimiento de asistencia"
       headerButtons={
         <Space>
           <CreateButton
@@ -146,7 +146,7 @@ export default function ListAsistencias() {
               window.location.href = url;
             }}
           >
-            Tomar Asistencia
+            Registrar asistencia
           </CreateButton>
         </Space>
       }
@@ -169,7 +169,7 @@ export default function ListAsistencias() {
           <Col xs={24} sm={8}>
             <Card>
               <Statistic
-                title="Estudiantes en Riesgo"
+                title="Clientes en seguimiento"
                 value={estudiantesEnRiesgo}
                 valueStyle={{ color: estudiantesEnRiesgo > 0 ? '#cf1322' : '#3f8600' }}
                 prefix={<WarningOutlined />}
@@ -182,7 +182,7 @@ export default function ListAsistencias() {
           <Col xs={24} sm={8}>
             <Card>
               <Statistic
-                title="Total Estudiantes"
+                title="Total clientes"
                 value={estadisticas.length}
                 prefix={<UserOutlined />}
               />
@@ -191,9 +191,9 @@ export default function ListAsistencias() {
         </Row>
       )}
 
-      {/* TABLA DE ESTADÍSTICAS POR ESTUDIANTE */}
+      {/* TABLA DE ESTADÍSTICAS POR CLIENTE */}
       {cursoSeleccionado && estadisticas.length > 0 && (
-        <Card title={isMobile ? "📊 Asistencia" : "📊 Estadísticas de Asistencia por Estudiante"} style={{ marginBottom: 20 }}>
+        <Card title={isMobile ? "📊 Asistencia" : "📊 Estadísticas de asistencia por cliente"} style={{ marginBottom: 20 }}>
           <Table 
             dataSource={estadisticas}
             rowKey="matricula_id"
@@ -203,7 +203,7 @@ export default function ListAsistencias() {
             scroll={isMobile ? { x: 720 } : undefined}
           >
             <Table.Column
-              title="Estudiante"
+              title="Cliente"
               dataIndex="estudiante"
               width={isMobile ? 220 : 320}
               render={(nombre, record: any) => (
@@ -226,7 +226,7 @@ export default function ListAsistencias() {
               )}
             />
             <Table.Column
-              title="Clases Totales"
+              title="Sesiones totales"
               dataIndex="totalClases"
               align="center"
               responsive={["md"]}
@@ -292,7 +292,7 @@ export default function ListAsistencias() {
           {estudiantesEnRiesgo > 0 && (
             <Alert
               message="⚠️ Acción Requerida"
-              description={`${estudiantesEnRiesgo} estudiante(s) no cumplen con el porcentaje mínimo de asistencia. No podrán certificarse hasta mejorar su asistencia.`}
+              description={`${estudiantesEnRiesgo} cliente(s) no cumplen con el porcentaje mínimo de asistencia. Requieren seguimiento antes de cerrar su proceso.`}
               type="warning"
               showIcon
               style={{ marginTop: 16 }}

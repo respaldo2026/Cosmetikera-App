@@ -34,7 +34,7 @@ Crea un archivo `.env.local` en la raíz del proyecto:
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Ubicación:** `academia-crystal/.env.local`
+**Ubicación:** `Cosmetikera App/.env.local`
 
 ### Paso 3: Reiniciar el servidor de desarrollo
 
@@ -122,3 +122,4 @@ Respuesta al cliente
 1. Verifica que la estructura de carpetas es: `src/app/api/create-user/route.ts`
 2. Reinicia el servidor
 3. Compila el proyecto: `npm run build`
+

@@ -10,7 +10,7 @@
 ### Paso 1: Ve a Business Manager
 
 1. Abre: https://business.facebook.com/
-2. Verifica que estés en la **Business Account correcta** (Academia Crystal Diamante)
+2. Verifica que estés en la **Business Account correcta** (La Cosmetikera)
 
 ### Paso 2: Crea/Obtén System User
 
@@ -220,3 +220,4 @@ npm run templates:crear
 ```
 
 Los 7 templates se crearán automáticamente. ✨
+

@@ -175,7 +175,7 @@ Usuario ve: Los cambios se guardan realmente ✅
 ### Opción 1: Automática (Recomendado)
 
 1. Abre [Supabase Dashboard](https://supabase.com/dashboard)
-2. Selecciona tu proyecto **Academia Crystal**
+2. Selecciona tu proyecto **La Cosmetikera**
 3. Sidebar → **SQL Editor**
 4. Click en **+ New Query**
 5. Abre archivo: `FIX-ACTUALIZACIONES-TABLAS-2026.sql`
@@ -311,3 +311,4 @@ WHERE tablename IN ('perfiles', 'cursos', 'matriculas');
 **Hecho:** 30 de Enero 2026  
 **Versión:** 1.0  
 **Status:** Listo para aplicar ✅
+

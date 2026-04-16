@@ -41,7 +41,7 @@ WHATSAPP_API_KEY: crystal_whatsapp_2026_X9aP7Lq82 ✅ Configurado
 
 ### Paso 2: Obtener el Nuevo Token
 1. Ir a **Configuración** → **Apps y sitios web** → **Apps**
-2. Seleccionar la app de WhatsApp (Academia Crystal)
+2. Seleccionar la app de WhatsApp (La Cosmetikera)
 3. Ir a **Configuración** → **Básica**
 4. En **Tokens de acceso de aplicación**, copiar el token
 
@@ -125,3 +125,4 @@ Plantillas configuradas:
 
 **Fecha del diagnóstico**: 1 de febrero de 2026  
 **Estado**: ❌ API NO OPERATIVA - Requiere nuevo token
+

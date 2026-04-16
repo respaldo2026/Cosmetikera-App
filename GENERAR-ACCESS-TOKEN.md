@@ -10,7 +10,7 @@
 ### **Paso 1: Ve a Meta Business Manager**
 
 1. Abre: https://business.facebook.com/
-2. Selecciona tu **Business Account** (Academia Crystal Diamante)
+2. Selecciona tu **Business Account** (La Cosmetikera)
 3. Ve a **Settings → Business Settings** (esquina inferior izquierda)
 
 ---
@@ -150,3 +150,4 @@ npm run templates:crear
 ```
 
 ¡Y listo! Los 7 templates se crearán automáticamente. ✨
+

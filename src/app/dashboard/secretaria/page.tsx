@@ -265,9 +265,9 @@ export default function SecretariaDashboard() {
 
   const resumenCards = useMemo(
     () => [
-      { key: "programas", label: "Programas activos", value: programas.length },
-      { key: "activos", label: "Grupos activos", value: cursosActivos.length },
-      { key: "proximos", label: "Próximos inicios", value: cursosProximos.length },
+      { key: "programas", label: "Categorías activas", value: programas.length },
+      { key: "activos", label: "Servicios activos", value: cursosActivos.length },
+      { key: "proximos", label: "Próximas aperturas", value: cursosProximos.length },
       { key: "leads", label: "Leads en seguimiento", value: leads.length },
       { key: "pagos", label: "Pagos pendientes", value: pagosPendientes.length },
     ],
@@ -371,8 +371,8 @@ export default function SecretariaDashboard() {
 📱 SÍGUENOS EN REDES
 {redes_sociales}
 
-✨ ACADEMIA {nombre_academia}
-Formamos profesionales en belleza y estética.
+✨ {nombre_academia}
+Servicios, experiencias y acompañamiento en belleza.
 
 📝 {programa_nombre}
 {programa_descripcion}
@@ -556,7 +556,7 @@ Formamos profesionales en belleza y estética.
     try {
       const { data, error } = await getEstudiantesActivos();
       if (error) {
-        messageApi.error("No se pudieron cargar los estudiantes");
+        messageApi.error("No se pudieron cargar los clientes");
         return;
       }
       const opciones = (data || []).map((estudiante: any) => ({
@@ -567,7 +567,7 @@ Formamos profesionales en belleza y estética.
       setEstudiantesCargados(true);
     } catch (error) {
       console.error("Error cargando estudiantes activos", error);
-      messageApi.error("No se pudieron cargar los estudiantes");
+      messageApi.error("No se pudieron cargar los clientes");
     } finally {
       setCargandoEstudiantes(false);
     }
@@ -611,7 +611,7 @@ Formamos profesionales en belleza y estética.
         console.error("[Secretaria] Error cargando configuración:", error);
       }
     } catch (error) {
-      console.error("Error cargando la configuración de la academia", error);
+      console.error("Error cargando la configuración del negocio", error);
     }
   }, []);
 
@@ -679,7 +679,7 @@ Formamos profesionales en belleza y estética.
           .eq("estudiante_id", estudianteId);
 
         if (error) {
-          messageApi.error("No se pudieron cargar las matrículas del estudiante");
+          messageApi.error("No se pudieron cargar los registros del cliente");
           return;
         }
 
@@ -699,7 +699,7 @@ Formamos profesionales en belleza y estética.
         }
       } catch (error) {
         console.error("Error cargando matrículas del estudiante", error);
-        messageApi.error("No se pudieron cargar las matrículas del estudiante");
+        messageApi.error("No se pudieron cargar los registros del cliente");
       } finally {
         setCargandoMatriculas(false);
       }
@@ -722,7 +722,7 @@ Formamos profesionales en belleza y estética.
             ...prev,
             {
               value: pago.estudiante_id,
-              label: pago.perfiles?.nombre_completo || "Estudiante",
+              label: pago.perfiles?.nombre_completo || "Cliente",
             },
           ];
         });
@@ -746,7 +746,7 @@ Formamos profesionales en belleza y estética.
     async (values: any) => {
       const cuotaIds: string[] = values.cuotas ?? [];
       if (!values.estudiante_id) {
-        messageApi.error("Selecciona un estudiante antes de registrar el pago");
+        messageApi.error("Selecciona un cliente antes de registrar el pago");
         return;
       }
 
@@ -786,7 +786,7 @@ Formamos profesionales en belleza y estética.
           .maybeSingle();
 
         if (estudianteError || !estudiantePerfil) {
-          throw estudianteError ?? new Error("No se pudo obtener la información del estudiante");
+          throw estudianteError ?? new Error("No se pudo obtener la información del cliente");
         }
 
         const configAcademia = configuracion ?? {};
@@ -834,7 +834,7 @@ Formamos profesionales en belleza y estética.
                 ticketCampos: configAcademia.ticket_campos ?? undefined,
               },
               estudiante: {
-                nombre: estudiantePerfil.nombre_completo ?? "Estudiante",
+                nombre: estudiantePerfil.nombre_completo ?? "Cliente",
                 identificacion: estudiantePerfil.identificacion ?? undefined,
                 telefono: estudiantePerfil.telefono ?? undefined,
               },
@@ -846,7 +846,7 @@ Formamos profesionales en belleza y estética.
                 concepto: `${
                   pagoActualizado.periodo_pagado ||
                   `Cuota ${pagoActualizado.numero_cuota ?? ""}`.trim()
-                } - ${(pagoActualizado as any)?.matricula?.cursos?.nombre ?? "Curso"}`,
+                } - ${(pagoActualizado as any)?.matricula?.cursos?.nombre ?? "Servicio"}`,
                 periodo:
                   pagoActualizado.periodo_pagado ||
                   `Cuota ${pagoActualizado.numero_cuota ?? ""}`.trim(),
@@ -876,7 +876,7 @@ Formamos profesionales en belleza y estética.
               .update({ ticket_url: publicUrl } as any)
               .eq("id", cuotaId);
 
-            const conceptoMovimiento = `${ticketData.pago.periodo ?? "Pago"} - ${ticketData.curso?.nombre ?? "Curso"}`;
+            const conceptoMovimiento = `${ticketData.pago.periodo ?? "Pago"} - ${ticketData.curso?.nombre ?? "Servicio"}`;
 
             await registrarIngresoDesdePago({
               fecha: fechaPagoISO,
@@ -934,7 +934,7 @@ Formamos profesionales en belleza y estética.
       <List.Item
         actions={[
           <Button key="matricular" type="link" onClick={() => abrirMatricula(curso.id)}>
-            Matricular
+            Registrar venta
           </Button>,
         ]}
       >
@@ -942,7 +942,7 @@ Formamos profesionales en belleza y estética.
           title={
             <Space direction="vertical" size={0}>
               <Text strong>{construirNombreGrupo(curso)}</Text>
-              <Text type="secondary">{curso.programas?.nombre || "Programa por definir"}</Text>
+              <Text type="secondary">{curso.programas?.nombre || "Categoría por definir"}</Text>
             </Space>
           }
           description={
@@ -953,7 +953,7 @@ Formamos profesionales en belleza y estética.
               </Space>
               <Space>
                 <TeamOutlined />
-                <Text>{`${inscritos}/${cupos || 0} inscritos`}</Text>
+                <Text>{`${inscritos}/${cupos || 0} registrados`}</Text>
                 <Tag color={libres > 0 ? "green" : "red"}>{libres} cupos libres</Tag>
               </Space>
               <Text type="secondary">{formatDias(curso.dias_semana)} · {formatHorario(curso.hora_inicio, curso.hora_fin)}</Text>

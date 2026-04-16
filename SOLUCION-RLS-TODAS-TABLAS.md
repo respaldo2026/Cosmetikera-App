@@ -168,7 +168,7 @@ curl -X POST http://localhost:3000/api/matriculas/create \
 
 **Test producción:**
 ```bash
-curl -X POST https://app.crystaldiamante.com/api/matriculas/create \
+curl -X POST https://app.lacosmetikera.com/api/matriculas/create \
   -H "Content-Type: application/json" \
   -d '{"curso_id": "uuid", "estudiante_id": "uuid", "estado": "activo"}'
 ```
@@ -282,3 +282,4 @@ A: Solo los que intenten INSERT/UPDATE en tablas bloqueadas. Prueba primero y ac
 
 **Estado**: ✅ Infraestructura completa lista  
 **Próximo paso**: Probar cada endpoint y actualizar formularios según sea necesario
+

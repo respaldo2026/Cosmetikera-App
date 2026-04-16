@@ -40,7 +40,7 @@ Recargar página
 
 1. Abre [https://supabase.com/dashboard](https://supabase.com/dashboard)
 2. Login con tu cuenta
-3. Selecciona proyecto: **Academia Crystal** (o tu proyecto)
+3. Selecciona proyecto: **La Cosmetikera** (o tu proyecto)
 4. Sidebar izquierdo → **SQL Editor**
 5. Click en **+ New Query** (botón azul arriba)
 
@@ -78,7 +78,7 @@ Recargar página
 
 ### En Vercel
 ```
-1. Abre tu app: https://academia-crystal.vercel.app
+1. Abre tu app: https://tu-app.vercel.app
 2. Limpia caché: Ctrl+Shift+R (importante!)
 3. Login como admin
 4. Ir a: /estudiantes
@@ -205,3 +205,4 @@ Si checklist está completo y todo funciona:
 **Fecha:** 30 Enero 2026  
 **Tiempo total:** 5-10 minutos  
 **Riesgo:** Ninguno (SQL es idempotent)
+
