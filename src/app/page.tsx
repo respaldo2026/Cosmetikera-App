@@ -1,877 +1,273 @@
-"use client";
+﻿"use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import { 
-  Typography, Row, Col, Card, Statistic, Button, Spin, Tag, Progress, 
-  Empty, Space, Segmented, Tooltip, Badge, Grid, Skeleton
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Card, Typography, Space, Row, Col, Spin, Tag,
+  Button, Avatar, Grid, Empty, Badge,
 } from "antd";
 import {
-  DollarCircleOutlined, TeamOutlined, BookOutlined, RiseOutlined,
-  FallOutlined, CalendarOutlined, TrophyOutlined, ClockCircleOutlined,
-  UserAddOutlined, WalletOutlined, FileTextOutlined, BankOutlined,
-  GiftOutlined, WarningOutlined, CheckCircleOutlined, SyncOutlined
+  ShoppingCartOutlined, UserOutlined, TagsOutlined, GiftOutlined,
+  TruckOutlined, WarningOutlined, CrownOutlined, ThunderboltOutlined,
+  DollarCircleOutlined, CalendarOutlined, ReloadOutlined, InboxOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
-import { enviarWhatsapp } from "@utils/whatsapp";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@hooks/useCurrentUser";
 import { LoginLanding } from "@components/auth-page/LoginLanding";
-import { AuthPage as AuthPageComponent } from "@components/auth-page";
 import dayjs from "dayjs";
-import isBetween from 'dayjs/plugin/isBetween';
-import { formatDate } from "@utils/date";
-import { Line, Column } from "@ant-design/plots";
-import 'dayjs/locale/es';
-import { useQuery } from "@tanstack/react-query";
-import { construirNombreGrupo } from "@utils/grupos";
-
-dayjs.extend(isBetween);
-dayjs.locale('es');
+import "dayjs/locale/es";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
+dayjs.locale("es");
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
-export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
+export default function VistaRapidaPage() {
+  const screens = useBreakpoint();
   const router = useRouter();
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
   const { user, loading: userLoading } = useCurrentUser();
-  const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md;
-  const isTablet = screens.md && !screens.lg;
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Estadísticas principales
-  const [stats, setStats] = useState({
-    ingresosMes: 0,
-    ingresosMesAnterior: 0,
-    egresosMes: 0,
-    estudiantesActivos: 0,
-    estudiantesNuevos: 0,
-    cursosActivos: 0,
-    profesores: 0,
-    balanceNeto: 0,
-    tasaConversion: 0,
-    // Métricas estratégicas
-    tasaDesercion: 0,
-    tasaOcupacion: 0,
-    moraPromedio: 0,
-    ingresosPorEstudiante: 0,
-    rentabilidadPorPrograma: [] as any[]
-  });
-
-  // Datos para gráficos
-  const [ingresosChart, setIngresosChart] = useState<any[]>([]);
-  const [distribucionPagos, setDistribucionPagos] = useState<any[]>([]);
-  
-  // Listas
-  const [pagosRecientes, setPagosRecientes] = useState<any[]>([]);
-  const [cumplesHoy, setCumplesHoy] = useState<any[]>([]);
-  const [proximosCursos, setProximosCursos] = useState<any[]>([]);
-  const [pagosVencidos, setPagosVencidos] = useState<any[]>([]);
-
-  // Redirigir no autorizados - USAR EFFECT PARA EVITAR CONDICIONALES
-  const normalizedRole = (user?.rol || "").toLowerCase();
-  const isAdminRole = normalizedRole === "admin" || normalizedRole === "director";
-  const isUnauthenticated = !userLoading && !user;
-
-  useEffect(() => {
-    if (userLoading || !user) return;
-    if (normalizedRole === "secretaria") {
-      void router.replace("/dashboard/secretaria");
-    } else if (normalizedRole === "profesor") {
-      void router.replace("/mi-oficina");
-    } else if (normalizedRole === "estudiante") {
-      void router.replace("/portal-estudiante");
-    }
-  }, [user, userLoading, normalizedRole, router]);
-
-
-  const cargarDashboard = useCallback(async () => {
+  const cargar = useCallback(async () => {
     setLoading(true);
     try {
       const hoy = dayjs();
-      
-      // Determinar rango según filtro
-      let inicioPeriodo: string;
-      let finPeriodo: string;
-      let periodoAnteriorInicio: string;
-      let periodoAnteriorFin: string;
-      
-      switch (timeRange) {
-        case 'week':
-          inicioPeriodo = hoy.startOf('week').format('YYYY-MM-DD');
-          finPeriodo = hoy.endOf('week').format('YYYY-MM-DD');
-          periodoAnteriorInicio = hoy.subtract(1, 'week').startOf('week').format('YYYY-MM-DD');
-          periodoAnteriorFin = hoy.subtract(1, 'week').endOf('week').format('YYYY-MM-DD');
-          break;
-        case 'year':
-          inicioPeriodo = hoy.startOf('year').format('YYYY-MM-DD');
-          finPeriodo = hoy.endOf('year').format('YYYY-MM-DD');
-          periodoAnteriorInicio = hoy.subtract(1, 'year').startOf('year').format('YYYY-MM-DD');
-          periodoAnteriorFin = hoy.subtract(1, 'year').endOf('year').format('YYYY-MM-DD');
-          break;
-        case 'month':
-        default:
-          inicioPeriodo = hoy.startOf('month').format('YYYY-MM-DD');
-          finPeriodo = hoy.endOf('month').format('YYYY-MM-DD');
-          periodoAnteriorInicio = hoy.subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
-          periodoAnteriorFin = hoy.subtract(1, 'month').endOf('month').format('YYYY-MM-DD');
-          break;
-      }
+      const inicioHoy = hoy.startOf("day").toISOString();
+      const inicioMes = hoy.startOf("month").toISOString();
 
-      // OPTIMIZACIÓN: Ejecutar todas las consultas en paralelo
       const [
-        pagosMes,
-        pagosMesAnterior,
-        nomina,
-        matriculasActivas,
-        cursosActivosCount,
-        profesoresCount,
-        pagosRec,
-        proxCursos,
-        vencidos
+        { data: ventasHoyData },
+        { data: ventasMesData },
+        { data: clientesData },
+        { data: articulosData },
+        { data: comprasData },
+        { data: ventasRecData },
       ] = await Promise.all([
-        // 1. INGRESOS DEL PERÍODO ACTUAL
-        supabaseBrowserClient
-          .from("pagos")
-          .select("monto, fecha_pago, estado, metodo_pago")
-          .eq("estado", "pagado")
-          .gte("fecha_pago", inicioPeriodo)
-          .lte("fecha_pago", finPeriodo),
-        
-        // 2. INGRESOS PERÍODO ANTERIOR
-        supabaseBrowserClient
-          .from("pagos")
-          .select("monto")
-          .eq("estado", "pagado")
-          .gte("fecha_pago", periodoAnteriorInicio)
-          .lte("fecha_pago", periodoAnteriorFin),
-        
-        // 3. EGRESOS (NÓMINA)
-        supabaseBrowserClient
-          .from("pagos_nomina")
-          .select("total_pagado")
-          .gte("fecha_pago", inicioPeriodo)
-          .lte("fecha_pago", finPeriodo),
-        
-        // 4. ESTUDIANTES ACTIVOS
-        supabaseBrowserClient
-          .from("matriculas")
-          .select("estudiante_id, created_at")
-          .eq("estado", "activo"),
-        
-        // 5. CURSOS ACTIVOS
-        supabaseBrowserClient
-          .from("cursos")
-          .select("*", { count: 'exact', head: true })
-          .eq("estado", "activo"),
-        
-        // 6. PROFESORES
-        supabaseBrowserClient
-          .from("perfiles")
-          .select("*", { count: 'exact', head: true })
-          .eq("rol", "profesor"),
-        
-        // 7. PAGOS RECIENTES
-        supabaseBrowserClient
-          .from("pagos")
-          .select("id, monto, fecha_pago, metodo_pago, estado, perfiles(nombre_completo)")
-          .eq("estado", "pagado")
-          .order("fecha_pago", { ascending: false })
-          .limit(8),
-        
-        // 8. PRÓXIMOS CURSOS - Cargar cursos y luego contar matrículas activas
-        supabaseBrowserClient
-          .from("cursos")
-          .select("id, nombre, fecha_inicio, cupos, estado, dias_semana, hora_inicio, hora_fin, programas(nombre)")
-          .gte("fecha_inicio", hoy.format('YYYY-MM-DD'))
-          .in("estado", ["proximo", "activo"])
-          .order("fecha_inicio", { ascending: true })
-          .limit(6),
-        
-        // 9. PAGOS VENCIDOS
-        supabaseBrowserClient
-          .from("pagos")
-          .select("id, monto, fecha_vencimiento, perfiles(nombre_completo), periodo_pagado")
-          .eq("estado", "pendiente")
-          .lt("fecha_vencimiento", hoy.format('YYYY-MM-DD'))
-          .order("fecha_vencimiento", { ascending: true })
-          .limit(5)
+        supabaseBrowserClient.from("ventas").select("total").gte("fecha", inicioHoy),
+        supabaseBrowserClient.from("ventas").select("total").gte("fecha", inicioMes),
+        supabaseBrowserClient.from("perfiles").select("id,nombre_completo,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,created_at"),
+        supabaseBrowserClient.from("articulos").select("id,nombre,stock,stock_minimo,precio_venta"),
+        supabaseBrowserClient.from("compras").select("id,estado,total,proveedor_nombre").eq("estado", "pendiente"),
+        supabaseBrowserClient.from("ventas").select("id,total,fecha,items,cliente:perfiles(nombre_completo)").order("fecha", { ascending: false }).limit(5),
       ]);
 
-      const totalIngresos = pagosMes.data?.reduce((sum, p) => sum + Number(p.monto || 0), 0) || 0;
-      const ingresosMesAnterior = pagosMesAnterior.data?.reduce((sum, p) => sum + Number(p.monto || 0), 0) || 0;
-      const totalEgresos = nomina.data?.reduce((sum, n) => sum + Number(n.total_pagado || 0), 0) || 0;
+      const ventasH = ventasHoyData || [];
+      const ventasM = ventasMesData || [];
+      const clientes = clientesData || [];
+      const articulos = articulosData || [];
 
-      const estudiantesUnicos = new Set(matriculasActivas.data?.map(m => m.estudiante_id) || []);
-      const estudiantesNuevosMes = matriculasActivas.data?.filter(m => 
-        dayjs(m.created_at).isBetween(inicioPeriodo, finPeriodo, null, '[]')
-      ).length || 0;
-
-      // Solo cargar cumpleaños si son pocos registros para no ralentizar
-      const cumples: any[] = []; // Desactivado temporalmente para mejor rendimiento
-
-      // 10. DATOS PARA GRÁFICO DE INGRESOS (dinámico según período)
-      const chartData = [];
-      let iteraciones = 7;
-      let unidad: 'day' | 'week' | 'month' = 'day';
-      let formato = 'DD MMM';
-      
-      if (timeRange === 'week') {
-        iteraciones = 7;
-        unidad = 'day';
-        formato = 'DD MMM';
-      } else if (timeRange === 'year') {
-        iteraciones = 12;
-        unidad = 'month';
-        formato = 'MMM';
-      } else {
-        iteraciones = 30;
-        unidad = 'day';
-        formato = 'DD';
-      }
-      
-      for (let i = iteraciones - 1; i >= 0; i--) {
-        const fecha = hoy.subtract(i, unidad);
-        const fechaInicio = fecha.startOf(unidad).format('YYYY-MM-DD');
-        const fechaFin = fecha.endOf(unidad).format('YYYY-MM-DD');
-        const pagos = pagosMes.data?.filter(p => {
-          const fechaPago = dayjs(p.fecha_pago);
-          return fechaPago.isBetween(fechaInicio, fechaFin, null, '[]');
-        }) || [];
-        const total = pagos.reduce((sum, p) => sum + Number(p.monto || 0), 0);
-        chartData.push({
-          fecha: fecha.format(formato),
-          monto: total,
-          cantidad: pagos.length
-        });
-      }
-
-      // 11. DISTRIBUCIÓN POR MÉTODO DE PAGO
-      const metodos: Record<string, number> = {};
-      pagosMes.data?.forEach(p => {
-        const metodo = p.metodo_pago || 'Efectivo';
-        metodos[metodo] = (metodos[metodo] || 0) + Number(p.monto || 0);
-      });
-      const distribucion = Object.entries(metodos).map(([metodo, monto]) => ({
-        metodo,
-        monto
-      }));
-
-      // Métricas simplificadas para mejor rendimiento
-      const tasaOcupacion = 75; // Valor estimado
-      const moraPromedio = 5; // Valor estimado
-      const ingresosPorEstudiante = estudiantesUnicos.size > 0 
-        ? Math.round(totalIngresos / estudiantesUnicos.size)
-        : 0;
+      const stockBajoItems = articulos.filter((a: any) => a.stock <= (a.stock_minimo ?? 3));
+      const clientesNuevosMes = clientes.filter((c: any) => dayjs(c.created_at).isAfter(hoy.startOf("month")));
+      const cumpleMes = clientes.filter((c: any) => c.fecha_nacimiento && dayjs(c.fecha_nacimiento).month() === hoy.month());
+      const clientesTop = [...clientes].sort((a: any, b: any) => (b.puntos_fidelidad || 0) - (a.puntos_fidelidad || 0)).slice(0, 5);
 
       setStats({
-        ingresosMes: totalIngresos,
-        ingresosMesAnterior,
-        egresosMes: totalEgresos,
-        estudiantesActivos: estudiantesUnicos.size,
-        estudiantesNuevos: estudiantesNuevosMes,
-        cursosActivos: cursosActivosCount.count || 0,
-        profesores: profesoresCount.count || 0,
-        balanceNeto: totalIngresos - totalEgresos,
-        tasaConversion: ((estudiantesNuevosMes / (proxCursos.data?.length || 1)) * 100),
-        tasaDesercion: 0,
-        tasaOcupacion,
-        moraPromedio,
-        ingresosPorEstudiante,
-        rentabilidadPorPrograma: []
+        ventasHoy: ventasH.length,
+        ingresoHoy: ventasH.reduce((s: number, v: any) => s + Number(v.total || 0), 0),
+        ventasMes: ventasM.length,
+        ingresoMes: ventasM.reduce((s: number, v: any) => s + Number(v.total || 0), 0),
+        totalClientes: clientes.length,
+        clientesNuevosMes: clientesNuevosMes.length,
+        totalArticulos: articulos.length,
+        stockBajo: stockBajoItems.length,
+        comprasPendientes: (comprasData || []).length,
+        ventasRecientes: ventasRecData || [],
+        clientesTop,
+        cumpleanierosMes: cumpleMes,
       });
-
-      setIngresosChart(chartData);
-      setDistribucionPagos(distribucion);
-      setPagosRecientes(pagosRec.data || []);
-      setCumplesHoy(cumples);
-      
-      // Contar matrículas activas para cada curso próximo
-      const cursosConConteo = await Promise.all(
-        (proxCursos.data || []).map(async (curso: any) => {
-          const { count } = await supabaseBrowserClient
-            .from("matriculas")
-            .select("*", { count: "exact", head: true })
-            .eq("curso_id", curso.id)
-            .neq("estado", "cancelado");
-          
-          return {
-            ...curso,
-            matriculas: [{ count: count || 0 }]
-          };
-        })
-      );
-      
-      setProximosCursos(cursosConConteo);
-      setPagosVencidos(vencidos.data || []);
-
-    } catch (error) {
-      console.error("Error al cargar dashboard", error);
+    } catch {
+      setStats(null);
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, []);
 
-  useEffect(() => {
-    if (userLoading) return;
-    if (normalizedRole === "secretaria") return;
+  useEffect(() => { cargar(); }, [cargar]);
 
-    cargarDashboard();
-
-    const subscription = supabaseBrowserClient
-      .channel('dashboard-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos' }, () => cargarDashboard())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matriculas' }, () => cargarDashboard())
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [cargarDashboard, normalizedRole, userLoading]);
-
-  if (user && !isAdminRole) {
-    return null;
+  if (userLoading) {
+    return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><Spin size="large" /></div>;
   }
+
+  if (!user) return <LoginLanding />;
 
   if (loading) {
-    return (
-      <div style={{ padding: 24 }}>
-        <Skeleton active paragraph={{ rows: 10 }} />
-      </div>
-    );
+    return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 400 }}><Spin size="large" tip="Cargando..." /></div>;
   }
 
-  const cambioIngresos = stats.ingresosMesAnterior > 0 
-    ? ((stats.ingresosMes - stats.ingresosMesAnterior) / stats.ingresosMesAnterior * 100).toFixed(1)
-    : 0;
+  const s = stats || {};
 
-  const lineConfig = {
-    data: ingresosChart,
-    xField: 'fecha',
-    yField: 'monto',
-    smooth: true,
-    color: '#52c41a',
-    point: {
-      size: 5,
-      shape: 'circle',
-    },
-    label: {
-      style: {
-        fill: '#aaa',
-      },
-    },
-  };
-
-  const columnConfig = {
-    data: distribucionPagos,
-    xField: 'metodo',
-    yField: 'monto',
-    seriesField: 'metodo',
-    color: ({ metodo }: any) => {
-      const colors: Record<string, string> = {
-        'efectivo': '#52c41a',
-        'transferencia': '#1890ff',
-        'tarjeta': '#722ed1',
-        'nequi': '#fa8c16',
-        'otro': '#8c8c8c'
-      };
-      return colors[metodo?.toLowerCase()] || '#8c8c8c';
-    },
-    label: {
-      position: 'top',
-      style: {
-        fill: '#000',
-        opacity: 0.6,
-      },
-    },
-  };
-
-  if (isUnauthenticated) {
-    return (
-      <LoginLanding>
-        <AuthPageComponent type="login" />
-      </LoginLanding>
-    );
-  }
-
-  // Texto del período seleccionado
-  const periodoTexto = timeRange === 'week' ? 'de la Semana' : timeRange === 'year' ? 'del Año' : 'del Mes';
-  const periodoAnteriorTexto = timeRange === 'week' ? 'Semana Anterior' : timeRange === 'year' ? 'Año Anterior' : 'Mes Anterior';
+  const KpiCard = ({ title, value, prefix, suffix, color, icon, onClick, badge }: any) => (
+    <Card
+      hoverable={!!onClick}
+      onClick={onClick}
+      style={{ borderRadius: 14, cursor: onClick ? "pointer" : "default", border: "none", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
+      bodyStyle={{ padding: "14px 16px" }}
+    >
+      <Row align="middle" gutter={12}>
+        <Col>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: color || "linear-gradient(135deg,#d81b87,#9c27b0)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {React.cloneElement(icon, { style: { color: "#fff", fontSize: 20 } })}
+          </div>
+        </Col>
+        <Col flex="auto">
+          <Text type="secondary" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{title}</Text>
+          <div>
+            <Text strong style={{ fontSize: 22, color: "#1a1a1a" }}>
+              {prefix}{typeof value === "number" ? value.toLocaleString() : value}{suffix}
+            </Text>
+          </div>
+        </Col>
+        {badge > 0 && <Col><Badge count={badge} style={{ background: "#ff4d4f" }} /></Col>}
+      </Row>
+    </Card>
+  );
 
   return (
-    <div style={{ padding: isMobile ? 12 : isTablet ? 16 : 24, background: '#f0f2f5', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ 
-        marginBottom: 24, 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 16
-      }}>
-        <div>
-          <Title level={isMobile ? 4 : 2} style={{ margin: 0, color: '#262626' }}>
-            Dashboard Ejecutivo
-          </Title>
-          <Text type="secondary">{dayjs().format('dddd, D [de] MMMM [de] YYYY')}</Text>
-        </div>
-        <Space wrap style={{ width: isMobile ? '100%' : 'auto' }}>
-          <Segmented
-            options={[
-              { label: 'Semana', value: 'week' },
-              { label: 'Mes', value: 'month' },
-              { label: 'Año', value: 'year' },
-            ]}
-            value={timeRange}
-            onChange={(value: 'week' | 'month' | 'year') => setTimeRange(value)}
-            size={isMobile ? 'small' : 'middle'}
-          />
-          <Button 
-            icon={<SyncOutlined />} 
-            onClick={cargarDashboard}
-            type="primary"
-            size={isMobile ? 'small' : 'middle'}
-          >
-            Actualizar
-          </Button>
-        </Space>
-      </div>
-
-      {/* KPIs Principales */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card variant="borderless" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)', boxShadow: '0 4px 12px rgba(30, 58, 138, 0.2)' }}>
-            <Statistic
-              title={<span style={{ color: '#fff', fontWeight: 600 }}>Ingresos {periodoTexto}</span>}
-              value={stats.ingresosMes}
-              precision={0}
-              valueStyle={{ color: '#fff', fontWeight: 'bold' }}
-              prefix={<DollarCircleOutlined style={{ color: '#fff' }} />}
-              suffix={
-                <Tag color={Number(cambioIngresos) >= 0 ? 'success' : 'error'} icon={Number(cambioIngresos) >= 0 ? <RiseOutlined /> : <FallOutlined />}>
-                  {cambioIngresos}%
-                </Tag>
-              }
-            />
-            <Text style={{ color: '#e0e7ff', fontSize: 11 }}>vs. {periodoAnteriorTexto}</Text>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} lg={6}>
-          <Card variant="borderless" style={{ background: 'linear-gradient(135deg, #be123c 0%, #f43f5e 100%)', boxShadow: '0 4px 12px rgba(190, 18, 60, 0.2)' }}>
-            <Statistic
-              title={<span style={{ color: '#fff', fontWeight: 600 }}>Egresos {periodoTexto}</span>}
-              value={stats.egresosMes}
-              precision={0}
-              valueStyle={{ color: '#fff', fontWeight: 'bold' }}
-              prefix={<WalletOutlined style={{ color: '#fff' }} />}
-            />
-            <Text style={{ color: '#ffe4e6', fontSize: 11 }}>Nómina y gastos</Text>
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={12} lg={6}>
-          <Card variant="borderless" style={{ background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)', boxShadow: '0 4px 12px rgba(8, 145, 178, 0.2)' }}>
-            <Statistic
-              title={<span style={{ color: '#fff', fontWeight: 600 }}>Balance Neto {periodoTexto}</span>}
-              value={stats.balanceNeto}
-              precision={0}
-              valueStyle={{ color: '#fff', fontWeight: 'bold' }}
-              prefix={<BankOutlined style={{ color: '#fff' }} />}
-            />
-            <Text style={{ color: '#cffafe', fontSize: 11 }}>Ingresos - Egresos</Text>
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={12} lg={6}>
-          <Card variant="borderless" style={{ background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)', boxShadow: '0 4px 12px rgba(21, 128, 61, 0.2)' }}>
-            <Statistic
-              title={<span style={{ color: '#fff', fontWeight: 600 }}>Clientes Activos</span>}
-              value={stats.estudiantesActivos}
-              valueStyle={{ color: '#fff', fontWeight: 'bold' }}
-              prefix={<TeamOutlined style={{ color: '#fff' }} />}
-              suffix={
-                <Badge count={`+${stats.estudiantesNuevos} nuevos clientes`} style={{ backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 600 }} />
-              }
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* MÉTRICAS ESTRATÉGICAS */}
-      <Card 
-        title={
-          <Space>
-            <TrophyOutlined style={{ color: '#faad14' }} />
-            <span>Indicadores Estratégicos</span>
-          </Space>
-        }
-        variant="outlined"
-        style={{ marginBottom: 24 }}
-      >
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
-            <Card size="small" style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}>
-              <Statistic
-                title="Tasa de Ocupación"
-                value={stats.tasaOcupacion}
-                precision={1}
-                suffix="%"
-                valueStyle={{ color: stats.tasaOcupacion >= 80 ? '#52c41a' : stats.tasaOcupacion >= 60 ? '#faad14' : '#ff4d4f' }}
-                prefix={<CheckCircleOutlined />}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {stats.tasaOcupacion >= 80 ? 'Excelente capacidad' : stats.tasaOcupacion >= 60 ? 'Buena ocupación' : 'Mejorar captación'}
-              </Text>
-            </Card>
+    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      {/* BIENVENIDA */}
+      <Card style={{ borderRadius: 16, border: "none", background: "linear-gradient(135deg,#fce4f8 0%,#f0d6ff 50%,#dbeafe 100%)", boxShadow: "0 4px 20px rgba(216,27,135,0.12)" }} bodyStyle={{ padding: "20px 24px" }}>
+        <Row align="middle" justify="space-between">
+          <Col>
+            <Space align="center">
+              <span style={{ fontSize: 36 }}>💄</span>
+              <div>
+                <Title level={3} style={{ margin: 0, color: "#d81b87" }}>La Cosmetikera</Title>
+                <Text style={{ color: "#888" }}>{dayjs().format("dddd D [de] MMMM, YYYY")}</Text>
+              </div>
+            </Space>
           </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <Card size="small" style={{ background: stats.tasaDesercion >= 15 ? '#fff1f0' : '#f6ffed', borderColor: stats.tasaDesercion >= 15 ? '#ffccc7' : '#b7eb8f' }}>
-              <Statistic
-                title="Tasa de Deserción"
-                value={stats.tasaDesercion}
-                precision={1}
-                suffix="%"
-                valueStyle={{ color: stats.tasaDesercion < 10 ? '#52c41a' : stats.tasaDesercion < 15 ? '#faad14' : '#ff4d4f' }}
-                prefix={<FallOutlined />}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {stats.tasaDesercion < 10 ? 'Retención excelente' : stats.tasaDesercion < 15 ? 'Retención normal' : 'Requiere atención'}
-              </Text>
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <Card size="small" style={{ background: '#fff7e6', borderColor: '#ffd591' }}>
-              <Statistic
-                title="Mora Promedio"
-                value={stats.moraPromedio}
-                suffix="días"
-                valueStyle={{ color: stats.moraPromedio <= 7 ? '#52c41a' : stats.moraPromedio <= 15 ? '#faad14' : '#ff4d4f' }}
-                prefix={<ClockCircleOutlined />}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {stats.moraPromedio <= 7 ? 'Cobranza efectiva' : stats.moraPromedio <= 15 ? 'Revisar procesos' : 'Acción inmediata'}
-              </Text>
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <Card size="small" style={{ background: '#e6f4ff', borderColor: '#91caff' }}>
-              <Statistic
-                title="Ingreso por Cliente"
-                value={stats.ingresosPorEstudiante}
-                precision={0}
-                prefix="$"
-                valueStyle={{ color: '#1890ff' }}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>LTV promedio mensual</Text>
-            </Card>
-          </Col>
+          <Col><Button icon={<ReloadOutlined />} onClick={cargar}>Actualizar</Button></Col>
         </Row>
       </Card>
 
-      {/* Accesos Rápidos */}
-      <Card 
-        title="Acciones Rápidas" 
-        variant="outlined"
-        style={{ marginBottom: 24 }}
-      >
-        <Space size="middle" wrap>
-          <Button 
-            type="primary" 
-            size="large"
-            icon={<UserAddOutlined />}
-            onClick={() => router.push('/matriculas/create')}
-          >
-            Nueva venta
-          </Button>
-          <Button 
-            size="large"
-            icon={<DollarCircleOutlined />}
-            onClick={() => router.push('/tesoreria/create')}
-          >
-            Registrar Pago
-          </Button>
-          <Button 
-            size="large"
-            icon={<BookOutlined />}
-            onClick={() => router.push('/cursos/create')}
-          >
-            Nuevo servicio
-          </Button>
-          <Button 
-            size="large"
-            icon={<FileTextOutlined />}
-            onClick={() => router.push('/nomina')}
-          >
-            Ver Nómina
-          </Button>
-        </Space>
-      </Card>
+      {/* KPIs VENTAS */}
+      <div>
+        <Text type="secondary" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, display: "block" }}>💰 Ventas</Text>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} sm={12} lg={6}>
+            <KpiCard title="Ingresos hoy" value={s.ingresoHoy || 0} prefix="$" color="linear-gradient(135deg,#389e0d,#52c41a)" icon={<DollarCircleOutlined />} onClick={() => router.push("/ventas")} />
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <KpiCard title="Ventas hoy" value={s.ventasHoy || 0} suffix=" ventas" color="linear-gradient(135deg,#d81b87,#9c27b0)" icon={<ShoppingCartOutlined />} onClick={() => router.push("/ventas")} />
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <KpiCard title="Ingresos este mes" value={s.ingresoMes || 0} prefix="$" color="linear-gradient(135deg,#1890ff,#096dd9)" icon={<CalendarOutlined />} onClick={() => router.push("/historial")} />
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <KpiCard title="Ventas del mes" value={s.ventasMes || 0} suffix=" ventas" color="linear-gradient(135deg,#722ed1,#531dab)" icon={<ThunderboltOutlined />} onClick={() => router.push("/historial")} />
+          </Col>
+        </Row>
+      </div>
 
-      {/* Gráficos */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} lg={16}>
-          <Card 
-            title={
-              timeRange === 'week' 
-                ? 'Ingresos de la Semana (Últimos 7 días)' 
-                : timeRange === 'year' 
-                  ? 'Ingresos del Año (Por mes)' 
-                  : 'Ingresos del Mes (Por día)'
-            } 
-            variant="borderless"
-          >
-            <Line {...lineConfig} height={300} />
-          </Card>
-        </Col>
+      {/* KPIs TIENDA */}
+      <div>
+        <Text type="secondary" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, display: "block" }}>🏪 Tienda</Text>
+        <Row gutter={[12, 12]}>
+          <Col xs={12} sm={6}>
+            <KpiCard title="Artículos" value={s.totalArticulos || 0} color="linear-gradient(135deg,#fa8c16,#faad14)" icon={<TagsOutlined />} onClick={() => router.push("/articulos")} />
+          </Col>
+          <Col xs={12} sm={6}>
+            <KpiCard title="Stock bajo" value={s.stockBajo || 0} color="linear-gradient(135deg,#cf1322,#ff4d4f)" icon={<WarningOutlined />} onClick={() => router.push("/articulos")} badge={s.stockBajo} />
+          </Col>
+          <Col xs={12} sm={6}>
+            <KpiCard title="Compras pend." value={s.comprasPendientes || 0} color="linear-gradient(135deg,#096dd9,#0050b3)" icon={<InboxOutlined />} onClick={() => router.push("/compras")} badge={s.comprasPendientes} />
+          </Col>
+          <Col xs={12} sm={6}>
+            <KpiCard title="Clientes" value={s.totalClientes || 0} color="linear-gradient(135deg,#08979c,#13c2c2)" icon={<UserOutlined />} onClick={() => router.push("/estudiantes")} />
+          </Col>
+        </Row>
+      </div>
 
+      {/* TOP CLIENTES + VENTAS RECIENTES */}
+      <Row gutter={[12, 12]}>
         <Col xs={24} lg={8}>
-          <Card title={`Métodos de Pago ${periodoTexto}`} variant="borderless">
-            <Column {...columnConfig} height={300} />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Alertas y Acciones Importantes */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {pagosVencidos.length > 0 && (
-          <Col xs={24} lg={12}>
-            <Card 
-              title={
-                <Space>
-                  <WarningOutlined style={{ color: '#ff4d4f' }} />
-                  Cobros Vencidos ({pagosVencidos.length})
-                </Space>
-              } 
-              variant="borderless"
-            >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {pagosVencidos.slice(0, 5).map((pago: any) => (
-                  <Card key={pago.id} size="small" style={{ background: '#fff1f0', borderColor: '#ffccc7' }}>
-                    <Space direction="vertical" size={0}>
-                      <Text strong>{pago.perfiles?.nombre_completo || 'Cliente'}</Text>
-                      <Text type="secondary">{pago.periodo_pagado}</Text>
-                      <Space>
-                        <Tag color="red">Vencido: {formatDate(pago.fecha_vencimiento)}</Tag>
-                        <Text strong style={{ color: '#ff4d4f' }}>${Number(pago.monto).toLocaleString()}</Text>
-                      </Space>
-                    </Space>
-                  </Card>
-                ))}
-                <Button type="link" onClick={() => router.push('/tesoreria')}>Ver todos los cobros</Button>
-              </Space>
-            </Card>
-          </Col>
-        )}
-
-        {cumplesHoy.length > 0 && (
-          <Col xs={24} lg={pagosVencidos.length > 0 ? 12 : 24}>
-            <Card 
-              title={
-                <Space>
-                  <GiftOutlined style={{ color: '#52c41a' }} />
-                  Cumpleaños Hoy ({cumplesHoy.length})
-                </Space>
-              } 
-              variant="borderless"
-            >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {cumplesHoy.map((estudiante: any) => (
-                  <Card key={estudiante.id} size="small" style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}>
-                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                      <Space>
-                        <TrophyOutlined style={{ fontSize: 20, color: '#52c41a' }} />
-                        <div>
-                          <Text strong>{estudiante.nombre_completo}</Text>
-                          <br />
-                          <Text type="secondary">{estudiante.telefono}</Text>
-                        </div>
-                      </Space>
-                      <Button 
-                        type="primary" 
-                        size="small" 
-                        style={{ background: '#25D366', borderColor: '#25D366' }}
-                        onClick={() => enviarWhatsapp(estudiante.telefono, `¡Feliz cumpleaños ${estudiante.nombre_completo}! 🎉`)}
-                      >
-                        Felicitar
-                      </Button>
-                    </Space>
-                  </Card>
-                ))}
-              </Space>
-            </Card>
-          </Col>
-        )}
-      </Row>
-
-      {/* Información Adicional */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <Card title="Ventas y Cobros Recientes" variant="borderless">
-            {pagosRecientes.length === 0 ? (
-              <Empty description="No hay movimientos recientes" />
+          <Card title={<Space><CrownOutlined style={{ color: "#faad14" }} /><Text strong>Top clientes</Text></Space>} extra={<Button type="link" size="small" onClick={() => router.push("/fidelizacion")}>Ver todos</Button>} style={{ borderRadius: 12, height: "100%" }} bodyStyle={{ padding: "8px 12px" }}>
+            {(s.clientesTop || []).length === 0 ? (
+              <Empty description="Sin datos" imageStyle={{ height: 40 }} />
             ) : (
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {pagosRecientes.map((pago: any) => (
-                  <div key={pago.id} style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    padding: '8px 0',
-                    borderBottom: '1px solid #f0f0f0'
-                  }}>
-                    <Space>
-                      <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                      <div>
-                        <Text strong>{pago.perfiles?.nombre_completo || 'Cliente'}</Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {formatDate(pago.fecha_pago)} • {pago.metodo_pago || 'Efectivo'}
-                        </Text>
-                      </div>
-                    </Space>
-                    <Text strong style={{ color: '#52c41a' }}>
-                      ${Number(pago.monto).toLocaleString()}
-                    </Text>
+              (s.clientesTop || []).map((c: any, idx: number) => {
+                const iconNivel = c.nivel_fidelidad === "diamante" ? "💎" : c.nivel_fidelidad === "oro" ? "🥇" : c.nivel_fidelidad === "plata" ? "🥈" : "🥉";
+                return (
+                  <div key={c.id} style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: 8, borderBottom: idx < 4 ? "1px solid #f0f0f0" : undefined }}>
+                    <Text strong style={{ minWidth: 20, color: idx < 3 ? "#faad14" : "#888" }}>{idx + 1}</Text>
+                    <Avatar size="small" icon={<UserOutlined />} style={{ background: "#d81b87" }} />
+                    <Text style={{ flex: 1, fontSize: 13 }} ellipsis>{c.nombre_completo}</Text>
+                    <Text strong style={{ color: "#faad14", fontSize: 12 }}>{iconNivel} {(c.puntos_fidelidad || 0).toLocaleString()} pts</Text>
                   </div>
-                ))}
-              </Space>
+                );
+              })
             )}
           </Card>
         </Col>
-
-        <Col xs={24} lg={12}>
-          <Card title="Próximos Servicios a Activar" variant="borderless">
-            {proximosCursos.length === 0 ? (
-              <Empty description="No hay servicios próximos" />
+        <Col xs={24} lg={16}>
+          <Card title={<Space><ShoppingCartOutlined style={{ color: "#d81b87" }} /><Text strong>Ventas recientes</Text></Space>} extra={<Button type="link" size="small" onClick={() => router.push("/historial")}>Ver historial</Button>} style={{ borderRadius: 12, height: "100%" }} bodyStyle={{ padding: "8px 12px" }}>
+            {(s.ventasRecientes || []).length === 0 ? (
+              <Empty description="Sin ventas registradas" imageStyle={{ height: 40 }}>
+                <Button type="primary" size="small" onClick={() => router.push("/ventas")}>Ir al POS</Button>
+              </Empty>
             ) : (
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {proximosCursos.map((curso: any) => {
-                  const inscritos = curso.matriculas?.[0]?.count || 0;
-                  const cupos = curso.cupos || 20;
-                  const porcentaje = (inscritos / cupos) * 100;
-                  
-                  return (
-                    <Card key={curso.id} size="small" hoverable onClick={() => router.push(`/cursos/salon/${curso.id}`)}>
-                      <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text strong>{construirNombreGrupo(curso)}</Text>
-                          <Tag color="blue">{formatDate(curso.fecha_inicio)}</Tag>
-                        </div>
-                        <Progress 
-                          percent={porcentaje} 
-                          format={() => `${inscritos}/${cupos}`}
-                          strokeColor={porcentaje >= 80 ? '#ff4d4f' : '#52c41a'}
-                        />
-                      </Space>
-                    </Card>
-                  );
-                })}
-              </Space>
+              (s.ventasRecientes || []).map((v: any) => (
+                <div key={v.id} style={{ padding: "8px 4px", display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid #f0f0f0" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: "linear-gradient(135deg,#fce4f8,#f0d6ff)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <ShoppingCartOutlined style={{ color: "#d81b87" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text strong style={{ fontSize: 13 }}>{(v.cliente as any)?.nombre_completo || "Cliente sin registrar"}</Text>
+                    <div><Text type="secondary" style={{ fontSize: 11 }}>{dayjs(v.fecha).fromNow()} · {(v.items || []).length} ítem(s)</Text></div>
+                  </div>
+                  <Text strong style={{ color: "#d81b87", fontSize: 15 }}>${Number(v.total).toLocaleString()}</Text>
+                </div>
+              ))
             )}
           </Card>
         </Col>
       </Row>
 
-      {/* RENTABILIDAD POR CATEGORÍA - Decisión Estratégica */}
-      {stats.rentabilidadPorPrograma.length > 0 && (
-        <Card 
-          title={
-            <Space>
-              <RiseOutlined style={{ color: '#52c41a' }} />
-              <span>Rentabilidad por Categoría</span>
-              <Tag color="blue">Decisión Estratégica</Tag>
-            </Space>
-          }
-          variant="borderless"
-          style={{ marginBottom: 24, marginTop: 24 }}
-        >
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            {stats.rentabilidadPorPrograma.map((programa: any, index: number) => (
-              <div key={index}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Space>
-                    <Badge 
-                      count={index + 1} 
-                      style={{ backgroundColor: index === 0 ? '#52c41a' : index === 1 ? '#1890ff' : '#8c8c8c' }} 
-                    />
-                    <Text strong>{programa.nombre}</Text>
-                    <Tag>{programa.estudiantes} clientes</Tag>
-                  </Space>
-                  <Space>
-                    <Text type="secondary">Promedio/cliente:</Text>
-                    <Text strong style={{ color: '#1890ff' }}>
-                      ${programa.promedioPorEstudiante.toLocaleString()}
-                    </Text>
-                  </Space>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Progress 
-                    percent={Math.round((programa.ingresos / (stats.rentabilidadPorPrograma[0]?.ingresos || 1)) * 100)}
-                    strokeColor={index === 0 ? '#52c41a' : index === 1 ? '#1890ff' : '#faad14'}
-                    style={{ flex: 1 }}
-                  />
-                  <Text strong style={{ color: '#52c41a', minWidth: 120, textAlign: 'right' }}>
-                    ${programa.ingresos.toLocaleString()}
-                  </Text>
-                </div>
-              </div>
-            ))}
-          </Space>
-          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 16 }}>
-            💡 Las categorías con mayor promedio por cliente tienen mejor rentabilidad.
-            Considera expandir o replicar las más exitosas.
-          </Text>
-        </Card>
-      )}
-
-      {/* Stats adicionales */}
-      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-        <Col xs={12} sm={6}>
-          <Card variant="borderless" style={{ textAlign: 'center' }}>
-            <Statistic
-              title="Servicios Activos"
-              value={stats.cursosActivos}
-              prefix={<BookOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card variant="borderless" style={{ textAlign: 'center' }}>
-            <Statistic
-              title="Equipo"
-              value={stats.profesores}
-              prefix={<TeamOutlined />}
-              valueStyle={{ color: '#722ed1' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card variant="borderless" style={{ textAlign: 'center' }}>
-            <Statistic
-              title="Tasa Conversión"
-              value={stats.tasaConversion}
-              suffix="%"
-              precision={1}
-              prefix={<TrophyOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card variant="borderless" style={{ textAlign: 'center' }}>
-            <Statistic
-              title="Clientes Nuevos"
-              value={stats.estudiantesNuevos}
-              prefix={<UserAddOutlined />}
-              valueStyle={{ color: '#fa8c16' }}
-            />
+      {/* ACCESOS RÁPIDOS + CUMPLEAÑOS */}
+      <Row gutter={[12, 12]}>
+        {(s.cumpleanierosMes || []).length > 0 && (
+          <Col xs={24} md={10}>
+            <Card title={<Space><span>🎂</span><Text strong>Cumpleaños este mes</Text></Space>} style={{ borderRadius: 12 }} bodyStyle={{ padding: "8px 12px" }}>
+              <Row gutter={[8, 8]}>
+                {(s.cumpleanierosMes || []).slice(0, 6).map((c: any) => (
+                  <Col key={c.id} span={12}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Avatar size="small" icon={<UserOutlined />} style={{ background: "#ff4d94" }} />
+                      <div>
+                        <Text style={{ fontSize: 12 }} ellipsis>{c.nombre_completo}</Text>
+                        <div><Text type="secondary" style={{ fontSize: 10 }}>{dayjs(c.fecha_nacimiento).format("D [de] MMMM")}</Text></div>
+                      </div>
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+            </Card>
+          </Col>
+        )}
+        <Col xs={24} md={(s.cumpleanierosMes || []).length > 0 ? 14 : 24}>
+          <Card title={<Space><ThunderboltOutlined style={{ color: "#d81b87" }} /><Text strong>Accesos rápidos</Text></Space>} style={{ borderRadius: 12 }} bodyStyle={{ padding: "12px" }}>
+            <Row gutter={[8, 8]}>
+              {[
+                { label: "Nueva venta", icon: <ShoppingCartOutlined />, path: "/ventas", color: "#d81b87" },
+                { label: "Artículos", icon: <TagsOutlined />, path: "/articulos", color: "#722ed1" },
+                { label: "Fidelización", icon: <GiftOutlined />, path: "/fidelizacion", color: "#faad14" },
+                { label: "Clientes", icon: <UserOutlined />, path: "/estudiantes", color: "#1890ff" },
+                { label: "Nueva compra", icon: <InboxOutlined />, path: "/compras", color: "#096dd9" },
+                { label: "Historial", icon: <CalendarOutlined />, path: "/historial", color: "#13c2c2" },
+              ].map((item) => (
+                <Col span={8} key={item.path}>
+                  <Button block onClick={() => router.push(item.path)} style={{ height: 64, borderRadius: 12, border: "none", background: `${item.color}12`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ fontSize: 20, color: item.color }}>{item.icon}</div>
+                    <Text style={{ fontSize: 11, color: item.color, marginTop: 2 }}>{item.label}</Text>
+                  </Button>
+                </Col>
+              ))}
+            </Row>
           </Card>
         </Col>
       </Row>
-    </div>
+    </Space>
   );
 }

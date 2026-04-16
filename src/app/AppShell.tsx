@@ -53,6 +53,17 @@ import {
   SunOutlined,
   NotificationOutlined,
   ShoppingCartOutlined,
+  ShopOutlined,
+  InboxOutlined,
+  TruckOutlined,
+  HistoryOutlined,
+  GiftOutlined,
+  CrownOutlined,
+  TagsOutlined,
+  ThunderboltOutlined,
+  BarChartOutlined,
+  WalletOutlined,
+  AppstoreOutlined,
 } from "@ant-design/icons";
 import routerProvider from "@refinedev/nextjs-router";
 import { dataProvider } from "@/providers/data-provider";
@@ -64,15 +75,90 @@ import { ColorModeContextProvider, useColorMode } from "@/contexts/color-mode";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 
 const allResources = [
+  // ── VISTA GENERAL ────────────────────────────────────────────────
   {
     key: "dashboard",
     name: "dashboard",
     list: "/",
     meta: {
-      label: "Dashboard",
-      icon: <DashboardOutlined />,
+      label: "Vista rápida",
+      icon: <ThunderboltOutlined />,
     },
   },
+  // ── PUNTO DE VENTA ────────────────────────────────────────────────
+  {
+    key: "ventas",
+    name: "ventas",
+    list: "/ventas",
+    meta: {
+      label: "Ventas",
+      icon: <ShoppingCartOutlined />,
+    },
+  },
+  {
+    key: "historial",
+    name: "historial",
+    list: "/historial",
+    meta: {
+      label: "Historial",
+      icon: <HistoryOutlined />,
+    },
+  },
+  {
+    key: "caja",
+    name: "caja",
+    list: "/caja",
+    meta: {
+      label: "Caja / POS",
+      icon: <WalletOutlined />,
+    },
+  },
+  // ── CATÁLOGO ──────────────────────────────────────────────────────
+  {
+    key: "articulos",
+    name: "articulos",
+    list: "/articulos",
+    create: "/articulos/create",
+    edit: "/articulos/edit/:id",
+    show: "/articulos/show/:id",
+    meta: {
+      label: "Artículos",
+      icon: <TagsOutlined />,
+    },
+  },
+  {
+    key: "cursos",
+    name: "programas",
+    list: "/programas",
+    meta: {
+      label: "Categorías",
+      icon: <AppstoreOutlined />,
+    },
+  },
+  // ── PROVEEDORES ───────────────────────────────────────────────────
+  {
+    key: "proveedores",
+    name: "proveedores",
+    list: "/proveedores",
+    create: "/proveedores/create",
+    edit: "/proveedores/edit/:id",
+    meta: {
+      label: "Proveedores",
+      icon: <TruckOutlined />,
+    },
+  },
+  {
+    key: "compras",
+    name: "compras",
+    list: "/compras",
+    create: "/compras/create",
+    edit: "/compras/edit/:id",
+    meta: {
+      label: "Compras",
+      icon: <InboxOutlined />,
+    },
+  },
+  // ── CLIENTES ──────────────────────────────────────────────────────
   {
     key: "estudiantes",
     name: "perfiles",
@@ -86,6 +172,56 @@ const allResources = [
     },
   },
   {
+    key: "fidelizacion",
+    name: "fidelizacion",
+    list: "/fidelizacion",
+    meta: {
+      label: "Fidelización",
+      icon: <GiftOutlined />,
+    },
+  },
+  // ── FINANZAS ──────────────────────────────────────────────────────
+  {
+    key: "tesoreria",
+    name: "tesoreria",
+    list: "/tesoreria",
+    create: "/tesoreria/create",
+    meta: {
+      label: "Tesorería",
+      icon: <DollarCircleOutlined />,
+    },
+  },
+  {
+    key: "nomina",
+    name: "nomina",
+    list: "/nomina",
+    create: "/nomina/create",
+    meta: {
+      label: "Nómina equipo",
+      icon: <CalculatorOutlined />,
+    },
+  },
+  {
+    key: "rentabilidad",
+    name: "rentabilidad",
+    list: "/rentabilidad",
+    meta: {
+      label: "Análisis",
+      icon: <BarChartOutlined />,
+    },
+  },
+  // ── MARKETING ─────────────────────────────────────────────────────
+  {
+    key: "marketing-center",
+    name: "marketing-center",
+    list: "/marketing-center",
+    meta: {
+      label: "Marketing",
+      icon: <NotificationOutlined />,
+    },
+  },
+  // ── EQUIPO ────────────────────────────────────────────────────────
+  {
     key: "profesores",
     name: "profesores",
     list: "/profesores",
@@ -98,121 +234,15 @@ const allResources = [
     },
   },
   {
-    key: "cursos",
-    name: "programas",
-    list: "/programas",
-    meta: {
-      label: "Categorías",
-      icon: <BookOutlined />,
-    },
-  },
-  {
-    key: "cursos",
-    name: "cursos",
-    list: "/cursos",
-    create: "/cursos/create",
-    edit: "/cursos/edit/:id",
-    show: "/cursos/show/:id",
-    meta: {
-      label: "Servicios",
-      icon: <UsergroupAddOutlined />,
-    },
-  },
-  {
     key: "leads",
     name: "leads",
     list: "/leads",
     meta: {
       label: "Leads",
-      icon: <CustomerServiceOutlined />,
+      icon: <CrownOutlined />,
     },
   },
-  {
-    key: "marketing-center",
-    name: "marketing-center",
-    list: "/marketing-center",
-    meta: {
-      label: "Marketing Center",
-      icon: <NotificationOutlined />,
-    },
-  },
-  {
-    key: "planificador",
-    name: "planificador",
-    list: "/planificador",
-    meta: {
-      label: "Planificador",
-      icon: <CalendarOutlined />,
-    },
-  },
-  {
-    key: "catalogo",
-    name: "catalogo",
-    list: "/catalogo",
-    meta: {
-      label: "Catálogo comercial",
-      icon: <BarsOutlined />,
-    },
-  },
-  {
-    key: "matriculas",
-    name: "matriculas",
-    list: "/matriculas",
-    create: "/matriculas/create",
-    edit: "/matriculas/edit/:id",
-    show: "/matriculas/show/:id",
-    meta: {
-      label: "Ventas y registros",
-      icon: <FileTextOutlined />,
-    },
-  },
-  {
-    key: "nomina",
-    name: "nomina",
-    list: "/nomina",
-    create: "/nomina/create",
-    meta: {
-      label: "Nómina",
-      icon: <CalculatorOutlined />,
-    },
-  },
-  {
-    key: "caja",
-            label: "Portal clientes",
-    list: "/caja",
-    meta: {
-      label: "Caja / POS",
-      icon: <ShoppingCartOutlined />,
-    },
-  },
-  {
-    key: "tesoreria",
-    name: "tesoreria",
-    list: "/tesoreria",
-    create: "/tesoreria/create",
-    meta: {
-      label: "Tesorería",
-      icon: <DollarCircleOutlined />,
-    },
-  },
-  {
-    key: "rentabilidad",
-    name: "rentabilidad",
-    list: "/rentabilidad",
-    meta: {
-      label: "Análisis de Rentabilidad",
-      icon: <CalculatorOutlined />,
-    },
-  },
-  {
-    key: "conversaciones",
-    name: "conversaciones",
-    list: "/conversaciones",
-    meta: {
-      label: "Conversaciones IA",
-      icon: <UnorderedListOutlined />,
-    },
-  },
+  // ── SISTEMA ───────────────────────────────────────────────────────
   {
     key: "configuracion",
     name: "configuracion",
@@ -783,14 +813,14 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
     }
 
     if (normalizedRole === "estudiante") {
-      console.log("[AppShell] Returning estudiante resources");
+      console.log("[AppShell] Returning cliente resources");
       return [
         {
-          name: "portal-estudiante",
-          list: "/portal-estudiante",
+          name: "historial-compras",
+          list: "/historial",
           meta: {
-            label: "Portal clientes",
-            icon: <BookOutlined />,
+            label: "Mis compras",
+            icon: <HistoryOutlined />,
           },
         },
       ];
@@ -810,18 +840,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
         return userPermisos[resource.key] === true;
       });
 
-      // Agregar dashboard de secretaria al inicio
-      return [
-        {
-          name: "dashboard-secretaria",
-          list: "/dashboard/secretaria",
-          meta: {
-            label: "Dashboard",
-            icon: <DashboardOutlined />,
-          },
-        },
-        ...filteredResources.filter(r => r.key !== "dashboard"),
-      ];
+      return filteredResources;
     }
 
     if (permisosLoading) {
