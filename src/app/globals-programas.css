@@ -1,0 +1,110 @@
+/* Estilos globales adicionales para programas */
+:root {
+  --gradient-pink: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+  --gradient-purple: linear-gradient(135deg, #d946ef 0%, #e879f9 100%);
+  --gradient-blue: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
+  --gradient-indigo: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Mejoras para botones */
+.ant-btn-primary {
+  transition: all 0.3s ease !important;
+}
+
+.ant-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4) !important;
+}
+
+/* Cards con efecto glassmorphism */
+.glass-card {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Animación para estadísticas */
+.ant-statistic-content-value {
+  transition: all 0.3s ease;
+}
+
+.ant-statistic:hover .ant-statistic-content-value {
+  transform: scale(1.1);
+}
+
+/* Mejorar inputs del formulario */
+.ant-input-lg,
+.ant-input-number-lg {
+  border-radius: 8px !important;
+}
+
+.ant-input:focus,
+.ant-input-number:focus-within {
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+}
+
+/* Tags más modernos */
+.ant-tag {
+  border-radius: 12px;
+  padding: 2px 12px;
+  font-weight: 500;
+}
+
+/* Tablas más elegantes */
+.ant-table-thead > tr > th {
+  background: #fafafa !important;
+  font-weight: 600;
+}
+
+.ant-table-tbody > tr:hover {
+  background: #f0f5ff !important;
+}
+
+/* Modales más modernos */
+.ant-modal-header {
+  border-bottom: none !important;
+  padding-bottom: 16px !important;
+}
+
+.ant-modal-footer {
+  border-top: none !important;
+  padding-top: 16px !important;
+}
+
+/* Mejoras para móvil */
+@media (max-width: 768px) {
+  .ant-card {
+    border-radius: 12px !important;
+  }
+  
+  .ant-modal {
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Skeleton loading elegante */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-loading {
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+}

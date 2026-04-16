@@ -1,0 +1,158 @@
+{
+  "title": "Ejemplos de configuración Make.com",
+  "version": "1.0",
+  "modules": [
+    {
+      "name": "buscar_lead_por_telefono",
+      "config": {
+        "url": "https://[TU-PROJECT].supabase.co/rest/v1/leads",
+        "method": "GET",
+        "headers": [
+          { "name": "apikey", "value": "[TU_SERVICE_ROLE_KEY]" },
+          { "name": "Authorization", "value": "Bearer [TU_SERVICE_ROLE_KEY]" },
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "qs": [
+          { "name": "telefono", "value": "eq.{{1.telefono_whatsapp}}" },
+          { "name": "select", "value": "*" }
+        ]
+      }
+    },
+    {
+      "name": "upsert_lead",
+      "config": {
+        "url": "https://[TU-PROJECT].supabase.co/rest/v1/rpc/upsert_lead_por_telefono",
+        "method": "POST",
+        "headers": [
+          { "name": "apikey", "value": "[TU_SERVICE_ROLE_KEY]" },
+          { "name": "Authorization", "value": "Bearer [TU_SERVICE_ROLE_KEY]" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=representation" }
+        ],
+        "body": {
+          "p_telefono": "{{1.telefono_whatsapp}}",
+          "p_nombre": "{{if(2.nombre != empty; 2.nombre; 'Cliente WhatsApp')}}",
+          "p_email": "{{2.email}}",
+          "p_interes": "{{5.interes_detectado}}",
+          "p_canal": "WhatsApp",
+          "p_estado": "{{if(5.interes_alto = true; 'en_seguimiento'; 'nuevo')}}",
+          "p_notas": "Bot: {{1.mensaje_original}}. Respondió: {{5.respuesta_ia}}",
+          "p_whatsapp_id": "whatsapp:{{1.telefono_whatsapp}}",
+          "p_metadatos_bot": {
+            "sesion_id": "{{1.session_id}}",
+            "idioma": "es",
+            "ultima_pregunta": "{{1.mensaje_original}}",
+            "respuesta_ia": "{{5.respuesta_ia}}",
+            "timestamp": "{{now}}"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_cursos_para_ia_texto",
+      "config": {
+        "url": "https://[TU-PROJECT].supabase.co/rest/v1/rpc/get_cursos_para_ia_texto",
+        "method": "POST",
+        "headers": [
+          { "name": "apikey", "value": "[TU_SERVICE_ROLE_KEY]" },
+          { "name": "Authorization", "value": "Bearer [TU_SERVICE_ROLE_KEY]" },
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "body": {}
+      }
+    },
+    {
+      "name": "get_marketing_assets_para_ia",
+      "config": {
+        "url": "https://[TU-PROJECT].supabase.co/rest/v1/rpc/get_marketing_assets_para_ia",
+        "method": "POST",
+        "headers": [
+          { "name": "apikey", "value": "[TU_SERVICE_ROLE_KEY]" },
+          { "name": "Authorization", "value": "Bearer [TU_SERVICE_ROLE_KEY]" },
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "p_programa": "{{5.programa_detectado}}",
+          "p_keyword": "{{5.keyword_busqueda}}"
+        }
+      }
+    },
+    {
+      "name": "openai_response",
+      "config": {
+        "model": "gpt-4-turbo-preview",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Eres Dany, asistente virtual de Academia Crystal Daniela.\n\nCursos disponibles:\n{{3.resumen_texto}}\n\nInstrucciones:\n- Responde en español\n- Máximo 3 párrafos\n- Usa emojis con moderación\n- Si detectas interés alto, menciona que un asesor se contactará"
+          },
+          {
+            "role": "user",
+            "content": "{{1.mensaje_whatsapp}}"
+          }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 300
+      }
+    },
+    {
+      "name": "text_parser_patterns",
+      "config": {
+        "interes_alto_pattern": "/(precio|costo|cuánto|inscri|matrícula|cuando empie|horario|disponib)/i",
+        "programas_pattern": "/(manicure|pedicure|uñ|pestañ|cejas|maquillaje|belleza)/i"
+      }
+    },
+    {
+      "name": "whatsapp_send_text",
+      "config": {
+        "to": "{{1.telefono_whatsapp}}",
+        "type": "text",
+        "text": {
+          "body": "{{5.respuesta_ia}}"
+        }
+      }
+    },
+    {
+      "name": "whatsapp_send_image",
+      "config": {
+        "to": "{{1.telefono_whatsapp}}",
+        "type": "image",
+        "image": {
+          "link": "{{4.url_archivo}}",
+          "caption": "{{4.titulo}}"
+        }
+      }
+    }
+  ],
+  "flow_recommended": [
+    "Webhook",
+    "HTTP: Buscar Lead",
+    "Router: ¿Existe?",
+    "HTTP: Obtener Cursos",
+    "Text Parser: Detectar keywords",
+    "Router: ¿Menciona programa?",
+    "HTTP: Buscar Assets",
+    "OpenAI/Claude: Generar respuesta",
+    "HTTP: Upsert Lead",
+    "WhatsApp: Enviar imagen (opcional)",
+    "WhatsApp: Enviar respuesta texto"
+  ],
+  "env_vars": {
+    "SUPABASE_URL": "https://[tu-project].supabase.co",
+    "SUPABASE_SERVICE_KEY": "[tu-service-key]",
+    "OPENAI_API_KEY": "[tu-openai-key]",
+    "WHATSAPP_TOKEN": "[tu-whatsapp-token]",
+    "WHATSAPP_PHONE_ID": "[tu-phone-id]"
+  },
+  "testing": {
+    "webhook_test": {
+      "url": "https://hook.us1.make.com/xxxxx",
+      "method": "POST",
+      "body": {
+        "telefono": "+573001234567",
+        "nombre": "Test",
+        "mensaje": "Hola, quisiera información sobre manicure"
+      }
+    }
+  }
+}

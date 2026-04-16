@@ -1,0 +1,49 @@
+{
+  "name": "academia-crystal",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "cross-env NODE_OPTIONS=--max_old_space_size=4096 refine dev",
+    "build": "refine build",
+    "start": "refine start",
+    "lint": "next lint",
+    "refine": "refine"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.1",
+    "@ant-design/nextjs-registry": "^1.0.0",
+    "@react-pdf/renderer": "^4.3.1",
+    "@refinedev/antd": "^6.0.3",
+    "@refinedev/cli": "^2.16.48",
+    "@refinedev/core": "^5.0.7",
+    "@refinedev/devtools": "^2.0.1",
+    "@refinedev/inferencer": "^6.0.2",
+    "@refinedev/kbar": "^2.0.0",
+    "@refinedev/nextjs-router": "^7.0.0",
+    "@refinedev/simple-rest": "^6.0.1",
+    "@refinedev/supabase": "^6.0.0",
+    "@supabase/ssr": "^0.3.0",
+    "antd": "^5.23.0",
+    "js-cookie": "^3.0.5",
+    "next": "^15.2.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-live": "^4.1.8"
+  },
+  "devDependencies": {
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^20",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "cross-env": "^7.0.3",
+    "eslint": "^8",
+    "eslint-config-next": "^15.0.3",
+    "typescript": "^5.8.3"
+  },
+  "refine": {
+    "projectId": "Jql38c-WWYmlx-vE6fxG"
+  }
+}

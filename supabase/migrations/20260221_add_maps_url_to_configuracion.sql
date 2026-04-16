@@ -1,0 +1,2 @@
+ALTER TABLE configuracion
+ADD COLUMN IF NOT EXISTS maps_url TEXT;

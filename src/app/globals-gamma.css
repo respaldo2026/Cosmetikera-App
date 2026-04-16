@@ -1,0 +1,25 @@
+.gamma-fullscreen-modal .ant-modal {
+  max-width: 100%;
+  top: 0;
+  padding-bottom: 0;
+  margin: 0;
+}
+.gamma-fullscreen-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  border-radius: 0;
+  padding: 0;
+}
+.gamma-fullscreen-modal .ant-modal-body {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Opcional: Para ocultar el header si el usuario quiere "inmersión total" */
+/* 
+.gamma-fullscreen-modal .ant-modal-header {
+  display: none; 
+} 
+*/
