@@ -14,6 +14,9 @@ import {
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
+import EscanerCodigo from "@/components/EscanerCodigo";
+import { imprimirTicketTermico, abrirCajon, DatosTicket } from "@utils/pos-hardware";
+import { PrinterOutlined, SafeOutlined } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -47,6 +50,8 @@ export default function VentasPage() {
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [efectivoRecibido, setEfectivoRecibido] = useState(0);
+  const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
+  const [imprimiendo, setImprimiendo] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -156,7 +161,12 @@ export default function VentasPage() {
         }).catch(() => {/* rpc opcional */});
       }
 
+      setUltimaVentaId(venta?.id ?? null);
       message.success("¡Venta registrada exitosamente! 🎉");
+      // Abrir cajón monedero automáticamente si el pago fue en efectivo
+      if (metodoPago === "efectivo") {
+        abrirCajon().catch(() => {});
+      }
       setModalPagoOpen(false);
       limpiarVenta();
       cargar();
@@ -167,13 +177,67 @@ export default function VentasPage() {
     }
   };
 
+  // Buscar artículo por código al escanear
+  const buscarPorCodigo = useCallback((codigo: string) => {
+    const art = articulos.find(
+      (a) =>
+        (a as any).referencia === codigo ||
+        (a as any).codigo_barras === codigo ||
+        a.id === codigo
+    );
+    if (art) {
+      agregarAlCarrito(art);
+      message.success(`${art.nombre} agregado al carrito`);
+    } else {
+      // Si no se encuentra, poner el código en el buscador
+      setSearch(codigo);
+      message.info(`Código: ${codigo} — no encontrado, mostrando búsqueda`);
+    }
+  }, [articulos]); // eslint-disable-line
+
+  const imprimirUltimaVenta = async () => {
+    if (carrito.length === 0 && !ultimaVentaId) return;
+    setImprimiendo(true);
+    const datos: DatosTicket = {
+      nombreTienda: "La Cosmetikera",
+      numeroVenta: ultimaVentaId?.slice(-6).toUpperCase() ?? "------",
+      fecha: dayjs().format("DD/MM/YYYY HH:mm"),
+      cliente: clienteSeleccionado?.nombre_completo,
+      metodoPago,
+      cambio: metodoPago === "efectivo" ? Math.max(0, vuelta) : undefined,
+      puntosFidelidad: clienteSeleccionado ? Math.floor(totalFinal / 1000) : undefined,
+      mensaje: "¡Gracias por tu compra en La Cosmetikera!",
+      lineas: [
+        { tipo: "titulo", texto: "DETALLE DE VENTA" },
+        { tipo: "linea" },
+        ...carrito.map((i) => ({ tipo: "item" as const, descripcion: i.nombre, cantidad: i.cantidad, precio: i.precio_venta })),
+        { tipo: "linea" },
+        ...(descuento > 0 ? [{ tipo: "total" as const, etiqueta: "Subtotal", valor: subtotalCarrito }, { tipo: "total" as const, etiqueta: `Descuento (${descuento}%)`, valor: -descuentoVal }] : []),
+        { tipo: "total", etiqueta: "TOTAL", valor: totalFinal },
+      ],
+    };
+    const result = await imprimirTicketTermico(datos);
+    if (!result.ok) {
+      message.warning(result.error || "No se pudo imprimir. Verifica QZ Tray.");
+    }
+    setImprimiendo(false);
+  };
+
   const PanelProductos = () => (
     <div>
-      {/* Búsqueda */}
+      {/* Escáner de código de barras / QR */}
+      <div style={{ marginBottom: 8 }}>
+        <EscanerCodigo
+          onCodigo={buscarPorCodigo}
+          placeholder="Escanear código de barras o QR del producto..."
+          conCamara
+        />
+      </div>
+      {/* Búsqueda manual */}
       <Row gutter={8} style={{ marginBottom: 12 }}>
         <Col flex="auto">
           <Input
-            placeholder="Buscar artículo..."
+            placeholder="Buscar artículo por nombre o marca..."
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -550,6 +614,28 @@ export default function VentasPage() {
           >
             Confirmar venta
           </Button>
+          <Row gutter={8} style={{ marginTop: 8 }}>
+            <Col span={12}>
+              <Button
+                block
+                icon={<PrinterOutlined />}
+                loading={imprimiendo}
+                onClick={imprimirUltimaVenta}
+                disabled={carrito.length === 0}
+              >
+                Imprimir ticket
+              </Button>
+            </Col>
+            <Col span={12}>
+              <Button
+                block
+                icon={<SafeOutlined />}
+                onClick={() => abrirCajon().then(r => !r.ok && message.warning("No se pudo abrir el cajón: " + r.error))}
+              >
+                Abrir cajón
+              </Button>
+            </Col>
+          </Row>
         </div>
       </Modal>
     </>
