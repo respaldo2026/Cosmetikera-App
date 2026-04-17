@@ -53,6 +53,7 @@ import {
   TagsOutlined,
   ThunderboltOutlined,
   WalletOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import routerProvider from "@refinedev/nextjs-router";
 import { dataProvider } from "@/providers/data-provider";
@@ -140,6 +141,15 @@ const allResources = [
     },
   },
   // ── CLIENTES ──────────────────────────────────────────────────────
+  {
+    key: "clientes",
+    name: "clientes",
+    list: "/clientes",
+    meta: {
+      label: "Clientes",
+      icon: <TeamOutlined />,
+    },
+  },
   {
     key: "fidelizacion",
     name: "fidelizacion",
