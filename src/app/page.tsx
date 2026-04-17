@@ -253,11 +253,11 @@ export default function VistaRapidaPage() {
                 { label: "Nueva venta", icon: <ShoppingCartOutlined />, path: "/ventas", color: "#d81b87" },
                 { label: "Artículos", icon: <TagsOutlined />, path: "/articulos", color: "#722ed1" },
                 { label: "Fidelización", icon: <GiftOutlined />, path: "/fidelizacion", color: "#faad14" },
-                { label: "Clientes", icon: <UserOutlined />, path: "/fidelizacion", color: "#1890ff" },
+                { label: "Clientes", icon: <UserOutlined />, path: "/perfiles", color: "#1890ff" },
                 { label: "Nueva compra", icon: <InboxOutlined />, path: "/compras", color: "#096dd9" },
                 { label: "Historial", icon: <CalendarOutlined />, path: "/historial", color: "#13c2c2" },
               ].map((item) => (
-                <Col span={8} key={item.path}>
+                <Col span={8} key={item.label}>
                   <Button block onClick={() => router.push(item.path)} style={{ height: 64, borderRadius: 12, border: "none", background: `${item.color}12`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ fontSize: 20, color: item.color }}>{item.icon}</div>
                     <Text style={{ fontSize: 11, color: item.color, marginTop: 2 }}>{item.label}</Text>
