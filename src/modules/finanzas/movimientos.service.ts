@@ -120,7 +120,7 @@ export async function actualizarMovimiento(id: string, payload: Partial<Omit<Mov
 }
 
 export async function eliminarMovimiento(id: string) {
-    const response = await fetch("/api/tesoreria/delete-movimiento", {
+    const response = await fetch("/api/movimientos/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ movimientoId: id }),

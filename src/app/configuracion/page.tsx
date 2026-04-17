@@ -53,7 +53,7 @@ interface PlantillaWhatsApp {
 
 export default function ConfiguracionPage() {
   const [messageApi, contextHolder] = message.useMessage();
-  const [activeTab, setActiveTab] = useState("academia");
+  const [activeTab, setActiveTab] = useState("negocio");
   const [initialized, setInitialized] = useState(false);
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
@@ -157,7 +157,7 @@ export default function ConfiguracionPage() {
   const [editingPlantilla, setEditingPlantilla] = useState<PlantillaWhatsApp | null>(null);
   const [submittingPlantilla, setSubmittingPlantilla] = useState(false);
 
-  const modulos: ModuleDefinition[] = MODULES.filter((modulo: ModuleDefinition) => modulo.key !== "portal-estudiante");
+  const modulos: ModuleDefinition[] = MODULES;
 
   const roleKeys = Object.keys(ROLES);
   const roleLabels = roleKeys.reduce<Record<string, string>>((acc, key) => {
@@ -885,7 +885,7 @@ export default function ConfiguracionPage() {
             <Row gutter={[16, 8]}>
               <Col xs={24} sm={12}>
                 <Form.Item label="Instagram" name="instagram">
-                  <Input prefix={<InstagramOutlined />} placeholder="https://instagram.com/academia" />
+                  <Input prefix={<InstagramOutlined />} placeholder="https://instagram.com/lacosmetikera" />
                 </Form.Item>
                 {previewInstagram && (
                   <div style={{ marginTop: -16, marginBottom: 8 }}>
@@ -897,7 +897,7 @@ export default function ConfiguracionPage() {
               </Col>
               <Col xs={24} sm={12}>
                 <Form.Item label="Facebook" name="facebook">
-                  <Input prefix={<FacebookOutlined />} placeholder="https://facebook.com/academia" />
+                  <Input prefix={<FacebookOutlined />} placeholder="https://facebook.com/lacosmetikera" />
                 </Form.Item>
                 {previewFacebook && (
                   <div style={{ marginTop: -16, marginBottom: 8 }}>
@@ -909,7 +909,7 @@ export default function ConfiguracionPage() {
               </Col>
               <Col xs={24} sm={12}>
                 <Form.Item label="YouTube" name="youtube">
-                  <Input prefix={<YoutubeOutlined />} placeholder="https://youtube.com/@academia" />
+                  <Input prefix={<YoutubeOutlined />} placeholder="https://youtube.com/@lacosmetikera" />
                 </Form.Item>
                 {previewYoutube && (
                   <div style={{ marginTop: -16, marginBottom: 8 }}>
@@ -923,7 +923,7 @@ export default function ConfiguracionPage() {
                 <Form.Item
                   label="WhatsApp Agente"
                   name="whatsapp"
-                  extra="Este número se usa en el portal estudiantil para la opción 'Hablar con Agente'."
+                    extra="Este número se usa para atención comercial y soporte a clientes."
                 >
                   <Input prefix={<WhatsAppOutlined />} placeholder="https://wa.me/573001112233" />
                 </Form.Item>
@@ -932,7 +932,7 @@ export default function ConfiguracionPage() {
                 <Form.Item
                   label="Ubicación Google Maps"
                   name="maps_url"
-                  extra="Este enlace se usará para compartir la ubicación desde el agente en WhatsApp."
+                    extra="Este enlace se usará para compartir la ubicación de la tienda por WhatsApp."
                 >
                   <Input prefix={<EnvironmentOutlined />} placeholder="https://maps.app.goo.gl/..." />
                 </Form.Item>
@@ -1004,7 +1004,7 @@ export default function ConfiguracionPage() {
                       Encabezado
                     </div>
                     <Switch checked={ticketFields.logo} onChange={(value) => setTicketFields((prev) => ({ ...prev, logo: value }))} /> Logo
-                    <Switch checked={ticketFields.nombreAcademia} onChange={(value) => setTicketFields((prev) => ({ ...prev, nombreAcademia: value }))} /> Nombre academia
+                    <Switch checked={ticketFields.nombreAcademia} onChange={(value) => setTicketFields((prev) => ({ ...prev, nombreAcademia: value }))} /> Nombre del negocio
                     <Switch checked={ticketFields.ruc} onChange={(value) => setTicketFields((prev) => ({ ...prev, ruc: value }))} /> RUC/NIT
                     <Switch checked={ticketFields.direccion} onChange={(value) => setTicketFields((prev) => ({ ...prev, direccion: value }))} /> Dirección
                     <Switch checked={ticketFields.telefono} onChange={(value) => setTicketFields((prev) => ({ ...prev, telefono: value }))} /> Teléfono
@@ -1046,7 +1046,7 @@ export default function ConfiguracionPage() {
                     ) : null}
                     {ticketFields.nombreAcademia ? (
                       <div style={{ fontWeight: 700, fontSize: 16, marginTop: 6 }}>
-                        {previewNombreAcademia || "Nombre de la Academia"}
+                        {previewNombreAcademia || "Nombre del Negocio"}
                       </div>
                     ) : null}
                     {ticketFields.ruc && previewRuc ? <div style={{ fontSize: 12, color: "#6b7280" }}>RUC/NIT: {previewRuc}</div> : null}
@@ -1069,7 +1069,7 @@ export default function ConfiguracionPage() {
                     {ticketFields.concepto ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
                         <span>Concepto</span>
-                        <span>Pago de matrícula</span>
+                        <span>Compra en tienda</span>
                       </div>
                     ) : null}
                     {ticketFields.monto ? (
@@ -1287,10 +1287,10 @@ export default function ConfiguracionPage() {
 
   const tabsItems = [
     {
-      key: "academia",
+      key: "negocio",
       label: (
         <span>
-          <SettingOutlined /> Academia
+          <SettingOutlined /> Negocio
         </span>
       ),
       children: academiaTab,
