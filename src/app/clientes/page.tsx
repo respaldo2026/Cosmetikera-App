@@ -103,8 +103,10 @@ function TabClientes({
   const { message } = App.useApp();
   const [search, setSearch] = useState("");
   const [editando, setEditando] = useState<Cliente | null>(null);
+  const [creando, setCreando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [form] = Form.useForm();
+  const [formNuevo] = Form.useForm();
 
   const filtrados = useMemo(() =>
     clientes.filter((c) =>
@@ -148,6 +150,37 @@ function TabClientes({
       onRecargar();
     } catch {
       message.error("Error al guardar");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const crearCliente = async () => {
+    try {
+      const values = await formNuevo.validateFields();
+      setGuardando(true);
+      const { error } = await supabaseBrowserClient.from("perfiles").insert({
+        nombre_completo: values.nombre_completo,
+        telefono: values.telefono || null,
+        email: values.email || null,
+        cedula: values.cedula || null,
+        fecha_nacimiento: values.fecha_nacimiento
+          ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD")
+          : null,
+        rol: "cliente",
+        puntos_fidelidad: 50,
+        nivel_fidelidad: "bronce",
+        puntos_ganados: 50,
+        activo: true,
+      });
+      if (error) throw error;
+      message.success("✅ Cliente creado — 50 pts de bienvenida");
+      setCreando(false);
+      formNuevo.resetFields();
+      onRecargar();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      message.error("Error al crear cliente: " + msg);
     } finally {
       setGuardando(false);
     }
@@ -226,6 +259,16 @@ function TabClientes({
             Actualizar
           </Button>
         </Col>
+        <Col>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            style={{ background: "#d81b87", borderColor: "#d81b87" }}
+            onClick={() => { setCreando(true); formNuevo.resetFields(); }}
+          >
+            Nuevo cliente
+          </Button>
+        </Col>
       </Row>
 
       <Table
@@ -276,6 +319,48 @@ function TabClientes({
               </Form.Item>
             </Col>
           </Row>
+        </Form>
+      </Modal>
+
+      {/* Modal: Nuevo cliente */}
+      <Modal
+        open={creando}
+        title={<Space><PlusOutlined style={{ color: "#d81b87" }} /> Nuevo cliente</Space>}
+        onCancel={() => setCreando(false)}
+        footer={[
+          <Button key="cancel" icon={<CloseOutlined />} onClick={() => setCreando(false)}>Cancelar</Button>,
+          <Button key="save" type="primary" icon={<SaveOutlined />} loading={guardando} onClick={crearCliente}
+            style={{ background: "#d81b87", borderColor: "#d81b87" }}>
+            Crear cliente
+          </Button>,
+        ]}
+        destroyOnClose
+      >
+        <Form form={formNuevo} layout="vertical" style={{ marginTop: 12 }}>
+          <Form.Item name="nombre_completo" label="Nombre completo" rules={[{ required: true, message: "Campo obligatorio" }]}>
+            <Input prefix={<UserOutlined />} placeholder="Ej: María García" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="cedula" label="Cédula">
+                <Input placeholder="Ej: 1234567890" maxLength={12} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="telefono" label="Teléfono">
+                <Input prefix={<PhoneOutlined />} placeholder="Ej: 3001234567" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="email" label="Email">
+            <Input prefix={<MailOutlined />} placeholder="correo@ejemplo.com" />
+          </Form.Item>
+          <Form.Item name="fecha_nacimiento" label="Fecha de nacimiento">
+            <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="DD/MM/AAAA" />
+          </Form.Item>
+          <div style={{ background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 8, padding: "10px 14px" }}>
+            <Text style={{ fontSize: 12 }}>🌟 El cliente recibirá <strong>50 puntos de bienvenida</strong> al crearse</Text>
+          </div>
         </Form>
       </Modal>
     </>
