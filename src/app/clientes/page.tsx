@@ -159,21 +159,21 @@ function TabClientes({
     try {
       const values = await formNuevo.validateFields();
       setGuardando(true);
-      const { error } = await supabaseBrowserClient.from("perfiles").insert({
-        nombre_completo: values.nombre_completo,
-        telefono: values.telefono || null,
-        email: values.email || null,
-        cedula: values.cedula || null,
-        fecha_nacimiento: values.fecha_nacimiento
-          ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD")
-          : null,
-        rol: "cliente",
-        puntos_fidelidad: 50,
-        nivel_fidelidad: "bronce",
-        puntos_ganados: 50,
-        activo: true,
+      const res = await fetch("/api/perfiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre_completo: values.nombre_completo,
+          telefono: values.telefono || null,
+          email: values.email || null,
+          cedula: values.cedula || null,
+          fecha_nacimiento: values.fecha_nacimiento
+            ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD")
+            : null,
+        }),
       });
-      if (error) throw error;
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error al crear");
       message.success("✅ Cliente creado — 50 pts de bienvenida");
       setCreando(false);
       formNuevo.resetFields();
