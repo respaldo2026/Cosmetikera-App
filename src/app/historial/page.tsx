@@ -34,6 +34,33 @@ const METODO_TAG: Record<string, string> = {
   efectivo: "green", tarjeta: "blue", transferencia: "purple", mixto: "orange",
 };
 
+const parseMetodoPago = (value?: string | null) => {
+  const raw = String(value || "");
+  if (raw.startsWith("mixto|")) {
+    const detalle = raw
+      .split("|")
+      .slice(1)
+      .map((parte) => {
+        const [clave, monto] = parte.split(":");
+        const label = clave === "efectivo" ? "Efectivo" : clave === "tarjeta" ? "Tarjeta" : clave === "transferencia" ? "Transferencia" : clave;
+        return `${label} $${Number(monto || 0).toLocaleString()}`;
+      })
+      .join(" · ");
+
+    return { base: "mixto", label: "Mixto", detail: detalle || null };
+  }
+
+  if (raw === "efectivo" || raw === "tarjeta" || raw === "transferencia" || raw === "mixto") {
+    return {
+      base: raw,
+      label: raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "—",
+      detail: null,
+    };
+  }
+
+  return { base: raw, label: raw || "—", detail: null };
+};
+
 export default function HistorialPage() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
@@ -63,7 +90,8 @@ export default function HistorialPage() {
     const matchSearch = !search ||
       nombreCliente.toLowerCase().includes(search.toLowerCase()) ||
       v.id.toLowerCase().includes(search.toLowerCase());
-    const matchMetodo = !filtroMetodo || v.metodo_pago === filtroMetodo;
+    const metodoBase = parseMetodoPago(v.metodo_pago).base;
+    const matchMetodo = !filtroMetodo || metodoBase === filtroMetodo;
     const matchRango = !rango ||
       (dayjs(v.fecha).isAfter(rango[0].startOf("day")) &&
         dayjs(v.fecha).isBefore(rango[1].endOf("day")));
@@ -109,11 +137,16 @@ export default function HistorialPage() {
       dataIndex: "metodo_pago",
       key: "metodo",
       width: 120,
-      render: (v: string) => (
-        <Tag color={METODO_TAG[v] || "default"} icon={<CreditCardOutlined />}>
-          {v ? v.charAt(0).toUpperCase() + v.slice(1) : "—"}
-        </Tag>
-      ),
+      render: (v: string) => {
+        const metodo = parseMetodoPago(v);
+        return (
+          <Tooltip title={metodo.detail || undefined}>
+            <Tag color={METODO_TAG[metodo.base] || "default"} icon={<CreditCardOutlined />}>
+              {metodo.label}
+            </Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: "Ítems",
@@ -307,9 +340,21 @@ export default function HistorialPage() {
             <Text strong style={{ fontSize: 14 }}>Total</Text>
             <Text strong style={{ fontSize: 16, color: "#d81b87" }}>${Number(detalle.total).toLocaleString()}</Text>
           </div>
-          <Tag color={METODO_TAG[detalle.metodo_pago || ""] || "default"} style={{ marginTop: 8 }}>
-            {detalle.metodo_pago || "—"}
-          </Tag>
+          {(() => {
+            const metodo = parseMetodoPago(detalle.metodo_pago);
+            return (
+              <>
+                <Tag color={METODO_TAG[metodo.base] || "default"} style={{ marginTop: 8 }}>
+                  {metodo.label}
+                </Tag>
+                {metodo.detail ? (
+                  <div style={{ marginTop: 8 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Desglose: {metodo.detail}</Text>
+                  </div>
+                ) : null}
+              </>
+            );
+          })()}
         </Card>
       )}
     </>

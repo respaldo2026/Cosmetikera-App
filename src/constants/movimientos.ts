@@ -4,6 +4,7 @@ export const MOVIMIENTO_TIPO = {
 } as const;
 
 export const MOVIMIENTO_CATEGORIAS = [
+    "ventas",
     "matriculas",
     "inscripciones",
     "materiales",

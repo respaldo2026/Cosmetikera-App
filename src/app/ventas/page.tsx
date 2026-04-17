@@ -17,6 +17,8 @@ import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
 import { imprimirTicketTermico, abrirCajon, DatosTicket } from "@utils/pos-hardware";
 import { PrinterOutlined, GoldOutlined } from "@ant-design/icons";
+import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -26,17 +28,48 @@ type Articulo = {
   stock: number; categoria?: string; marca?: string; imagen_url?: string;
 };
 type CarritoItem = Articulo & { cantidad: number; subtotal: number };
-type Cliente = { id: string; nombre_completo: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string };
+type Cliente = { id: string; nombre_completo: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; total_compras?: number; rol?: string; activo?: boolean };
 type MetodoPago = "efectivo" | "tarjeta" | "transferencia" | "mixto";
+type PagoMixto = { efectivo: number; tarjeta: number; transferencia: number };
 
 const NIVEL_COLORS: Record<string, string> = {
   bronce: "#cd7f32", plata: "#aaa", oro: "#faad14", diamante: "#13c2c2",
 };
 
+const METODO_PAGO_LABELS: Record<Exclude<MetodoPago, "mixto">, string> = {
+  efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
+  transferencia: "Transferencia",
+};
+
+const getNivelFidelidad = (puntos: number) => {
+  if (puntos >= 15000) return "diamante";
+  if (puntos >= 5000) return "oro";
+  if (puntos >= 1000) return "plata";
+  return "bronce";
+};
+
+const getMetodoPagoPersistido = (metodo: MetodoPago, pagoMixto: PagoMixto) => {
+  if (metodo !== "mixto") return metodo;
+
+  const partes = Object.entries(pagoMixto)
+    .filter(([, monto]) => Number(monto) > 0)
+    .map(([clave, monto]) => `${clave}:${Number(monto)}`);
+
+  return partes.length > 0 ? `mixto|${partes.join("|")}` : "mixto";
+};
+
+const getDetallePagoMixto = (pagoMixto: PagoMixto) =>
+  Object.entries(pagoMixto)
+    .filter(([, monto]) => Number(monto) > 0)
+    .map(([clave, monto]) => `${METODO_PAGO_LABELS[clave as keyof typeof METODO_PAGO_LABELS]} $${Number(monto).toLocaleString()}`)
+    .join(" · ");
+
 export default function VentasPage() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
+  const { user } = useCurrentUser();
 
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -51,13 +84,20 @@ export default function VentasPage() {
   const [procesando, setProcesando] = useState(false);
   const [efectivoRecibido, setEfectivoRecibido] = useState(0);
   const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
+  const [ultimoTicket, setUltimoTicket] = useState<DatosTicket | null>(null);
   const [imprimiendo, setImprimiendo] = useState(false);
+  const [pagoMixto, setPagoMixto] = useState<PagoMixto>({ efectivo: 0, tarjeta: 0, transferencia: 0 });
 
   const cargar = useCallback(async () => {
     setLoading(true);
     const [{ data: arts }, { data: cls }] = await Promise.all([
       supabaseBrowserClient.from("articulos").select("*").eq("activo", true).order("nombre"),
-      supabaseBrowserClient.from("perfiles").select("id,nombre_completo,telefono,puntos_fidelidad,nivel_fidelidad").order("nombre_completo"),
+      supabaseBrowserClient
+        .from("perfiles")
+        .select("id,nombre_completo,telefono,puntos_fidelidad,nivel_fidelidad,total_compras,rol,activo")
+        .eq("rol", "estudiante")
+        .eq("activo", true)
+        .order("nombre_completo"),
     ]);
     setArticulos((arts || []).filter((a: Articulo) => a.stock > 0));
     setClientes(cls || []);
@@ -83,6 +123,10 @@ export default function VentasPage() {
   const descuentoVal = Math.round(subtotalCarrito * (descuento / 100));
   const totalFinal = subtotalCarrito - descuentoVal;
   const vuelta = efectivoRecibido - totalFinal;
+  const totalPagoMixto = useMemo(
+    () => Object.values(pagoMixto).reduce((acc, monto) => acc + Number(monto || 0), 0),
+    [pagoMixto]
+  );
   const clienteSeleccionado = clientes.find((c) => c.id === clienteId);
 
   const agregarAlCarrito = (art: Articulo) => {
@@ -121,12 +165,25 @@ export default function VentasPage() {
     setDescuento(0);
     setMetodoPago("efectivo");
     setEfectivoRecibido(0);
+    setPagoMixto({ efectivo: 0, tarjeta: 0, transferencia: 0 });
   };
 
   const procesarVenta = async () => {
     if (carrito.length === 0) { message.warning("El carrito está vacío"); return; }
+    if (metodoPago === "efectivo" && efectivoRecibido < totalFinal) {
+      message.warning("El efectivo recibido debe cubrir el total de la venta");
+      return;
+    }
+    if (metodoPago === "mixto" && totalPagoMixto !== totalFinal) {
+      message.warning("El desglose del pago mixto debe sumar exactamente el total de la venta");
+      return;
+    }
+
     setProcesando(true);
     try {
+      const metodoPagoPersistido = getMetodoPagoPersistido(metodoPago, pagoMixto);
+      const puntosGanados = clienteId ? Math.floor(totalFinal / 1000) : 0;
+
       // Registrar venta en Supabase
       const { data: venta, error: ventaErr } = await supabaseBrowserClient
         .from("ventas")
@@ -136,7 +193,7 @@ export default function VentasPage() {
           subtotal: subtotalCarrito,
           descuento: descuentoVal,
           total: totalFinal,
-          metodo_pago: metodoPago,
+          metodo_pago: metodoPagoPersistido,
           items: carrito.map((i) => ({ id: i.id, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio_venta, subtotal: i.subtotal })),
         }])
         .select()
@@ -153,19 +210,87 @@ export default function VentasPage() {
       ));
 
       // Puntos de fidelidad (1 punto por cada $1000)
-      if (clienteId) {
-        const puntos = Math.floor(totalFinal / 1000);
+      if (clienteId && clienteSeleccionado) {
         try {
           await supabaseBrowserClient.rpc("sumar_puntos_cliente", {
             p_cliente_id: clienteId,
-            p_puntos: puntos,
+            p_puntos: puntosGanados,
           });
         } catch {
-          // La RPC es opcional; no bloquea el flujo de venta.
+          const nuevosPuntos = Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados;
+          await supabaseBrowserClient
+            .from("perfiles")
+            .update({
+              puntos_fidelidad: nuevosPuntos,
+              nivel_fidelidad: getNivelFidelidad(nuevosPuntos),
+            })
+            .eq("id", clienteId);
         }
+
+        await supabaseBrowserClient
+          .from("perfiles")
+          .update({
+            total_compras: Number(clienteSeleccionado.total_compras || 0) + totalFinal,
+          })
+          .eq("id", clienteId);
       }
 
+      try {
+        const detallePagoMixto = metodoPago === "mixto" ? getDetallePagoMixto(pagoMixto) : null;
+        await crearMovimiento({
+          fecha: dayjs().format("YYYY-MM-DD"),
+          tipo: "ingreso",
+          monto: totalFinal,
+          concepto: `Venta POS ${venta?.id ? `#${String(venta.id).slice(-6).toUpperCase()}` : ""}`.trim(),
+          categoria: "ventas",
+          metodo_pago: metodoPagoPersistido,
+          referencia: venta?.id || null,
+          descripcion: [
+            `Items: ${carrito.map((item) => `${item.nombre} x${item.cantidad}`).join(", ")}`,
+            detallePagoMixto ? `Pago: ${detallePagoMixto}` : null,
+          ].filter(Boolean).join(" | "),
+          estudiante_id: clienteId,
+          created_by: user?.id || null,
+        });
+      } catch {
+        // El asiento financiero no debe bloquear la venta.
+      }
+
+      const ticketDatos: DatosTicket = {
+        nombreTienda: "La Cosmetikera",
+        numeroVenta: venta?.id?.slice(-6).toUpperCase() ?? "------",
+        fecha: dayjs().format("DD/MM/YYYY HH:mm"),
+        cliente: clienteSeleccionado?.nombre_completo,
+        metodoPago: metodoPago === "mixto" ? `Mixto (${getDetallePagoMixto(pagoMixto)})` : metodoPago,
+        cambio: metodoPago === "efectivo" ? Math.max(0, vuelta) : undefined,
+        puntosFidelidad: clienteSeleccionado ? puntosGanados : undefined,
+        mensaje: "¡Gracias por tu compra en La Cosmetikera!",
+        lineas: [
+          { tipo: "titulo", texto: "DETALLE DE VENTA" },
+          { tipo: "linea" },
+          ...carrito.map((i) => ({ tipo: "item" as const, descripcion: i.nombre, cantidad: i.cantidad, precio: i.precio_venta })),
+          { tipo: "linea" },
+          ...(descuento > 0
+            ? [
+                { tipo: "total" as const, etiqueta: "Subtotal", valor: subtotalCarrito },
+                { tipo: "total" as const, etiqueta: `Descuento (${descuento}%)`, valor: -descuentoVal },
+              ]
+            : []),
+          ...(metodoPago === "mixto"
+            ? Object.entries(pagoMixto)
+                .filter(([, monto]) => Number(monto) > 0)
+                .map(([clave, monto]) => ({
+                  tipo: "total" as const,
+                  etiqueta: METODO_PAGO_LABELS[clave as keyof typeof METODO_PAGO_LABELS],
+                  valor: Number(monto),
+                }))
+            : []),
+          { tipo: "total", etiqueta: "TOTAL", valor: totalFinal },
+        ],
+      };
+
       setUltimaVentaId(venta?.id ?? null);
+      setUltimoTicket(ticketDatos);
       message.success("¡Venta registrada exitosamente! 🎉");
       // Abrir cajón monedero automáticamente si el pago fue en efectivo
       if (metodoPago === "efectivo") {
@@ -200,27 +325,18 @@ export default function VentasPage() {
   }, [articulos]); // eslint-disable-line
 
   const imprimirUltimaVenta = async () => {
-    if (carrito.length === 0 && !ultimaVentaId) return;
+    if (!ultimoTicket && !ultimaVentaId) return;
     setImprimiendo(true);
-    const datos: DatosTicket = {
-      nombreTienda: "La Cosmetikera",
-      numeroVenta: ultimaVentaId?.slice(-6).toUpperCase() ?? "------",
-      fecha: dayjs().format("DD/MM/YYYY HH:mm"),
-      cliente: clienteSeleccionado?.nombre_completo,
-      metodoPago,
-      cambio: metodoPago === "efectivo" ? Math.max(0, vuelta) : undefined,
-      puntosFidelidad: clienteSeleccionado ? Math.floor(totalFinal / 1000) : undefined,
-      mensaje: "¡Gracias por tu compra en La Cosmetikera!",
-      lineas: [
-        { tipo: "titulo", texto: "DETALLE DE VENTA" },
-        { tipo: "linea" },
-        ...carrito.map((i) => ({ tipo: "item" as const, descripcion: i.nombre, cantidad: i.cantidad, precio: i.precio_venta })),
-        { tipo: "linea" },
-        ...(descuento > 0 ? [{ tipo: "total" as const, etiqueta: "Subtotal", valor: subtotalCarrito }, { tipo: "total" as const, etiqueta: `Descuento (${descuento}%)`, valor: -descuentoVal }] : []),
-        { tipo: "total", etiqueta: "TOTAL", valor: totalFinal },
-      ],
-    };
-    const result = await imprimirTicketTermico(datos);
+    const result = await imprimirTicketTermico(
+      ultimoTicket || {
+        nombreTienda: "La Cosmetikera",
+        numeroVenta: ultimaVentaId?.slice(-6).toUpperCase() ?? "------",
+        fecha: dayjs().format("DD/MM/YYYY HH:mm"),
+        metodoPago,
+        mensaje: "¡Gracias por tu compra en La Cosmetikera!",
+        lineas: [{ tipo: "total", etiqueta: "TOTAL", valor: totalFinal }],
+      }
+    );
     if (!result.ok) {
       message.warning(result.error || "No se pudo imprimir. Verifica QZ Tray.");
     }
@@ -596,6 +712,40 @@ export default function VentasPage() {
             </div>
           )}
 
+          {metodoPago === "mixto" && (
+            <div style={{ marginBottom: 16 }}>
+              <Text strong style={{ fontSize: 13, display: "block", marginBottom: 8 }}>Desglose pago mixto</Text>
+              <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                {(["efectivo", "tarjeta", "transferencia"] as const).map((clave) => (
+                  <div key={clave}>
+                    <Text style={{ fontSize: 12 }}>{METODO_PAGO_LABELS[clave]}</Text>
+                    <InputNumber
+                      size="large"
+                      style={{ width: "100%", marginTop: 4 }}
+                      min={0}
+                      value={pagoMixto[clave]}
+                      onChange={(valor) => setPagoMixto((prev) => ({ ...prev, [clave]: Number(valor || 0) }))}
+                      formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                      placeholder="$ 0"
+                    />
+                  </div>
+                ))}
+              </Space>
+              <div style={{
+                marginTop: 10,
+                padding: "8px 12px",
+                background: totalPagoMixto === totalFinal ? "#f6ffed" : "#fff7e6",
+                border: `1px solid ${totalPagoMixto === totalFinal ? "#b7eb8f" : "#ffd591"}`,
+                borderRadius: 8,
+              }}>
+                <Text style={{ color: totalPagoMixto === totalFinal ? "#389e0d" : "#d46b08" }}>
+                  Total ingresado: <strong>${totalPagoMixto.toLocaleString()}</strong>
+                  {totalPagoMixto !== totalFinal ? ` · faltan/exceden ${Math.abs(totalFinal - totalPagoMixto).toLocaleString()}` : ""}
+                </Text>
+              </div>
+            </div>
+          )}
+
           {clienteSeleccionado && (
             <div style={{
               padding: "8px 12px", background: "#f9f0ff",
@@ -625,7 +775,7 @@ export default function VentasPage() {
                 icon={<PrinterOutlined />}
                 loading={imprimiendo}
                 onClick={imprimirUltimaVenta}
-                disabled={carrito.length === 0}
+                disabled={!ultimaVentaId && !ultimoTicket}
               >
                 Imprimir ticket
               </Button>
