@@ -240,6 +240,17 @@ ON CONFLICT DO NOTHING;
 -- 10. ACTUALIZAR CONSTRAINT rol en perfiles
 --     Nuevos roles: administrador, marketing, vendedor, cliente
 -- =====================================================
+
+-- Primero migrar roles antiguos a los nuevos equivalentes
+UPDATE public.perfiles SET rol = 'administrador' WHERE rol IN ('admin', 'director', 'administrativo');
+UPDATE public.perfiles SET rol = 'vendedor'      WHERE rol IN ('secretaria', 'asesor');
+UPDATE public.perfiles SET rol = 'cliente'       WHERE rol IN ('estudiante', 'egresado');
+UPDATE public.perfiles SET rol = 'marketing'     WHERE rol IN ('marketing');
+-- Cualquier otro rol desconocido → vendedor como rol base
+UPDATE public.perfiles SET rol = 'vendedor'
+  WHERE rol NOT IN ('administrador', 'marketing', 'vendedor', 'cliente');
+
+-- Ahora es seguro reemplazar el constraint
 ALTER TABLE public.perfiles DROP CONSTRAINT IF EXISTS perfiles_rol_check;
 ALTER TABLE public.perfiles
   ADD CONSTRAINT perfiles_rol_check
