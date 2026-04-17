@@ -683,7 +683,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
   }, [pathname]);
 
   const roleNeedsPermissions = normalizedRole.length > 0 &&
-    !["admin", "director"].includes(normalizedRole);
+    !['administrador'].includes(normalizedRole);
 
   const shouldUseLayout = !isAuthRoute && Boolean(user);
 
@@ -727,8 +727,8 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
 
     console.log("[AppShell] Resources - Building for role:", normalizedRole);
 
-    if (normalizedRole === "admin" || normalizedRole === "director") {
-      console.log("[AppShell] Returning admin/director resources");
+    if (normalizedRole === "administrador") {
+      console.log("[AppShell] Returning administrador resources");
       return allResources;
     }
 

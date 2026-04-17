@@ -155,7 +155,7 @@ export default function CajaPage() {
       const { data, error } = await supabaseBrowserClient
         .from("perfiles")
         .select("id, nombre_completo, telefono, email, notif_whatsapp")
-        .eq("rol", "estudiante")
+        .eq("rol", "cliente")
         .eq("activo", true)
         .order("nombre_completo");
 

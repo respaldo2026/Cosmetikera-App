@@ -95,7 +95,7 @@ export default function VentasPage() {
       supabaseBrowserClient
         .from("perfiles")
         .select("id,nombre_completo,telefono,puntos_fidelidad,nivel_fidelidad,total_compras,rol,activo")
-        .eq("rol", "estudiante")
+        .eq("rol", "cliente")
         .eq("activo", true)
         .order("nombre_completo"),
     ]);

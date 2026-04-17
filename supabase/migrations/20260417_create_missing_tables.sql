@@ -19,11 +19,10 @@ CREATE POLICY "Acceso total role_permissions autenticados"
   ON public.role_permissions FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 INSERT INTO public.role_permissions (rol, permisos) VALUES
-  ('admin',       '{"articulos":true,"ventas":true,"compras":true,"proveedores":true,"configuracion":true,"fidelizacion":true,"marketing-center":true,"leads":true,"tesoreria":true,"perfiles":true}'::jsonb),
-  ('director',    '{"articulos":true,"ventas":true,"compras":true,"proveedores":true,"configuracion":true,"fidelizacion":true,"marketing-center":true,"leads":true,"tesoreria":true,"perfiles":true}'::jsonb),
-  ('secretaria',  '{"articulos":true,"ventas":true,"compras":true,"proveedores":true,"fidelizacion":true,"leads":true}'::jsonb),
-  ('estudiante',  '{}'::jsonb),
-  ('profesor',    '{}'::jsonb)
+  ('administrador', '{"articulos":true,"ventas":true,"compras":true,"proveedores":true,"configuracion":true,"fidelizacion":true,"marketing-center":true,"leads":true,"tesoreria":true,"perfiles":true}'::jsonb),
+  ('marketing',     '{"marketing-center":true,"leads":true,"fidelizacion":true,"articulos":true}'::jsonb),
+  ('vendedor',      '{"ventas":true,"articulos":true,"fidelizacion":true,"clientes":true}'::jsonb),
+  ('cliente',       '{}'::jsonb)
 ON CONFLICT (rol) DO NOTHING;
 
 -- =====================================================
@@ -236,3 +235,12 @@ VALUES (
   '{"logo":true,"nombreAcademia":true,"ruc":true,"direccion":true,"telefono":true,"email":true,"fecha":true,"concepto":true,"monto":true,"nota":true,"pie":true,"titulo":true}'
 )
 ON CONFLICT DO NOTHING;
+
+-- =====================================================
+-- 10. ACTUALIZAR CONSTRAINT rol en perfiles
+--     Nuevos roles: administrador, marketing, vendedor, cliente
+-- =====================================================
+ALTER TABLE public.perfiles DROP CONSTRAINT IF EXISTS perfiles_rol_check;
+ALTER TABLE public.perfiles
+  ADD CONSTRAINT perfiles_rol_check
+  CHECK (rol IN ('administrador', 'marketing', 'vendedor', 'cliente'));

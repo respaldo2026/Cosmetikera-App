@@ -34,8 +34,9 @@ export default function PermisosRolPage() {
 
   // Memoizar la lista de roles
   const roles = useMemo(() => [
-    "administrativo",
-    "secretaria",
+    "administrador",
+    "marketing",
+    "vendedor",
   ], []);
 
   const cargarPermisos = useCallback(async () => {

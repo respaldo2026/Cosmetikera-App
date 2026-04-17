@@ -165,7 +165,7 @@ export default function ConfiguracionPage() {
     acc[key] = rawLabel.replace(/^[^\w]*\s*/, "").trim() || key;
     return acc;
   }, {});
-  const adminAssignableRoles = ["admin", "director", "secretaria"];
+  const adminAssignableRoles = ["administrador", "marketing", "vendedor"];
   const infoSeparator = "\n\nInformacion adicional:\n";
 
   const splitDescripcion = (value?: string | null) => {

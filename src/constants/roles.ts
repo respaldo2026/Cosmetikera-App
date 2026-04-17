@@ -8,12 +8,10 @@ export interface RoleDefinition {
 }
 
 export const ROLES: Record<string, RoleDefinition> = {
-  admin: { label: "👔 Administrador", color: "blue", nivel: 5, descripcion: "Gestión administrativa y financiera" },
-  director: { label: "🏆 Director", color: "gold", nivel: 6, descripcion: "Propietario del negocio" },
-  secretaria: { label: "🗂️ Secretaría", color: "purple", nivel: 4, descripcion: "Soporte operativo y atención" },
-  asesor: { label: "📞 Asesor", color: "cyan", nivel: 3, descripcion: "Marketing y ventas" },
-  profesor: { label: "🧾 Operativo", color: "green", nivel: 2, descripcion: "Equipo operativo heredado" },
-  estudiante: { label: "🛍️ Cliente", color: "default", nivel: 1, descripcion: "Cliente heredado" },
+  administrador: { label: "👔 Administrador", color: "blue", nivel: 4, descripcion: "Gestión completa del negocio" },
+  marketing:     { label: "📣 Marketing",     color: "purple", nivel: 3, descripcion: "Gestión de contenido y campañas" },
+  vendedor:      { label: "🛒 Vendedor",      color: "cyan", nivel: 2, descripcion: "Ventas y atención al cliente" },
+  cliente:       { label: "🛍️ Cliente",       color: "default", nivel: 1, descripcion: "Cliente de la tienda" },
 };
 
 export type RoleKey = keyof typeof ROLES;
