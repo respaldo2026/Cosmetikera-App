@@ -213,8 +213,11 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
 export async function imprimirTicketTermico(
   datos: DatosTicket,
   impresora?: string | null,
-  ancho = 32
+  ancho?: number
 ): Promise<{ ok: boolean; error?: string }> {
+  // Usar variables de entorno si no se pasan parámetros
+  const printerName = impresora ?? process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null;
+  const printWidth = ancho ?? Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 32);
   try {
     const q = await cargarQZ();
 
@@ -224,21 +227,21 @@ export async function imprimirTicketTermico(
     }
 
     // Obtener la impresora
-    let printerName = impresora;
-    if (!printerName) {
-      printerName = await q.printers.getDefault();
+    let resolvedPrinter = printerName;
+    if (!resolvedPrinter) {
+      resolvedPrinter = await q.printers.getDefault();
     }
-    if (!printerName) {
+    if (!resolvedPrinter) {
       return { ok: false, error: "No se encontró ninguna impresora configurada." };
     }
 
-    const config = q.configs.create(printerName, {
+    const config = q.configs.create(resolvedPrinter, {
       encoding: "Cp1252",
       altPrinting: false,
       colorType: "blackwhite",
     });
 
-    const comandos = construirComandosEscpos(datos, ancho);
+    const comandos = construirComandosEscpos(datos, printWidth);
     const data = [{ type: "raw", format: "plain", data: comandos.join("") }];
 
     await q.print(config, data);

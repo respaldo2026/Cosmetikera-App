@@ -16,7 +16,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
 import { imprimirTicketTermico, abrirCajon, DatosTicket } from "@utils/pos-hardware";
-import { PrinterOutlined, SafeOutlined } from "@ant-design/icons";
+import { PrinterOutlined, GoldOutlined } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -629,7 +629,7 @@ export default function VentasPage() {
             <Col span={12}>
               <Button
                 block
-                icon={<SafeOutlined />}
+                icon={<GoldOutlined />}
                 onClick={() => abrirCajon().then(r => !r.ok && message.warning("No se pudo abrir el cajón: " + r.error))}
               >
                 Abrir cajón
