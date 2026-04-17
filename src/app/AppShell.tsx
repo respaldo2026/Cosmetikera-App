@@ -666,7 +666,11 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
 
   const normalizedRole = useMemo(() => {
     const rawRole = (user as any)?.rol ?? (user as any)?.role ?? "";
-    const normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
+    let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
+    // Mapear roles antiguos a los nuevos
+    if (["admin", "director", "administrativo"].includes(normalized)) normalized = "administrador";
+    if (["secretaria", "asesor"].includes(normalized)) normalized = "vendedor";
+    if (["estudiante", "egresado"].includes(normalized)) normalized = "cliente";
     console.log("[AppShell] User object:", user);
     console.log("[AppShell] Raw role:", rawRole);
     console.log("[AppShell] Normalized role:", normalized);
@@ -754,6 +758,12 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
     }
 
     const userPermisos = permisos[normalizedRole] || {};
+    const knownRoles = ["administrador", "marketing", "vendedor", "cliente", "administrativo"];
+
+    // Si el rol no es conocido o no tiene permisos definidos, mostrar todo (fallback seguro)
+    if (!normalizedRole || !knownRoles.includes(normalizedRole) || Object.keys(userPermisos).length === 0) {
+      return allResources;
+    }
 
     return allResources.filter((resource) => {
       if (!resource.key) return false;
