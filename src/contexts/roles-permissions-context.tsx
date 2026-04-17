@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { ROLES } from "@/constants/roles";
+import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
 export interface RolePermissions {
   rol: string;
@@ -19,16 +20,30 @@ interface RolesPermissionsContextType {
 
 const RolesPermissionsContext = createContext<RolesPermissionsContextType | undefined>(undefined);
 
+const buildEmptyPermissionsMap = () =>
+  Object.keys(ROLES).reduce<Record<string, Record<string, boolean>>>((acc, rol) => {
+    acc[rol] = {};
+    return acc;
+  }, {});
+
 export const RolesPermissionsProvider = ({ children }: { children: ReactNode }) => {
-  const [permisos, setPermisos] = useState<Record<string, Record<string, boolean>>>({});
+  const [permisos, setPermisos] = useState<Record<string, Record<string, boolean>>>(buildEmptyPermissionsMap);
   const [loading, setLoading] = useState(true);
 
   const recargar = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabaseBrowserClient
+      const { data, error } = await supabaseBrowserClient
         .from("role_permissions")
         .select("rol, permisos");
+
+      if (error) {
+        if (!isMissingSupabaseRelationError(error)) {
+          console.error("Error cargando role_permissions:", error);
+        }
+        setPermisos(buildEmptyPermissionsMap());
+        return;
+      }
 
       if (data) {
         const permisosMap: Record<string, Record<string, boolean>> = {};
@@ -43,6 +58,8 @@ export const RolesPermissionsProvider = ({ children }: { children: ReactNode }) 
         }, {});
 
         setPermisos(completos);
+      } else {
+        setPermisos(buildEmptyPermissionsMap());
       }
     } finally {
       setLoading(false);

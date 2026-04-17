@@ -62,6 +62,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { RolesPermissionsProvider, useRolesPermissions } from "@/contexts/roles-permissions-context";
 import { ColorModeContextProvider, useColorMode } from "@/contexts/color-mode";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
 const allResources = [
   // ── VISTA GENERAL ────────────────────────────────────────────────
@@ -690,13 +691,20 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const cargarBranding = async () => {
-      const { data } = await supabaseBrowserClient
+      const { data, error } = await supabaseBrowserClient
         .from("configuracion")
         .select("nombre_academia, logo_url")
         .order("updated_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
+
+      if (error) {
+        if (!isMissingSupabaseRelationError(error)) {
+          console.error("Error cargando branding global:", error);
+        }
+        return;
+      }
 
       if (data?.nombre_academia) setBrandingName(data.nombre_academia);
       if (data?.logo_url) setBrandingLogo(data.logo_url);

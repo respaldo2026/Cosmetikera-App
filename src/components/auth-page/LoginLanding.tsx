@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import React, { useState, useEffect } from "react";
 import { PwaInstallPrompt } from "../PwaInstallPrompt";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
 export function LoginLanding({ children }: { children?: ReactNode }) {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
@@ -20,13 +21,20 @@ export function LoginLanding({ children }: { children?: ReactNode }) {
 
   useEffect(() => {
     const cargarBranding = async () => {
-      const { data } = await supabaseBrowserClient
+      const { data, error } = await supabaseBrowserClient
         .from("configuracion")
         .select("nombre_academia, logo_url")
         .order("updated_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
+
+      if (error) {
+        if (!isMissingSupabaseRelationError(error)) {
+          console.error("Error cargando branding del login:", error);
+        }
+        return;
+      }
 
       if (data?.logo_url) setLogoUrl(data.logo_url);
       if (data?.nombre_academia) setNombreAcademia(data.nombre_academia);
