@@ -1,0 +1,583 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  Card, Tabs, Typography, Space, Button, Spin, Row, Col,
+  Statistic, Tag, Table, Avatar, Empty, Form, Input,
+  InputNumber, Badge, Descriptions, App,
+} from "antd";
+import {
+  ArrowLeftOutlined, TagsOutlined, ShoppingOutlined,
+  UserOutlined, GiftOutlined, HistoryOutlined, EditOutlined,
+  SaveOutlined, ShopOutlined,
+} from "@ant-design/icons";
+import { supabaseBrowserClient } from "@utils/supabase/client";
+import dayjs from "dayjs";
+import Link from "next/link";
+
+const { Title, Text } = Typography;
+
+type Articulo = {
+  id: string;
+  nombre: string;
+  referencia?: string;
+  categoria?: string;
+  precio_venta: number;
+  precio_costo?: number;
+  stock: number;
+  stock_minimo?: number;
+  marca?: string;
+  descripcion?: string;
+  activo?: boolean;
+  imagen_url?: string;
+  descuento_porcentaje?: number;
+  promocion_texto?: string;
+};
+
+type VentaHistorial = {
+  id: string;
+  fecha: string;
+  total: number;
+  metodo_pago: string;
+  cliente_id?: string;
+  cliente_nombre?: string;
+  cantidad: number;
+  subtotal: number;
+};
+
+export default function ArticuloDetallePage() {
+  const params = useParams();
+  const router = useRouter();
+  const { message } = App.useApp();
+  const id = params.id as string;
+
+  const [articulo, setArticulo] = useState<Articulo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [ventas, setVentas] = useState<VentaHistorial[]>([]);
+  const [loadingVentas, setLoadingVentas] = useState(false);
+  const [editandoPromo, setEditandoPromo] = useState(false);
+  const [savingPromo, setSavingPromo] = useState(false);
+  const [formPromo] = Form.useForm();
+
+  const cargarArticulo = useCallback(async () => {
+    const { data, error } = await supabaseBrowserClient
+      .from("articulos")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (!error && data) setArticulo(data as Articulo);
+    setLoading(false);
+  }, [id]);
+
+  const cargarVentas = useCallback(async () => {
+    setLoadingVentas(true);
+    try {
+      const { data, error } = await supabaseBrowserClient
+        .from("ventas")
+        .select("id, fecha, total, metodo_pago, cliente_id, items, perfiles:cliente_id(nombre_completo)")
+        .order("fecha", { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      const ventasFiltradas: VentaHistorial[] = [];
+      for (const v of (data || [])) {
+        const items = Array.isArray(v.items) ? v.items : [];
+        const item = items.find((i: any) => i.id === id);
+        if (item) {
+          ventasFiltradas.push({
+            id: v.id,
+            fecha: v.fecha,
+            total: v.total,
+            metodo_pago: v.metodo_pago,
+            cliente_id: v.cliente_id,
+            cliente_nombre: (v.perfiles as any)?.nombre_completo || "Sin cliente",
+            cantidad: item.cantidad,
+            subtotal: item.subtotal,
+          });
+        }
+      }
+      setVentas(ventasFiltradas);
+    } catch {
+      // sin ventas
+    } finally {
+      setLoadingVentas(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    cargarArticulo();
+    cargarVentas();
+  }, [cargarArticulo, cargarVentas]);
+
+  const guardarPromocion = async () => {
+    const values = formPromo.getFieldsValue();
+    setSavingPromo(true);
+    try {
+      const { error } = await supabaseBrowserClient
+        .from("articulos")
+        .update({
+          descuento_porcentaje: values.descuento_porcentaje || null,
+          promocion_texto: values.promocion_texto || null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+      message.success("Promoción guardada");
+      setEditandoPromo(false);
+      cargarArticulo();
+    } catch (e: any) {
+      message.error(e?.message || "Error al guardar la promoción");
+    } finally {
+      setSavingPromo(false);
+    }
+  };
+
+  const getStockColor = (art: Articulo) => {
+    if (art.stock === 0) return "#ff4d4f";
+    if (art.stock <= (art.stock_minimo ?? 3)) return "#fa8c16";
+    return "#52c41a";
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", padding: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (!articulo) {
+    return (
+      <Empty description="Artículo no encontrado">
+        <Button onClick={() => router.push("/articulos")}>Volver</Button>
+      </Empty>
+    );
+  }
+
+  const precioConDescuento = articulo.descuento_porcentaje
+    ? articulo.precio_venta * (1 - articulo.descuento_porcentaje / 100)
+    : null;
+
+  const totalVendido = ventas.reduce((s, v) => s + v.cantidad, 0);
+  const totalIngresos = ventas.reduce((s, v) => s + v.subtotal, 0);
+
+  const clientesUnicos = ventas
+    .filter((v) => v.cliente_id)
+    .reduce(
+      (acc, v) => {
+        const existing = acc.find((c) => c.cliente_id === v.cliente_id);
+        if (existing) {
+          existing.totalCompras += v.subtotal;
+          existing.numCompras += 1;
+        } else {
+          acc.push({
+            cliente_id: v.cliente_id!,
+            nombre: v.cliente_nombre!,
+            totalCompras: v.subtotal,
+            numCompras: 1,
+            ultimaCompra: v.fecha,
+          });
+        }
+        return acc;
+      },
+      [] as Array<{
+        cliente_id: string;
+        nombre: string;
+        totalCompras: number;
+        numCompras: number;
+        ultimaCompra: string;
+      }>
+    )
+    .sort((a, b) => b.totalCompras - a.totalCompras);
+
+  return (
+    <>
+      {/* Header */}
+      <Card style={{ marginBottom: 16, borderRadius: 12 }} bodyStyle={{ padding: "12px 16px" }}>
+        <Row gutter={[16, 12]} align="middle">
+          <Col>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push("/articulos")}>
+              Volver
+            </Button>
+          </Col>
+          <Col flex="auto">
+            <Space align="center">
+              <div style={{
+                width: 48, height: 48, borderRadius: 10,
+                background: "linear-gradient(135deg,#d81b87,#9c27b0)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden", flexShrink: 0,
+              }}>
+                {articulo.imagen_url
+                  ? <img src={articulo.imagen_url} alt={articulo.nombre} style={{ width: 48, height: 48, objectFit: "cover" }} />
+                  : <ShopOutlined style={{ color: "#fff", fontSize: 22 }} />
+                }
+              </div>
+              <div>
+                <Title level={4} style={{ margin: 0 }}>{articulo.nombre}</Title>
+                <Space size={4}>
+                  {articulo.categoria && <Tag color="purple">{articulo.categoria}</Tag>}
+                  {articulo.marca && <Text type="secondary" style={{ fontSize: 12 }}>{articulo.marca}</Text>}
+                  {articulo.activo === false && <Tag color="error">Inactivo</Tag>}
+                  {articulo.descuento_porcentaje ? (
+                    <Tag color="red">🔥 {articulo.descuento_porcentaje}% OFF</Tag>
+                  ) : null}
+                </Space>
+              </div>
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* KPIs */}
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={6}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic
+              title="Precio venta"
+              value={precioConDescuento ?? articulo.precio_venta}
+              prefix="$"
+              formatter={(v) => Number(v).toLocaleString()}
+              valueStyle={{ color: "#d81b87" }}
+            />
+            {precioConDescuento && (
+              <Text type="secondary" style={{ fontSize: 11, textDecoration: "line-through" }}>
+                ${Number(articulo.precio_venta).toLocaleString()}
+              </Text>
+            )}
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic
+              title="Stock actual"
+              value={articulo.stock}
+              valueStyle={{ color: getStockColor(articulo) }}
+            />
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              Mín: {articulo.stock_minimo ?? 3}
+            </Text>
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic
+              title="Unidades vendidas"
+              value={totalVendido}
+              prefix={<ShoppingOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic
+              title="Ingresos generados"
+              value={totalIngresos}
+              prefix="$"
+              formatter={(v) => Number(v).toLocaleString()}
+              valueStyle={{ color: "#52c41a" }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Tabs */}
+      <Card style={{ borderRadius: 12 }}>
+        <Tabs
+          defaultActiveKey="ficha"
+          items={[
+            {
+              key: "ficha",
+              label: <Space><TagsOutlined />Ficha</Space>,
+              children: (
+                <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
+                  <Descriptions.Item label="Nombre">{articulo.nombre}</Descriptions.Item>
+                  <Descriptions.Item label="Referencia / SKU">
+                    {articulo.referencia || <Text type="secondary">—</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Categoría">
+                    {articulo.categoria ? <Tag color="purple">{articulo.categoria}</Tag> : <Text type="secondary">—</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Marca">
+                    {articulo.marca || <Text type="secondary">—</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Precio de venta">
+                    <Text strong style={{ color: "#d81b87" }}>
+                      ${Number(articulo.precio_venta).toLocaleString()}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Precio de costo">
+                    {articulo.precio_costo
+                      ? `$${Number(articulo.precio_costo).toLocaleString()}`
+                      : <Text type="secondary">—</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Margen de ganancia">
+                    {articulo.precio_costo && articulo.precio_costo > 0 ? (
+                      <Tag color="blue">
+                        {(((articulo.precio_venta - articulo.precio_costo) / articulo.precio_costo) * 100).toFixed(1)}%
+                      </Tag>
+                    ) : <Text type="secondary">—</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Estado">
+                    {articulo.activo !== false
+                      ? <Tag color="success">Activo</Tag>
+                      : <Tag color="error">Inactivo</Tag>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Stock actual">
+                    <Space>
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: getStockColor(articulo) }} />
+                      <Text strong>{articulo.stock} unidades</Text>
+                    </Space>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Stock mínimo">
+                    {articulo.stock_minimo ?? 3} unidades
+                  </Descriptions.Item>
+                  {articulo.descripcion && (
+                    <Descriptions.Item label="Descripción" span={2}>
+                      {articulo.descripcion}
+                    </Descriptions.Item>
+                  )}
+                  {articulo.imagen_url && (
+                    <Descriptions.Item label="Imagen" span={2}>
+                      <img
+                        src={articulo.imagen_url}
+                        alt={articulo.nombre}
+                        style={{ maxHeight: 140, borderRadius: 8, objectFit: "cover" }}
+                      />
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              ),
+            },
+            {
+              key: "historial",
+              label: (
+                <Space>
+                  <HistoryOutlined />
+                  Historial
+                  {ventas.length > 0 && (
+                    <Badge count={ventas.length} style={{ backgroundColor: "#d81b87" }} />
+                  )}
+                </Space>
+              ),
+              children: (
+                <Table
+                  loading={loadingVentas}
+                  dataSource={ventas}
+                  rowKey="id"
+                  size="small"
+                  pagination={{ pageSize: 10, showSizeChanger: false }}
+                  locale={{ emptyText: <Empty description="Sin ventas registradas para este artículo" /> }}
+                  columns={[
+                    {
+                      title: "Fecha",
+                      dataIndex: "fecha",
+                      render: (v) => dayjs(v).format("DD/MM/YYYY HH:mm"),
+                      sorter: (a, b) => dayjs(a.fecha).unix() - dayjs(b.fecha).unix(),
+                      defaultSortOrder: "descend",
+                    },
+                    {
+                      title: "Cliente",
+                      dataIndex: "cliente_nombre",
+                      render: (v, r) => (
+                        <Space>
+                          <Avatar size="small" icon={<UserOutlined />} style={{ background: "#9c27b0" }} />
+                          {r.cliente_id
+                            ? <Link href={`/perfiles/${r.cliente_id}`}>{v}</Link>
+                            : <Text type="secondary">Sin cliente</Text>}
+                        </Space>
+                      ),
+                    },
+                    {
+                      title: "Cantidad",
+                      dataIndex: "cantidad",
+                      render: (v) => <Tag color="blue">{v} ud.</Tag>,
+                    },
+                    {
+                      title: "Subtotal",
+                      dataIndex: "subtotal",
+                      render: (v) => <Text strong style={{ color: "#52c41a" }}>${Number(v).toLocaleString()}</Text>,
+                    },
+                    {
+                      title: "Método pago",
+                      dataIndex: "metodo_pago",
+                      render: (v) => <Tag>{(v || "").split("|")[0]}</Tag>,
+                    },
+                  ]}
+                  summary={() => ventas.length > 0 ? (
+                    <Table.Summary.Row>
+                      <Table.Summary.Cell index={0} colSpan={2}>
+                        <Text strong>Total</Text>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={1}>
+                        <Tag color="blue">{totalVendido} uds.</Tag>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={2}>
+                        <Text strong style={{ color: "#52c41a" }}>${totalIngresos.toLocaleString()}</Text>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={3} />
+                    </Table.Summary.Row>
+                  ) : null}
+                />
+              ),
+            },
+            {
+              key: "clientes",
+              label: (
+                <Space>
+                  <UserOutlined />
+                  Clientes
+                  {clientesUnicos.length > 0 && (
+                    <Badge count={clientesUnicos.length} style={{ backgroundColor: "#722ed1" }} />
+                  )}
+                </Space>
+              ),
+              children: clientesUnicos.length === 0 ? (
+                <Empty description="Aún no hay clientes registrados para este artículo" style={{ padding: 40 }} />
+              ) : (
+                <Table
+                  dataSource={clientesUnicos}
+                  rowKey="cliente_id"
+                  size="small"
+                  pagination={{ pageSize: 10, showSizeChanger: false }}
+                  columns={[
+                    {
+                      title: "Cliente",
+                      dataIndex: "nombre",
+                      render: (v, r) => (
+                        <Space>
+                          <Avatar icon={<UserOutlined />} style={{ background: "#9c27b0" }} />
+                          <Link href={`/perfiles/${r.cliente_id}`}>{v}</Link>
+                        </Space>
+                      ),
+                    },
+                    {
+                      title: "Compras",
+                      dataIndex: "numCompras",
+                      render: (v) => <Tag color="blue">{v} {v === 1 ? "vez" : "veces"}</Tag>,
+                      sorter: (a, b) => a.numCompras - b.numCompras,
+                    },
+                    {
+                      title: "Total gastado",
+                      dataIndex: "totalCompras",
+                      render: (v) => <Text strong>${Number(v).toLocaleString()}</Text>,
+                      sorter: (a, b) => a.totalCompras - b.totalCompras,
+                      defaultSortOrder: "descend",
+                    },
+                    {
+                      title: "Última compra",
+                      dataIndex: "ultimaCompra",
+                      render: (v) => dayjs(v).format("DD/MM/YYYY"),
+                    },
+                  ]}
+                />
+              ),
+            },
+            {
+              key: "ofertas",
+              label: <Space><GiftOutlined />Ofertas</Space>,
+              children: (
+                <div style={{ maxWidth: 520 }}>
+                  <Card
+                    style={{ borderRadius: 12, background: "linear-gradient(135deg,#fce4f8,#f0d6ff)", marginBottom: 16 }}
+                    bodyStyle={{ padding: 20 }}
+                  >
+                    <Space direction="vertical" style={{ width: "100%" }} size="middle">
+                      <div>
+                        <Title level={5} style={{ margin: 0, color: "#d81b87" }}>
+                          <GiftOutlined /> Promoción activa
+                        </Title>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Configura un descuento o mensaje promocional para este artículo
+                        </Text>
+                      </div>
+
+                      {!editandoPromo ? (
+                        <>
+                          {articulo.descuento_porcentaje ? (
+                            <div>
+                              <Tag color="error" style={{ fontSize: 15, padding: "5px 12px" }}>
+                                🔥 {articulo.descuento_porcentaje}% DESCUENTO
+                              </Tag>
+                              <div style={{ marginTop: 8 }}>
+                                <Text strong style={{ fontSize: 20, color: "#d81b87" }}>
+                                  ${Number(precioConDescuento).toLocaleString()}
+                                </Text>
+                                <Text type="secondary" style={{ marginLeft: 10, textDecoration: "line-through", fontSize: 14 }}>
+                                  ${Number(articulo.precio_venta).toLocaleString()}
+                                </Text>
+                              </div>
+                              {articulo.promocion_texto && (
+                                <Text style={{ display: "block", marginTop: 6, fontStyle: "italic", color: "#555" }}>
+                                  "{articulo.promocion_texto}"
+                                </Text>
+                              )}
+                            </div>
+                          ) : (
+                            <Empty
+                              image={<GiftOutlined style={{ fontSize: 40, color: "#d9d9d9" }} />}
+                              imageStyle={{ height: 50 }}
+                              description="Sin promoción activa"
+                            />
+                          )}
+                          <Button
+                            type="primary"
+                            icon={<EditOutlined />}
+                            onClick={() => {
+                              formPromo.setFieldsValue({
+                                descuento_porcentaje: articulo.descuento_porcentaje ?? undefined,
+                                promocion_texto: articulo.promocion_texto ?? "",
+                              });
+                              setEditandoPromo(true);
+                            }}
+                            style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)" }}
+                          >
+                            {articulo.descuento_porcentaje ? "Modificar promoción" : "Agregar promoción"}
+                          </Button>
+                        </>
+                      ) : (
+                        <Form form={formPromo} layout="vertical">
+                          <Form.Item
+                            name="descuento_porcentaje"
+                            label="Descuento (%)"
+                            help="Déjalo vacío para quitar el descuento"
+                          >
+                            <InputNumber
+                              min={0}
+                              max={100}
+                              style={{ width: "100%" }}
+                              placeholder="Ej: 20 para un 20% de descuento"
+                              addonAfter="%"
+                            />
+                          </Form.Item>
+                          <Form.Item name="promocion_texto" label="Texto promocional (opcional)">
+                            <Input placeholder="Ej: ¡Oferta por tiempo limitado!" maxLength={100} />
+                          </Form.Item>
+                          <Space>
+                            <Button
+                              type="primary"
+                              icon={<SaveOutlined />}
+                              loading={savingPromo}
+                              onClick={guardarPromocion}
+                              style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)" }}
+                            >
+                              Guardar
+                            </Button>
+                            <Button onClick={() => setEditandoPromo(false)}>
+                              Cancelar
+                            </Button>
+                          </Space>
+                        </Form>
+                      )}
+                    </Space>
+                  </Card>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </Card>
+    </>
+  );
+}

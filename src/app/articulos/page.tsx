@@ -10,9 +10,10 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, MoreOutlined,
   WarningOutlined, TagsOutlined, SearchOutlined, ReloadOutlined,
   InboxOutlined, BarcodeOutlined, ShopOutlined, AppstoreOutlined,
-  UnorderedListOutlined, CameraOutlined,
+  UnorderedListOutlined, CameraOutlined, EyeOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { useRouter } from "next/navigation";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -42,6 +43,7 @@ export default function ArticulosPage() {
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
   const [form] = Form.useForm();
+  const router = useRouter();
 
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +164,9 @@ export default function ArticulosPage() {
           </div>
         }
         actions={[
+          <Tooltip key="view" title="Ver detalle">
+            <EyeOutlined onClick={() => router.push(`/articulos/show/${art.id}`)} />
+          </Tooltip>,
           <Tooltip key="edit" title="Editar">
             <EditOutlined onClick={() => openModal(art)} />
           </Tooltip>,
