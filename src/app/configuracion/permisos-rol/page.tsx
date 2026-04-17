@@ -19,24 +19,23 @@ export default function PermisosRolPage() {
 
   // Memoizar la lista de módulos
   const modulos = useMemo(() => [
-    { key: "estudiantes", label: "Clientes" },
-    { key: "profesores", label: "Equipo" },
-    { key: "cursos", label: "Servicios/Categorías" },
-    { key: "catalogo", label: "Catálogo comercial" },
-    { key: "leads", label: "Leads" },
-    { key: "planificador", label: "Planificador" },
-    { key: "matriculas", label: "Ventas y registros" },
-    { key: "nomina", label: "Nómina" },
-    { key: "tesoreria", label: "Tesorería" },
+    { key: "dashboard", label: "Vista rápida" },
+    { key: "ventas", label: "Ventas" },
+    { key: "historial", label: "Historial" },
     { key: "caja", label: "Caja / POS" },
+    { key: "articulos", label: "Artículos" },
+    { key: "compras", label: "Compras" },
+    { key: "proveedores", label: "Proveedores" },
+    { key: "fidelizacion", label: "Fidelización" },
+    { key: "marketing-center", label: "Marketing" },
+    { key: "nomina", label: "Nómina" },
     { key: "configuracion", label: "Configuración" },
   ], []);
 
   // Memoizar la lista de roles
   const roles = useMemo(() => [
     "administrativo",
-    "profesor",
-    "estudiante",
+    "secretaria",
   ], []);
 
   const cargarPermisos = useCallback(async () => {

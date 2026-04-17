@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import { PwaInstallPrompt } from "../PwaInstallPrompt";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 
-export function LoginLanding({ children }: { children: ReactNode }) {
+export function LoginLanding({ children }: { children?: ReactNode }) {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
   const [mounted, setMounted] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);

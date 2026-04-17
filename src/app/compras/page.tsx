@@ -29,7 +29,9 @@ type Compra = {
   items?: CompraItem[];
 };
 
-const ESTADO_CONFIG: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
+type CompraEstado = Compra["estado"];
+
+const ESTADO_CONFIG: Record<CompraEstado, { color: string; label: string; icon: React.ReactNode }> = {
   pendiente: { color: "gold", label: "Pendiente", icon: <ClockCircleOutlined /> },
   recibida: { color: "green", label: "Recibida", icon: <CheckCircleOutlined /> },
   parcial: { color: "orange", label: "Parcial", icon: <WarningOutlined /> },
@@ -84,10 +86,10 @@ export default function ComprasPage() {
 
   const addItem = () => setItemsForm([...itemsForm, { nombre: "", cantidad: 1, precio_unitario: 0 }]);
   const removeItem = (idx: number) => setItemsForm(itemsForm.filter((_, i) => i !== idx));
-  const updateItem = (idx: number, field: keyof CompraItem, value: any) => {
-    const updated = [...itemsForm];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setItemsForm(updated);
+  const updateItem = <K extends keyof CompraItem>(idx: number, field: K, value: CompraItem[K]) => {
+    setItemsForm((current) => current.map((item, itemIndex) => (
+      itemIndex === idx ? { ...item, [field]: value } as CompraItem : item
+    )));
   };
 
   const openModal = (c?: Compra) => {
@@ -149,7 +151,7 @@ export default function ComprasPage() {
     });
   };
 
-  const cambiarEstado = async (c: Compra, estado: string) => {
+  const cambiarEstado = async (c: Compra, estado: CompraEstado) => {
     await supabaseBrowserClient.from("compras").update({ estado }).eq("id", c.id);
     message.success(`Estado → ${ESTADO_CONFIG[estado]?.label}`);
     cargar();
@@ -178,7 +180,7 @@ export default function ComprasPage() {
       title: "Estado",
       dataIndex: "estado",
       key: "estado",
-      render: (v: string) => {
+      render: (v: CompraEstado) => {
         const cfg = ESTADO_CONFIG[v] || ESTADO_CONFIG.pendiente;
         return <Tag color={cfg.color} icon={cfg.icon}>{cfg.label}</Tag>;
       },

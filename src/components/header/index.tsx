@@ -54,19 +54,15 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
   }
 
   const getPortalRoute = () => {
-    if (currentUser?.rol === "estudiante") {
-      return "/portal-estudiante";
-    } else if (currentUser?.rol === "profesor") {
-      return "/mi-oficina";
+    if (currentUser?.rol === "secretaria") {
+      return "/dashboard/secretaria";
     }
     return null;
   };
 
   const getPortalLabel = () => {
-    if (currentUser?.rol === "estudiante") {
-      return "Portal clientes";
-    } else if (currentUser?.rol === "profesor") {
-      return "Panel de equipo";
+    if (currentUser?.rol === "secretaria") {
+      return "Panel operativo";
     }
     return null;
   };

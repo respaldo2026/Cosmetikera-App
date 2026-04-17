@@ -155,10 +155,14 @@ export default function VentasPage() {
       // Puntos de fidelidad (1 punto por cada $1000)
       if (clienteId) {
         const puntos = Math.floor(totalFinal / 1000);
-        await supabaseBrowserClient.rpc("sumar_puntos_cliente", {
-          p_cliente_id: clienteId,
-          p_puntos: puntos,
-        }).catch(() => {/* rpc opcional */});
+        try {
+          await supabaseBrowserClient.rpc("sumar_puntos_cliente", {
+            p_cliente_id: clienteId,
+            p_puntos: puntos,
+          });
+        } catch {
+          // La RPC es opcional; no bloquea el flujo de venta.
+        }
       }
 
       setUltimaVentaId(venta?.id ?? null);

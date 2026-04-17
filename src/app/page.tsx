@@ -175,7 +175,7 @@ export default function VistaRapidaPage() {
             <KpiCard title="Compras pend." value={s.comprasPendientes || 0} color="linear-gradient(135deg,#096dd9,#0050b3)" icon={<InboxOutlined />} onClick={() => router.push("/compras")} badge={s.comprasPendientes} />
           </Col>
           <Col xs={12} sm={6}>
-            <KpiCard title="Clientes" value={s.totalClientes || 0} color="linear-gradient(135deg,#08979c,#13c2c2)" icon={<UserOutlined />} onClick={() => router.push("/estudiantes")} />
+            <KpiCard title="Clientes" value={s.totalClientes || 0} color="linear-gradient(135deg,#08979c,#13c2c2)" icon={<UserOutlined />} onClick={() => router.push("/fidelizacion")} />
           </Col>
         </Row>
       </div>
@@ -253,7 +253,7 @@ export default function VistaRapidaPage() {
                 { label: "Nueva venta", icon: <ShoppingCartOutlined />, path: "/ventas", color: "#d81b87" },
                 { label: "Artículos", icon: <TagsOutlined />, path: "/articulos", color: "#722ed1" },
                 { label: "Fidelización", icon: <GiftOutlined />, path: "/fidelizacion", color: "#faad14" },
-                { label: "Clientes", icon: <UserOutlined />, path: "/estudiantes", color: "#1890ff" },
+                { label: "Clientes", icon: <UserOutlined />, path: "/fidelizacion", color: "#1890ff" },
                 { label: "Nueva compra", icon: <InboxOutlined />, path: "/compras", color: "#096dd9" },
                 { label: "Historial", icon: <CalendarOutlined />, path: "/historial", color: "#13c2c2" },
               ].map((item) => (

@@ -28,15 +28,24 @@ type Cliente = {
   total_compras?: number;
 };
 
-const NIVELES = [
+type NivelFidelidad = {
+  key: string;
+  label: string;
+  color: string;
+  min: number;
+  max: number;
+  icon: string;
+};
+
+const NIVELES: NivelFidelidad[] = [
   { key: "bronce", label: "Bronce", color: "#cd7f32", min: 0, max: 999, icon: "🥉" },
   { key: "plata", label: "Plata", color: "#aaa", min: 1000, max: 4999, icon: "🥈" },
   { key: "oro", label: "Oro", color: "#faad14", min: 5000, max: 14999, icon: "🥇" },
   { key: "diamante", label: "Diamante", color: "#13c2c2", min: 15000, max: Infinity, icon: "💎" },
 ];
 
-function getNivel(puntos: number) {
-  return NIVELES.findLast((n) => puntos >= n.min) || NIVELES[0];
+function getNivel(puntos: number): NivelFidelidad {
+  return NIVELES.findLast((n) => puntos >= n.min) ?? NIVELES[0]!;
 }
 
 function getniveProgresoNext(puntos: number) {
@@ -44,6 +53,7 @@ function getniveProgresoNext(puntos: number) {
   const idx = NIVELES.indexOf(actual);
   if (idx >= NIVELES.length - 1) return null;
   const sig = NIVELES[idx + 1];
+  if (!sig) return null;
   const progress = Math.round(((puntos - actual.min) / (sig.min - actual.min)) * 100);
   return { siguiente: sig, progress, faltantes: sig.min - puntos };
 }

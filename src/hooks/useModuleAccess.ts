@@ -3,18 +3,17 @@ import { useRolesPermissions } from "@contexts/roles-permissions-context";
 import { useCurrentUser } from "./useCurrentUser";
 
 const MODULOS_DISPONIBLES = [
-  "cursos",
-  "estudiantes",
-  "matriculas",
-  "asistencias",
-  "profesores",
-  "tesoreria",
+  "dashboard",
+  "ventas",
+  "historial",
+  "articulos",
+  "compras",
+  "proveedores",
+  "fidelizacion",
+  "marketing-center",
+  "caja",
   "nomina",
-  "perfiles",
-  "leads",
-  "inventario",
-  "planificador",
-  "portal-estudiante",
+  "configuracion",
 ] as const;
 
 /**

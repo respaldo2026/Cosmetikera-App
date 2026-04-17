@@ -32,18 +32,10 @@ import {
 import type { MenuProps } from "antd";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  DashboardOutlined,
   UserOutlined,
   BookOutlined,
-  FileTextOutlined,
-  DollarCircleOutlined,
   SettingOutlined,
   CalculatorOutlined,
-  CalendarOutlined,
-  CustomerServiceOutlined,
-  HomeOutlined,
-  UsergroupAddOutlined,
-  SolutionOutlined,
   LogoutOutlined,
   UnorderedListOutlined,
   BarsOutlined,
@@ -58,12 +50,9 @@ import {
   TruckOutlined,
   HistoryOutlined,
   GiftOutlined,
-  CrownOutlined,
   TagsOutlined,
   ThunderboltOutlined,
-  BarChartOutlined,
   WalletOutlined,
-  AppstoreOutlined,
 } from "@ant-design/icons";
 import routerProvider from "@refinedev/nextjs-router";
 import { dataProvider } from "@/providers/data-provider";
@@ -126,15 +115,6 @@ const allResources = [
       icon: <TagsOutlined />,
     },
   },
-  {
-    key: "cursos",
-    name: "programas",
-    list: "/programas",
-    meta: {
-      label: "Categorías",
-      icon: <AppstoreOutlined />,
-    },
-  },
   // ── PROVEEDORES ───────────────────────────────────────────────────
   {
     key: "proveedores",
@@ -160,35 +140,12 @@ const allResources = [
   },
   // ── CLIENTES ──────────────────────────────────────────────────────
   {
-    key: "estudiantes",
-    name: "perfiles",
-    list: "/estudiantes",
-    create: "/estudiantes/create",
-    edit: "/estudiantes/edit/:id",
-    show: "/estudiantes/show/:id",
-    meta: {
-      label: "Clientes",
-      icon: <UserOutlined />,
-    },
-  },
-  {
     key: "fidelizacion",
     name: "fidelizacion",
     list: "/fidelizacion",
     meta: {
       label: "Fidelización",
       icon: <GiftOutlined />,
-    },
-  },
-  // ── FINANZAS ──────────────────────────────────────────────────────
-  {
-    key: "tesoreria",
-    name: "tesoreria",
-    list: "/tesoreria",
-    create: "/tesoreria/create",
-    meta: {
-      label: "Tesorería",
-      icon: <DollarCircleOutlined />,
     },
   },
   {
@@ -201,15 +158,6 @@ const allResources = [
       icon: <CalculatorOutlined />,
     },
   },
-  {
-    key: "rentabilidad",
-    name: "rentabilidad",
-    list: "/rentabilidad",
-    meta: {
-      label: "Análisis",
-      icon: <BarChartOutlined />,
-    },
-  },
   // ── MARKETING ─────────────────────────────────────────────────────
   {
     key: "marketing-center",
@@ -218,28 +166,6 @@ const allResources = [
     meta: {
       label: "Marketing",
       icon: <NotificationOutlined />,
-    },
-  },
-  // ── EQUIPO ────────────────────────────────────────────────────────
-  {
-    key: "profesores",
-    name: "profesores",
-    list: "/profesores",
-    create: "/profesores/create",
-    edit: "/profesores/edit/:id",
-    show: "/profesores/show/:id",
-    meta: {
-      label: "Equipo",
-      icon: <SolutionOutlined />,
-    },
-  },
-  {
-    key: "leads",
-    name: "leads",
-    list: "/leads",
-    meta: {
-      label: "Leads",
-      icon: <CrownOutlined />,
     },
   },
   // ── SISTEMA ───────────────────────────────────────────────────────
@@ -715,7 +641,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
   const i18nProvider = useMemo(() => {
     const messages: Record<string, string> = {
       "pages.login.title": "Accede a tu cuenta",
-      "pages.login.subtitle": "Plataforma Académica",
+      "pages.login.subtitle": "Administración de tienda",
       "pages.login.signin": "Iniciar sesión",
       "pages.login.buttons.submit": "Entrar",
       "pages.login.buttons.forgotPassword": "¿Olvidaste tu contraseña?",
@@ -756,7 +682,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
   }, [pathname]);
 
   const roleNeedsPermissions = normalizedRole.length > 0 &&
-    !["admin", "director", "profesor", "estudiante"].includes(normalizedRole);
+    !["admin", "director"].includes(normalizedRole);
 
   const shouldUseLayout = !isAuthRoute && Boolean(user);
 
@@ -796,34 +722,6 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
     if (normalizedRole === "admin" || normalizedRole === "director") {
       console.log("[AppShell] Returning admin/director resources");
       return allResources;
-    }
-
-    if (normalizedRole === "profesor") {
-      console.log("[AppShell] Returning profesor resources");
-      return [
-        {
-          name: "mi-oficina",
-          list: "/mi-oficina",
-          meta: {
-            label: "Panel de equipo",
-            icon: <HomeOutlined />,
-          },
-        },
-      ];
-    }
-
-    if (normalizedRole === "estudiante") {
-      console.log("[AppShell] Returning cliente resources");
-      return [
-        {
-          name: "historial-compras",
-          list: "/historial",
-          meta: {
-            label: "Mis compras",
-            icon: <HistoryOutlined />,
-          },
-        },
-      ];
     }
 
     if (normalizedRole === "administrativo") {

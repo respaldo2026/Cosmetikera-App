@@ -71,16 +71,13 @@ export const authProvider: AuthProvider = {
         
         // If we can read the profile, use role-based redirect
         if (!perfilError && perfil) {
-          if (perfil.rol === "profesor") {
-            redirectTo = "/mi-oficina";
-            console.log("[AUTH] Redirecting to profesor panel: /mi-oficina");
-          } else if (perfil.rol === "estudiante") {
-            redirectTo = "/portal-estudiante";
-          } else if (perfil.rol === "secretaria") {
+          if (perfil.rol === "secretaria") {
             redirectTo = "/dashboard/secretaria";
           } else if (perfil.rol === "admin" || perfil.rol === "director") {
             redirectTo = "/";
           } else if (perfil.rol === "administrativo") {
+            redirectTo = "/";
+          } else {
             redirectTo = "/";
           }
         }

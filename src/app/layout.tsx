@@ -2,12 +2,9 @@ import type { ReactNode } from "react";
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import "@refinedev/antd/dist/reset.css";
-import "./globals-gamma.css";
 import "@utils/suppress-warnings";
 import { AppShell } from "./AppShell";
 import { PwaRegister } from "@components/PwaRegister";
-import { LoginLanding } from "@components/auth-page/LoginLanding";
-import { AuthPage } from "@components/auth-page";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"),
