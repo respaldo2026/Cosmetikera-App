@@ -9,7 +9,53 @@ function getAdminClient() {
   );
 }
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const rol = searchParams.get("rol") || "cliente";
+
+    const supabase = getAdminClient();
+    const { data, error } = await supabase
+      .from("perfiles")
+      .select("id,nombre_completo,telefono,email,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,total_compras,activo,created_at")
+      .eq("rol", rol)
+      .order("nombre_completo");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ data });
+  } catch (err) {
+    console.error("[GET /api/perfiles]", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
+
+    const body = await request.json();
+    const supabase = getAdminClient();
+
+    const { data, error } = await supabase
+      .from("perfiles")
+      .update(body)
+      .eq("id", id)
+      .select("id")
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ data });
+  } catch (err) {
+    console.error("[PATCH /api/perfiles]", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
   try {
     const body = await request.json();
 

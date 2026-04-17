@@ -132,9 +132,10 @@ function TabClientes({
     try {
       const values = await form.validateFields();
       setGuardando(true);
-      const { error } = await supabaseBrowserClient
-        .from("perfiles")
-        .update({
+      const res = await fetch(`/api/perfiles?id=${editando.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           nombre_completo: values.nombre_completo,
           telefono: values.telefono || null,
           email: values.email || null,
@@ -142,14 +143,15 @@ function TabClientes({
             ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD")
             : null,
           activo: values.activo,
-        })
-        .eq("id", editando.id);
-      if (error) throw error;
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error al guardar");
       message.success("Cliente actualizado");
       setEditando(null);
       onRecargar();
-    } catch {
-      message.error("Error al guardar");
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : "Error al guardar");
     } finally {
       setGuardando(false);
     }
@@ -767,12 +769,9 @@ export default function ClientesPage() {
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabaseBrowserClient
-      .from("perfiles")
-      .select("id,nombre_completo,telefono,email,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,total_compras,activo,created_at")
-      .eq("rol", "cliente")
-      .order("nombre_completo");
-    setClientes(data || []);
+    const res = await fetch("/api/perfiles?rol=cliente");
+    const json = await res.json();
+    setClientes(json.data || []);
     setLoading(false);
   }, []);
 
