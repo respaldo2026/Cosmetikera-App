@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { devAuthUser, isDevAuthBypassEnabled } from "@/utils/auth/dev-bypass";
 
 export interface CurrentUser {
   id: string;
@@ -30,6 +31,10 @@ export function useCurrentUser() {
   const { data: user, isLoading, error } = useQuery({
     queryKey: ["current-user"],
     queryFn: async (): Promise<CurrentUser | null> => {
+      if (isDevAuthBypassEnabled) {
+        return devAuthUser;
+      }
+
       console.log('[useCurrentUser] Iniciando query...');
       
       try {
@@ -96,6 +101,8 @@ export function useCurrentUser() {
   });
 
   useEffect(() => {
+    if (isDevAuthBypassEnabled) return;
+
     const { data: authListener } = supabaseBrowserClient.auth.onAuthStateChange(() => {
       queryClient.invalidateQueries({ queryKey: ["current-user"] });
     });
@@ -106,6 +113,8 @@ export function useCurrentUser() {
   }, [queryClient]);
 
   useEffect(() => {
+    if (isDevAuthBypassEnabled) return;
+
     if (!user?.id) return;
 
     const channel = supabaseBrowserClient

@@ -1,5 +1,6 @@
 import type { AuthProvider } from "@refinedev/core";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { devAuthUser, isDevAuthBypassEnabled } from "@/utils/auth/dev-bypass";
 
 async function getPerfilByIdOrEmail(userId?: string, userEmail?: string | null) {
   if (userId) {
@@ -28,6 +29,13 @@ async function getPerfilByIdOrEmail(userId?: string, userEmail?: string | null) 
 
 export const authProvider: AuthProvider = {
   login: async ({ email, password }) => {
+    if (isDevAuthBypassEnabled) {
+      return {
+        success: true,
+        redirectTo: "/",
+      };
+    }
+
     try {
       const { data, error } = await supabaseBrowserClient.auth.signInWithPassword({
         email,
@@ -108,6 +116,13 @@ export const authProvider: AuthProvider = {
   },
 
   logout: async () => {
+    if (isDevAuthBypassEnabled) {
+      return {
+        success: true,
+        redirectTo: "/",
+      };
+    }
+
     const { error } = await supabaseBrowserClient.auth.signOut();
     if (error) {
       return {
@@ -126,6 +141,12 @@ export const authProvider: AuthProvider = {
   },
 
   check: async () => {
+    if (isDevAuthBypassEnabled) {
+      return {
+        authenticated: true,
+      };
+    }
+
     try {
       const { data: { session }, error } = await supabaseBrowserClient.auth.getSession();
       
@@ -165,6 +186,10 @@ export const authProvider: AuthProvider = {
   },
 
   getPermissions: async () => {
+    if (isDevAuthBypassEnabled) {
+      return devAuthUser.rol;
+    }
+
     try {
       const { data: { user } } = await supabaseBrowserClient.auth.getUser();
       
@@ -181,6 +206,15 @@ export const authProvider: AuthProvider = {
   },
 
   getIdentity: async () => {
+    if (isDevAuthBypassEnabled) {
+      return {
+        id: devAuthUser.id,
+        name: devAuthUser.nombre_completo,
+        email: devAuthUser.email,
+        rol: devAuthUser.rol,
+      };
+    }
+
     try {
       const { data: { user } } = await supabaseBrowserClient.auth.getUser();
       

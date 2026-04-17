@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { isDevAuthBypassEnabled } from "@/utils/auth/dev-bypass";
 
 /**
  * Proveedor de Autenticación para el Lado del Servidor
@@ -7,6 +8,13 @@ import { cookies } from "next/headers";
  */
 export const authProviderServer: any = {
   check: async () => {
+    if (isDevAuthBypassEnabled) {
+      return {
+        authenticated: true,
+        redirectTo: "/",
+      };
+    }
+
     const cookieStore = await cookies();
 
     // Creamos el cliente de servidor para gestionar las cookies de sesión
