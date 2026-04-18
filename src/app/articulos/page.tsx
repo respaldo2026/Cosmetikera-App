@@ -28,6 +28,7 @@ type Articulo = {
   id: string;
   nombre: string;
   referencia?: string;
+  codigo_secundario?: string;
   categoria?: string;
   precio_venta: number;
   precio_costo?: number;
@@ -87,6 +88,7 @@ export default function ArticulosPage() {
     const matchSearch = !search ||
       a.nombre.toLowerCase().includes(search.toLowerCase()) ||
       (a.referencia || "").toLowerCase().includes(search.toLowerCase()) ||
+      (a.codigo_secundario || "").toLowerCase().includes(search.toLowerCase()) ||
       (a.marca || "").toLowerCase().includes(search.toLowerCase());
     const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
     return matchSearch && matchCat;
@@ -164,6 +166,7 @@ export default function ArticulosPage() {
       imagen_url: art.imagen_url,
       activo: true,
       referencia: undefined, // se omite el código intencionalmente
+      codigo_secundario: undefined,
     });
     setModalOpen(true);
   };
@@ -608,13 +611,18 @@ export default function ArticulosPage() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="referencia" label="Referencia / SKU">
-                <Input placeholder="SKU-001" prefix={<BarcodeOutlined />} />
+              <Form.Item name="referencia" label="Código principal">
+                <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
+              <Form.Item name="codigo_secundario" label="Referencia / 2° código">
+                <Input placeholder="REF-001" prefix={<BarcodeOutlined />} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
               <Form.Item name="categoria" label="Categoría">
                 <Select
                   showSearch allowClear
@@ -623,7 +631,7 @@ export default function ArticulosPage() {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item name="marca" label="Marca">
                 <Input placeholder="Ej: OPI, Essie, Sally Hansen..." />
               </Form.Item>
