@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card, Button, Typography, Space, Modal, Form, Input, InputNumber,
   Select, Tag, App, Spin, Tooltip, Row, Col, Statistic, Badge, Upload,
-  Divider, Grid, Empty, Dropdown, Progress,
+  Divider, Grid, Empty, Dropdown, Progress, Table, Radio, Alert, Checkbox,
 } from "antd";
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, MoreOutlined,
   WarningOutlined, TagsOutlined, SearchOutlined, ReloadOutlined,
   InboxOutlined, BarcodeOutlined, ShopOutlined, AppstoreOutlined,
-  UnorderedListOutlined, CameraOutlined, EyeOutlined,
+  UnorderedListOutlined, CameraOutlined, EyeOutlined, PercentageOutlined,
+  DollarOutlined, RiseOutlined, FallOutlined, ControlOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -54,6 +55,17 @@ export default function ArticulosPage() {
   const [filtroCategoria, setFiltroCategoria] = useState<string | null>(null);
   const [vista, setVista] = useState<"grid" | "lista">("grid");
 
+  // Ajuste masivo
+  const [ajusteOpen, setAjusteOpen] = useState(false);
+  const [ajusteForm] = Form.useForm();
+  const [ajusteFiltroCategoria, setAjusteFiltroCategoria] = useState<string[]>([]);
+  const [ajusteFiltrMarca, setAjusteFiltrMarca] = useState<string[]>([]);
+  const [ajusteTipo, setAjusteTipo] = useState<"porcentaje" | "fijo">("porcentaje");
+  const [ajusteDireccion, setAjusteDireccion] = useState<"subir" | "bajar">("subir");
+  const [ajusteValor, setAjusteValor] = useState<number>(0);
+  const [ajusteCampo, setAjusteCampo] = useState<"precio_venta" | "precio_costo" | "ambos">("precio_venta");
+  const [aplicandoAjuste, setAplicandoAjuste] = useState(false);
+
   const cargar = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabaseBrowserClient
@@ -83,6 +95,54 @@ export default function ArticulosPage() {
   const stockBajo = articulos.filter((a) => a.stock <= (a.stock_minimo ?? 3));
   const valorInventario = articulos.reduce((s, a) => s + a.stock * (a.precio_costo || 0), 0);
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
+  const marcas = [...new Set(articulos.map((a) => a.marca).filter(Boolean))];
+
+  // Previsualización ajuste masivo
+  const articulosAjuste = useMemo(() => {
+    let lista = [...articulos];
+    if (ajusteFiltroCategoria.length > 0)
+      lista = lista.filter((a) => ajusteFiltroCategoria.includes(a.categoria || ""));
+    if (ajusteFiltrMarca.length > 0)
+      lista = lista.filter((a) => ajusteFiltrMarca.includes(a.marca || ""));
+    return lista.map((a) => {
+      const calcNuevo = (precio: number) => {
+        if (!ajusteValor || ajusteValor <= 0) return precio;
+        let delta = ajusteTipo === "porcentaje" ? Math.round(precio * ajusteValor / 100) : ajusteValor;
+        return ajusteDireccion === "subir" ? precio + delta : Math.max(0, precio - delta);
+      };
+      return {
+        ...a,
+        nuevo_precio_venta: ajusteCampo !== "precio_costo" ? calcNuevo(a.precio_venta) : a.precio_venta,
+        nuevo_precio_costo: ajusteCampo !== "precio_venta" ? calcNuevo(a.precio_costo || 0) : (a.precio_costo || 0),
+      };
+    });
+  }, [articulos, ajusteFiltroCategoria, ajusteFiltrMarca, ajusteTipo, ajusteDireccion, ajusteValor, ajusteCampo]);
+
+  const aplicarAjusteMasivo = async () => {
+    if (!ajusteValor || ajusteValor <= 0) { message.warning("Ingresa un valor mayor a 0"); return; }
+    setAplicandoAjuste(true);
+    try {
+      let errores = 0;
+      for (const art of articulosAjuste) {
+        const update: Record<string, number> = {};
+        if (ajusteCampo !== "precio_costo") update.precio_venta = art.nuevo_precio_venta;
+        if (ajusteCampo !== "precio_venta") update.precio_costo = art.nuevo_precio_costo;
+        const { error } = await supabaseBrowserClient.from("articulos").update(update).eq("id", art.id);
+        if (error) errores++;
+      }
+      if (errores > 0) message.warning(`${errores} artículo(s) no se pudieron actualizar`);
+      else message.success(`✅ ${articulosAjuste.length} artículo(s) actualizados`);
+      setAjusteOpen(false);
+      setAjusteValor(0);
+      setAjusteFiltroCategoria([]);
+      setAjusteFiltrMarca([]);
+      cargar();
+    } catch {
+      message.error("Error al aplicar ajuste masivo");
+    } finally {
+      setAplicandoAjuste(false);
+    }
+  };
 
   const openModal = (art?: Articulo) => {
     setEditing(art || null);
@@ -225,6 +285,12 @@ export default function ArticulosPage() {
               />
               <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
               <Button
+                icon={<ControlOutlined />}
+                onClick={() => setAjusteOpen(true)}
+              >
+                {isMobile ? "Precios" : "Ajuste masivo"}
+              </Button>
+              <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => openModal()}
@@ -318,6 +384,189 @@ export default function ArticulosPage() {
           {articulosFiltrados.map(renderCard)}
         </Row>
       )}
+
+      {/* ── MODAL AJUSTE MASIVO DE PRECIOS ── */}
+      <Modal
+        title={<Space><ControlOutlined style={{ color: "#d81b87" }} />Modificación masiva de precios</Space>}
+        open={ajusteOpen}
+        onCancel={() => setAjusteOpen(false)}
+        width={820}
+        footer={null}
+        destroyOnClose
+      >
+        {/* Filtros */}
+        <Card size="small" style={{ marginBottom: 12, background: "#fafafa" }}
+          title={<Text strong style={{ fontSize: 13 }}>1. Seleccionar artículos</Text>}>
+          <Row gutter={[12, 8]}>
+            <Col xs={24} md={12}>
+              <div style={{ marginBottom: 4 }}><Text type="secondary" style={{ fontSize: 12 }}>Filtrar por categoría</Text></div>
+              <Select
+                mode="multiple"
+                placeholder="Todas las categorías"
+                style={{ width: "100%" }}
+                value={ajusteFiltroCategoria}
+                onChange={setAjusteFiltroCategoria}
+                allowClear
+                options={[...CATEGORIAS_DEFAULT, ...categorias.filter(c => !CATEGORIAS_DEFAULT.includes(c!))]
+                  .map((c) => ({ label: c, value: c }))}
+              />
+            </Col>
+            <Col xs={24} md={12}>
+              <div style={{ marginBottom: 4 }}><Text type="secondary" style={{ fontSize: 12 }}>Filtrar por marca</Text></div>
+              <Select
+                mode="multiple"
+                placeholder="Todas las marcas"
+                style={{ width: "100%" }}
+                value={ajusteFiltrMarca}
+                onChange={setAjusteFiltrMarca}
+                allowClear
+                options={marcas.map((m) => ({ label: m, value: m }))}
+              />
+            </Col>
+          </Row>
+          <div style={{ marginTop: 8 }}>
+            <Tag color="blue">{articulosAjuste.length} artículo(s) seleccionados</Tag>
+            {ajusteFiltroCategoria.length === 0 && ajusteFiltrMarca.length === 0 && (
+              <Tag color="orange">Sin filtros = se modifican TODOS los artículos</Tag>
+            )}
+          </div>
+        </Card>
+
+        {/* Tipo de ajuste */}
+        <Card size="small" style={{ marginBottom: 12, background: "#fafafa" }}
+          title={<Text strong style={{ fontSize: 13 }}>2. Tipo de modificación</Text>}>
+          <Row gutter={[16, 12]} align="middle">
+            <Col xs={24} sm={8}>
+              <div style={{ marginBottom: 4 }}><Text type="secondary" style={{ fontSize: 12 }}>Campo a modificar</Text></div>
+              <Radio.Group value={ajusteCampo} onChange={(e) => setAjusteCampo(e.target.value)} size="small">
+                <Space direction="vertical" size={4}>
+                  <Radio value="precio_venta">Precio venta</Radio>
+                  <Radio value="precio_costo">Precio costo</Radio>
+                  <Radio value="ambos">Ambos precios</Radio>
+                </Space>
+              </Radio.Group>
+            </Col>
+            <Col xs={24} sm={8}>
+              <div style={{ marginBottom: 4 }}><Text type="secondary" style={{ fontSize: 12 }}>Método</Text></div>
+              <Radio.Group value={ajusteTipo} onChange={(e) => setAjusteTipo(e.target.value)} size="small">
+                <Space direction="vertical" size={4}>
+                  <Radio value="porcentaje"><PercentageOutlined /> Porcentaje (%)</Radio>
+                  <Radio value="fijo"><DollarOutlined /> Valor fijo ($)</Radio>
+                </Space>
+              </Radio.Group>
+            </Col>
+            <Col xs={24} sm={8}>
+              <div style={{ marginBottom: 4 }}><Text type="secondary" style={{ fontSize: 12 }}>Dirección</Text></div>
+              <Radio.Group value={ajusteDireccion} onChange={(e) => setAjusteDireccion(e.target.value)} size="small">
+                <Space direction="vertical" size={4}>
+                  <Radio value="subir"><RiseOutlined style={{ color: "#52c41a" }} /> Subir precio</Radio>
+                  <Radio value="bajar"><FallOutlined style={{ color: "#ff4d4f" }} /> Bajar precio</Radio>
+                </Space>
+              </Radio.Group>
+            </Col>
+          </Row>
+          <Divider style={{ margin: "12px 0" }} />
+          <Row align="middle" gutter={12}>
+            <Col>
+              <Text>Valor a {ajusteDireccion === "subir" ? "aumentar" : "reducir"}:</Text>
+            </Col>
+            <Col>
+              <InputNumber
+                min={0}
+                max={ajusteTipo === "porcentaje" ? 100 : undefined}
+                value={ajusteValor}
+                onChange={(v) => setAjusteValor(v || 0)}
+                addonAfter={ajusteTipo === "porcentaje" ? "%" : "$"}
+                style={{ width: 160 }}
+                size="large"
+              />
+            </Col>
+            {ajusteValor > 0 && (
+              <Col>
+                <Alert
+                  type={ajusteDireccion === "subir" ? "success" : "warning"}
+                  showIcon
+                  style={{ padding: "2px 10px" }}
+                  message={
+                    ajusteTipo === "porcentaje"
+                      ? `${ajusteDireccion === "subir" ? "+" : "-"}${ajusteValor}% en ${articulosAjuste.length} artículo(s)`
+                      : `${ajusteDireccion === "subir" ? "+" : "-"}$${ajusteValor.toLocaleString()} en ${articulosAjuste.length} artículo(s)`
+                  }
+                />
+              </Col>
+            )}
+          </Row>
+        </Card>
+
+        {/* Preview */}
+        {ajusteValor > 0 && articulosAjuste.length > 0 && (
+          <Card size="small" style={{ marginBottom: 12 }}
+            title={<Text strong style={{ fontSize: 13 }}>3. Vista previa ({articulosAjuste.length} artículos)</Text>}>
+            <Table
+              dataSource={articulosAjuste}
+              rowKey="id"
+              size="small"
+              pagination={{ pageSize: 6, size: "small" }}
+              scroll={{ x: 500 }}
+              columns={[
+                { title: "Artículo", dataIndex: "nombre", ellipsis: true, render: (n: string, r: Articulo & { nuevo_precio_venta: number; nuevo_precio_costo: number }) => (
+                  <Space size={4} direction="vertical" style={{ lineHeight: 1.2 }}>
+                    <Text style={{ fontSize: 12 }}>{n}</Text>
+                    {r.marca && <Text type="secondary" style={{ fontSize: 11 }}>{r.marca}</Text>}
+                  </Space>
+                )},
+                { title: "Categoría", dataIndex: "categoria", width: 120, render: (c?: string) => c ? <Tag style={{ fontSize: 10 }}>{c}</Tag> : <Text type="secondary">—</Text> },
+                ...(ajusteCampo !== "precio_costo" ? [{
+                  title: "Precio venta",
+                  key: "pv",
+                  width: 180,
+                  render: (_: unknown, r: Articulo & { nuevo_precio_venta: number }) => (
+                    <Space size={4}>
+                      <Text delete type="secondary" style={{ fontSize: 11 }}>${Number(r.precio_venta).toLocaleString()}</Text>
+                      <Text>→</Text>
+                      <Text strong style={{ color: ajusteDireccion === "subir" ? "#52c41a" : "#ff4d4f" }}>
+                        ${Number(r.nuevo_precio_venta).toLocaleString()}
+                      </Text>
+                    </Space>
+                  ),
+                }] : []),
+                ...(ajusteCampo !== "precio_venta" ? [{
+                  title: "Precio costo",
+                  key: "pc",
+                  width: 180,
+                  render: (_: unknown, r: Articulo & { nuevo_precio_costo: number }) => (
+                    <Space size={4}>
+                      <Text delete type="secondary" style={{ fontSize: 11 }}>${Number(r.precio_costo || 0).toLocaleString()}</Text>
+                      <Text>→</Text>
+                      <Text strong style={{ color: ajusteDireccion === "subir" ? "#52c41a" : "#ff4d4f" }}>
+                        ${Number(r.nuevo_precio_costo).toLocaleString()}
+                      </Text>
+                    </Space>
+                  ),
+                }] : []),
+              ]}
+            />
+          </Card>
+        )}
+
+        {/* Acciones */}
+        <Row justify="end" gutter={8}>
+          <Col><Button onClick={() => setAjusteOpen(false)}>Cancelar</Button></Col>
+          <Col>
+            <Button
+              type="primary"
+              danger={ajusteDireccion === "bajar"}
+              icon={ajusteDireccion === "subir" ? <RiseOutlined /> : <FallOutlined />}
+              loading={aplicandoAjuste}
+              disabled={ajusteValor <= 0 || articulosAjuste.length === 0}
+              onClick={aplicarAjusteMasivo}
+              style={ajusteDireccion === "subir" ? { background: "#52c41a", borderColor: "#52c41a" } : {}}
+            >
+              Aplicar a {articulosAjuste.length} artículo(s)
+            </Button>
+          </Col>
+        </Row>
+      </Modal>
 
       {/* ── MODAL EDICIÓN ── */}
       <Modal
