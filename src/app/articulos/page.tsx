@@ -368,7 +368,7 @@ export default function ArticulosPage() {
         )}
         <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Text strong style={{ color: "#d81b87", fontSize: 15 }}>
-            ${Number(art.precio_venta).toLocaleString()}
+            {`$${Number(art.precio_venta).toLocaleString()}`}
           </Text>
           <div style={{
             width: 10, height: 10, borderRadius: "50%",
@@ -543,12 +543,12 @@ export default function ArticulosPage() {
               },
               {
                 title: "P. Venta", dataIndex: "precio_venta", width: 110, align: "right" as const,
-                render: (v: number) => <Text strong style={{ color: "#d81b87" }}>${Number(v).toLocaleString()}</Text>,
+                render: (v: number) => <Text strong style={{ color: "#d81b87" }}>{`$${Number(v).toLocaleString()}`}</Text>,
                 sorter: (a: Articulo, b: Articulo) => a.precio_venta - b.precio_venta,
               },
               {
                 title: "P. Costo", dataIndex: "precio_costo", width: 100, align: "right" as const,
-                render: (v?: number) => v ? <Text type="secondary">${Number(v).toLocaleString()}</Text> : <Text type="secondary">—</Text>,
+                render: (v?: number) => v ? <Text type="secondary">{`$${Number(v).toLocaleString()}`}</Text> : <Text type="secondary">—</Text>,
               },
               {
                 title: "Stock", dataIndex: "stock", width: 90, align: "center" as const,
@@ -716,10 +716,10 @@ export default function ArticulosPage() {
                   width: 180,
                   render: (_: unknown, r: Articulo & { nuevo_precio_venta: number }) => (
                     <Space size={4}>
-                      <Text delete type="secondary" style={{ fontSize: 11 }}>${Number(r.precio_venta).toLocaleString()}</Text>
+                      <Text delete type="secondary" style={{ fontSize: 11 }}>{`$${Number(r.precio_venta).toLocaleString()}`}</Text>
                       <Text>→</Text>
                       <Text strong style={{ color: ajusteDireccion === "subir" ? "#52c41a" : "#ff4d4f" }}>
-                        ${Number(r.nuevo_precio_venta).toLocaleString()}
+                        {`$${Number(r.nuevo_precio_venta).toLocaleString()}`}
                       </Text>
                     </Space>
                   ),
@@ -730,10 +730,10 @@ export default function ArticulosPage() {
                   width: 180,
                   render: (_: unknown, r: Articulo & { nuevo_precio_costo: number }) => (
                     <Space size={4}>
-                      <Text delete type="secondary" style={{ fontSize: 11 }}>${Number(r.precio_costo || 0).toLocaleString()}</Text>
+                      <Text delete type="secondary" style={{ fontSize: 11 }}>{`$${Number(r.precio_costo || 0).toLocaleString()}`}</Text>
                       <Text>→</Text>
                       <Text strong style={{ color: ajusteDireccion === "subir" ? "#52c41a" : "#ff4d4f" }}>
-                        ${Number(r.nuevo_precio_costo).toLocaleString()}
+                        {`$${Number(r.nuevo_precio_costo).toLocaleString()}`}
                       </Text>
                     </Space>
                   ),
