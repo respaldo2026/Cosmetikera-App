@@ -51,8 +51,8 @@ export async function POST(req: Request) {
       oferta,
     } = body || {};
 
-    const prompt = `Eres copywriter de una academia de belleza. Devuelve SOLO un JSON sin texto adicional.
-    Estructura: {"promo_text": string, "keywords": string[]}
+      const prompt = `Eres copywriter de un negocio de belleza. Devuelve SOLO un JSON sin texto adicional.
+      Estructura: {"promo_text": string, "keywords": string[]}
     - Idioma: español de Colombia.
     - Estilo: ${tono}.
     - Usa 1 o 2 frases cortas que incluyan beneficio, fecha si existe, y un CTA breve.

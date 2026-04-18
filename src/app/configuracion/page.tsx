@@ -59,7 +59,7 @@ export default function ConfiguracionPage() {
   const isMobile = !screens.md;
   const isTablet = screens.md && !screens.lg;
 
-  // Estados para Academia
+  // Estados para la configuración del negocio
   const [formAcademia] = Form.useForm();
   const [loadingAcademia, setLoadingAcademia] = useState(false);
   const [savingAcademia, setSavingAcademia] = useState(false);
@@ -268,7 +268,7 @@ export default function ConfiguracionPage() {
     }
   };
 
-  // ==================== FUNCIONES ACADEMIA ====================
+  // ==================== FUNCIONES DEL NEGOCIO ====================
   const cargarConfiguracionAcademia = useCallback(async () => {
     setLoadingAcademia(true);
     try {

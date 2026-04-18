@@ -31,7 +31,7 @@ export default function NominaPage() {
   const isTablet = screens.md && !screens.lg;
   const { user } = useCurrentUser();
   const [loading, setLoading] = useState(false);
-  const [profesores, setProfesores] = useState<any[]>([]);
+    const [colaboradores, setColaboradores] = useState<any[]>([]);
   // Iniciamos con el mes actual por defecto
   const [rangoFechas, setRangoFechas] = useState<any>(() => {
       const hoy = dayjs();
@@ -52,7 +52,7 @@ export default function NominaPage() {
 
   // Modal Pagar
   const [modalVisible, setModalVisible] = useState(false);
-  const [profesorSeleccionado, setProfesorSeleccionado] = useState<any>(null);
+    const [colaboradorSeleccionado, setColaboradorSeleccionado] = useState<any>(null);
 
     const columnasNomina = useMemo(
         () => [
@@ -80,7 +80,7 @@ export default function NominaPage() {
                         icon={<PayCircleOutlined />}
                         disabled={record.total_pagado <= 0}
                         onClick={() => {
-                            setProfesorSeleccionado(record);
+                            setColaboradorSeleccionado(record);
                             setModalVisible(true);
                         }}
                     >
@@ -100,13 +100,13 @@ export default function NominaPage() {
     const fin = rangoFechas[1].format("YYYY-MM-DD");
 
     try {
-        // 1. Obtener profesores y su valor hora
+        // 1. Obtener colaboradores y su valor hora
         let query = supabaseBrowserClient
             .from("perfiles")
             .select("id, nombre_completo, valor_hora, telefono")
             .eq("rol", "profesor");
 
-        // Si es profesor, solo ve su propia información
+        // Si el usuario es profesor, solo ve su propia información
         if (user?.rol === "profesor") {
             query = query.eq("id", user.id);
         }
@@ -122,7 +122,7 @@ export default function NominaPage() {
             .order("fecha", { ascending: true });
 
                 // 3. Cruzar información (Matemática de Nómina)
-                // IMPORTANTE: Los profesores solo ven clases PENDIENTES para pagar
+                // El reporte se calcula sobre sesiones pendientes por pagar
                 const sesionesPendientes = sesiones?.filter((s: any) => s.estado_pago === 'pendiente') || [];
                 const reporte = dataProfes?.map((prof: any) => {
                         const susClases = sesionesPendientes.filter((s: any) => s.profesor_id === prof.id) || [];
@@ -154,7 +154,7 @@ export default function NominaPage() {
 
                 setClasesPendientes(sesionesEnriquecidas);
 
-        setProfesores(reporte || []);
+        setColaboradores(reporte || []);
         
         const totalGeneral = reporte?.reduce((acc: number, curr: any) => acc + curr.total_pagado, 0) || 0;
         setTotalAPagar(totalGeneral);
@@ -172,18 +172,18 @@ export default function NominaPage() {
     }, [calcularNomina]);
 
   const procesarPago = async () => {
-      if (!profesorSeleccionado) return;
+    if (!colaboradorSeleccionado) return;
       
       try {
         // 1. Guardar en historial de pagos (pagos_nomina)
         const { data: pagoData, error: errPago } = await supabaseBrowserClient.from("pagos_nomina").insert({
-            profesor_id: profesorSeleccionado.id,
+            profesor_id: colaboradorSeleccionado.id,
             fecha_pago: dayjs().format("YYYY-MM-DD"),
-            total_pagado: profesorSeleccionado.total_pagado,
-            total_horas: profesorSeleccionado.total_horas,
+            total_pagado: colaboradorSeleccionado.total_pagado,
+            total_horas: colaboradorSeleccionado.total_horas,
             fecha_inicio_periodo: rangoFechas[0].format("YYYY-MM-DD"),
             fecha_fin_periodo: rangoFechas[1].format("YYYY-MM-DD"),
-            observaciones: `Pago por ${profesorSeleccionado.total_horas} horas trabajadas del ${formatDate(rangoFechas[0])} al ${formatDate(rangoFechas[1])} - Método: ${metodoNomina}`
+            observaciones: `Pago por ${colaboradorSeleccionado.total_horas} horas trabajadas del ${formatDate(rangoFechas[0])} al ${formatDate(rangoFechas[1])} - Método: ${metodoNomina}`
         }).select().single();
         if (errPago) throw errPago;
 
@@ -194,25 +194,25 @@ export default function NominaPage() {
         const { error: errUpdate } = await supabaseBrowserClient
             .from("sesiones_clase")
             .update({ estado_pago: 'pagado' })
-            .eq("profesor_id", profesorSeleccionado.id)
+              .eq("profesor_id", colaboradorSeleccionado.id)
             .gte("fecha", inicio)
             .lte("fecha", fin)
             .eq("estado_pago", "pendiente");
 
         if (errUpdate) throw errUpdate;
 
-        message.success(`Pago registrado a ${profesorSeleccionado.nombre_completo}`);
+        message.success(`Pago registrado a ${colaboradorSeleccionado.nombre_completo}`);
         
         // 3. Enviar WhatsApp
-        if (profesorSeleccionado.telefono) {
+        if (colaboradorSeleccionado.telefono) {
             const periodoInicio = rangoFechas?.[0] ? formatDate(rangoFechas[0]) : formatDate(dayjs());
             const periodoFin = rangoFechas?.[1] ? formatDate(rangoFechas[1]) : periodoInicio;
             await enviarWhatsappConPlantilla(
-                profesorSeleccionado.telefono,
+                colaboradorSeleccionado.telefono,
                 "nomina_pago_profesor",
                 {
-                    nombre: profesorSeleccionado.nombre_completo,
-                    monto: formatoCOP(Number(profesorSeleccionado.total_pagado) || 0),
+                    nombre: colaboradorSeleccionado.nombre_completo,
+                    monto: formatoCOP(Number(colaboradorSeleccionado.total_pagado) || 0),
                     periodo_inicio: periodoInicio,
                     periodo_fin: periodoFin,
                 }
@@ -221,7 +221,7 @@ export default function NominaPage() {
 
         setModalVisible(false);
         calcularNomina(); // Refrescar pantalla
-        setPagoReciente({ ...pagoData, nombre_profesor: profesorSeleccionado.nombre_completo });
+        setPagoReciente({ ...pagoData, nombre_profesor: colaboradorSeleccionado.nombre_completo });
         setModalReciboVisible(true);
 
       } catch (error: any) {
@@ -396,7 +396,7 @@ export default function NominaPage() {
         </Card>
 
         <Table 
-            dataSource={profesores}
+              dataSource={colaboradores}
             rowKey="id"
             loading={loading}
             locale={{ emptyText: "No hay clases pendientes de pago en este rango de fechas" }}
@@ -429,7 +429,7 @@ export default function NominaPage() {
                             loading={loading}
                             locale={{ emptyText: "No hay sesiones pendientes en este rango" }}
                             columns={isMobile ? columnasClases.filter((col: any) => 
-                              ['Fecha', 'Profesor', 'Horas', 'A Pagar', 'Acción'].includes(col.title)
+                              ['Fecha', 'Colaborador', 'Horas', 'A Pagar', 'Acción'].includes(col.title)
                             ) : columnasClases}
                             scroll={isMobile ? { x: 600 } : undefined}
                             size={isMobile ? "small" : "middle"}
@@ -449,13 +449,13 @@ export default function NominaPage() {
             onOk={procesarPago}
             okText="Confirmar Pago"
         >
-            {profesorSeleccionado && (
+              {colaboradorSeleccionado && (
                 <div>
-                    <p>Vas a registrar el pago para el colaborador: <b>{profesorSeleccionado.nombre_completo}</b></p>
+                        <p>Vas a registrar el pago para el colaborador: <b>{colaboradorSeleccionado.nombre_completo}</b></p>
                     <ul>
                         <li>Periodo: {formatDate(rangoFechas[0])} al {formatDate(rangoFechas[1])}</li>
-                        <li>Horas: {profesorSeleccionado.total_horas}</li>
-                        <li>Total: <b>$ {Number(profesorSeleccionado.total_pagado).toLocaleString()}</b></li>
+                        <li>Horas: {colaboradorSeleccionado.total_horas}</li>
+                        <li>Total: <b>$ {Number(colaboradorSeleccionado.total_pagado).toLocaleString()}</b></li>
                     </ul>
                     <div style={{marginTop: 16}}>
                         <Text strong>Método de Pago:</Text><br/>

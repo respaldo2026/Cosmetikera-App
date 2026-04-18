@@ -38,12 +38,12 @@ const accesos = [
   },
 ];
 
-export default function SecretariaDashboardPage() {
+export default function OperativoDashboardPage() {
   return (
     <div style={{ padding: 24 }}>
       <Space direction="vertical" size={8} style={{ marginBottom: 24 }}>
         <Title level={3} style={{ margin: 0 }}>
-          Panel de secretaria
+          Panel operativo
         </Title>
         <Text type="secondary">
           Accesos rapidos para las tareas operativas mas frecuentes.

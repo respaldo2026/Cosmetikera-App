@@ -41,7 +41,7 @@ const { Title, Text } = Typography;
 
 type MetodoPago = "efectivo" | "transferencia" | "tarjeta" | "nequi" | "sistecredito" | "qr";
 
-interface Estudiante {
+interface ClientePerfil {
   id: string;
   nombre_completo: string;
   telefono?: string;
@@ -127,8 +127,8 @@ export default function CajaPage() {
   const [form] = Form.useForm();
 
   const [loading, setLoading] = useState(false);
-  const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
-  const [estudianteSeleccionado, setEstudianteSeleccionado] = useState<Estudiante | null>(null);
+  const [clientes, setClientes] = useState<ClientePerfil[]>([]);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<ClientePerfil | null>(null);
   const [matriculas, setMatriculas] = useState<Matricula[]>([]);
   const [cuotas, setCuotas] = useState<Cuota[]>([]);
   const [cuotasSeleccionadas, setCuotasSeleccionadas] = useState<string[]>([]);
@@ -150,7 +150,7 @@ export default function CajaPage() {
     return valorEntregado - totalAPagar;
   }, [valorEntregado, totalAPagar]);
 
-  const cargarEstudiantes = useCallback(async () => {
+  const cargarClientes = useCallback(async () => {
     try {
       const { data, error } = await supabaseBrowserClient
         .from("perfiles")
@@ -160,9 +160,9 @@ export default function CajaPage() {
         .order("nombre_completo");
 
       if (error) throw error;
-      setEstudiantes(data || []);
+      setClientes(data || []);
     } catch (error) {
-      console.error("Error cargando estudiantes:", error);
+      console.error("Error cargando clientes:", error);
       messageApi.error("No se pudieron cargar los clientes");
     }
   }, [messageApi]);
@@ -202,10 +202,10 @@ export default function CajaPage() {
   }, []);
 
   useEffect(() => {
-    cargarEstudiantes();
+    cargarClientes();
     cargarConfiguracion();
     cargarMediosPago();
-  }, [cargarEstudiantes, cargarConfiguracion, cargarMediosPago]);
+  }, [cargarClientes, cargarConfiguracion, cargarMediosPago]);
 
   // Generar número de factura cuando se selecciona una cuota
   useEffect(() => {
@@ -215,18 +215,18 @@ export default function CajaPage() {
     }
   }, [cuotasSeleccionadas, form]);
 
-  const handleEstudianteChange = useCallback(
-    async (estudianteId: string) => {
+  const handleClienteChange = useCallback(
+    async (clienteId: string) => {
       setLoading(true);
       try {
-        const estudiante = estudiantes.find((e) => e.id === estudianteId);
-        setEstudianteSeleccionado(estudiante || null);
+        const cliente = clientes.find((e) => e.id === clienteId);
+        setClienteSeleccionado(cliente || null);
 
-        // Cargar matrículas del estudiante
+        // Cargar matrículas del cliente
         const { data: matriculasData, error: matriculasError } = await supabaseBrowserClient
           .from("matriculas")
           .select("id, fecha_inicio, cursos ( nombre, numero_cuotas, duracion, precio_mensualidad, programas ( duracion, precio_mensualidad ) )")
-          .eq("estudiante_id", estudianteId)
+          .eq("estudiante_id", clienteId)
           .eq("estado", "activo");
 
         if (matriculasError) throw matriculasError;
@@ -466,13 +466,13 @@ export default function CajaPage() {
         setCuotasSeleccionadas([]);
         form.setFieldsValue({ matricula_id: undefined });
       } catch (error) {
-        console.error("Error cargando datos del estudiante:", error);
+        console.error("Error cargando datos del cliente:", error);
         messageApi.error("Error al cargar datos del cliente");
       } finally {
         setLoading(false);
       }
     },
-    [estudiantes, form, messageApi]
+    [clientes, form, messageApi]
   );
 
   const handleRegistrarPago = useCallback(async () => {
@@ -511,7 +511,7 @@ export default function CajaPage() {
           metodo_pago: (values.metodo_pago as string).toLowerCase(),
           fecha_pago: dayjs().toISOString(),
           referencia: referenciaPago,
-          estudiante_id: estudianteSeleccionado?.id || null,
+          estudiante_id: clienteSeleccionado?.id || null,
           observaciones: values.observaciones || null,
         };
 
@@ -583,8 +583,8 @@ export default function CajaPage() {
           ticketCampos: configTicket?.ticket_campos || undefined,
         },
         estudiante: {
-          nombre: estudianteSeleccionado?.nombre_completo || "",
-          telefono: estudianteSeleccionado?.telefono || "",
+          nombre: clienteSeleccionado?.nombre_completo || "",
+          telefono: clienteSeleccionado?.telefono || "",
         },
         pago: {
           monto: totalAPagar,
@@ -615,7 +615,7 @@ export default function CajaPage() {
           const { publicUrl } = await subirTicketPago({
             blob,
             pagoId: pagosActualizados[0].id,
-            estudianteId: estudianteSeleccionado?.id,
+            estudianteId: clienteSeleccionado?.id,
           });
 
           const pagoIds = pagosActualizados.map((p) => p.id);
@@ -641,7 +641,7 @@ export default function CajaPage() {
         abrirCajonRegistrador();
       }
 
-      if (estudianteSeleccionado?.telefono && (estudianteSeleccionado?.notif_whatsapp ?? true)) {
+      if (clienteSeleccionado?.telefono && (clienteSeleccionado?.notif_whatsapp ?? true)) {
         try {
           const { enviarConfirmacionPago } = await import("@/services/whatsapp-messages-module");
 
@@ -662,9 +662,9 @@ export default function CajaPage() {
             .filter(Boolean)
             .join(", ");
 
-          await enviarConfirmacionPago(estudianteSeleccionado.id, {
-            nombre: estudianteSeleccionado.nombre_completo,
-            telefono: estudianteSeleccionado.telefono,
+          await enviarConfirmacionPago(clienteSeleccionado.id, {
+            nombre: clienteSeleccionado.nombre_completo,
+            telefono: clienteSeleccionado.telefono,
             referenciaPago,
             monto: totalAPagar,
             fechaPago: dayjs().format("DD/MM/YYYY"),
@@ -683,7 +683,7 @@ export default function CajaPage() {
       // Limpiar formulario y recargar datos
       form.resetFields();
       setCuotasSeleccionadas([]);
-      setEstudianteSeleccionado(null);
+      setClienteSeleccionado(null);
       setMatriculas([]);
       setCuotas([]);
       setValorEntregado(null);
@@ -694,7 +694,7 @@ export default function CajaPage() {
     } finally {
       setProcesando(false);
     }
-  }, [cuotasSeleccionadas, cuotas, form, messageApi, estudianteSeleccionado, totalAPagar, configuracion]);
+  }, [cuotasSeleccionadas, cuotas, form, messageApi, clienteSeleccionado, totalAPagar, configuracion]);
 
   const abrirCajonRegistrador = () => {
     try {
@@ -818,19 +818,19 @@ export default function CajaPage() {
                   filterOption={(input, option) =>
                     (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
                   }
-                  options={estudiantes.map((e) => ({ label: e.nombre_completo, value: e.id }))}
-                  onChange={handleEstudianteChange}
+                  options={clientes.map((e) => ({ label: e.nombre_completo, value: e.id }))}
+                  onChange={handleClienteChange}
                   size="large"
                 />
               </Form.Item>
 
-              {estudianteSeleccionado && (
+              {clienteSeleccionado && (
                 <Alert
-                  message={`Cliente: ${estudianteSeleccionado.nombre_completo}`}
+                  message={`Cliente: ${clienteSeleccionado.nombre_completo}`}
                   description={
                     <div>
-                      {estudianteSeleccionado.telefono && <div>Teléfono: {estudianteSeleccionado.telefono}</div>}
-                      {estudianteSeleccionado.email && <div>Email: {estudianteSeleccionado.email}</div>}
+                      {clienteSeleccionado.telefono && <div>Teléfono: {clienteSeleccionado.telefono}</div>}
+                      {clienteSeleccionado.email && <div>Email: {clienteSeleccionado.email}</div>}
                     </div>
                   }
                   type="info"
@@ -992,7 +992,7 @@ export default function CajaPage() {
                   disabled={cuotasSeleccionadas.length === 0}
                   onClick={async () => {
                     const values = form.getFieldsValue();
-                    if (!estudianteSeleccionado || !values.metodo_pago) {
+                    if (!clienteSeleccionado || !values.metodo_pago) {
                       messageApi.warning("Complete la información para imprimir");
                       return;
                     }
@@ -1024,8 +1024,8 @@ export default function CajaPage() {
                         ticketCampos: configTicket?.ticket_campos || undefined,
                       },
                       estudiante: {
-                        nombre: estudianteSeleccionado.nombre_completo,
-                        telefono: estudianteSeleccionado.telefono || "",
+                        nombre: clienteSeleccionado.nombre_completo,
+                        telefono: clienteSeleccionado.telefono || "",
                       },
                       pago: {
                         monto: totalAPagar,
