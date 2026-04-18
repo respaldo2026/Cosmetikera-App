@@ -88,6 +88,37 @@ export default function VentasPage() {
   const [imprimiendo, setImprimiendo] = useState(false);
   const [pagoMixto, setPagoMixto] = useState<PagoMixto>({ efectivo: 0, tarjeta: 0, transferencia: 0 });
 
+  // Crear cliente rápido desde caja
+  const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
+  const [nuevoClienteForm] = Form.useForm();
+  const [creandoCliente, setCreandoCliente] = useState(false);
+
+  const crearClienteRapido = async () => {
+    const values = await nuevoClienteForm.validateFields();
+    setCreandoCliente(true);
+    try {
+      const res = await fetch("/api/perfiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, rol: "cliente", activo: true }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error al crear cliente");
+      message.success(`✅ Cliente ${values.nombre_completo} creado`);
+      setNuevoClienteOpen(false);
+      nuevoClienteForm.resetFields();
+      // Recargar clientes y seleccionar el nuevo
+      const r = await fetch("/api/perfiles?rol=cliente");
+      const rj = await r.json();
+      setClientes(rj.data || []);
+      if (json.data?.id) setClienteId(json.data.id);
+    } catch (e: unknown) {
+      message.error((e as Error)?.message || "Error al crear cliente");
+    } finally {
+      setCreandoCliente(false);
+    }
+  };
+
   const cargar = useCallback(async () => {
     setLoading(true);
     const [{ data: arts }, { data: cls }] = await Promise.all([
@@ -443,21 +474,34 @@ export default function VentasPage() {
         <Text strong style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#888" }}>
           Cliente
         </Text>
-        <Select
-          showSearch
-          allowClear
-          placeholder="Seleccionar cliente (opcional)"
-          style={{ width: "100%", marginTop: 4 }}
-          value={clienteId}
-          onChange={setClienteId}
-          filterOption={(input, opt) =>
-            (opt?.label as string || "").toLowerCase().includes(input.toLowerCase())
-          }
-          options={clientes.map((c) => ({
-            value: c.id,
-            label: c.nombre_completo,
-          }))}
-        />
+        <Row gutter={6} style={{ marginTop: 4 }}>
+          <Col flex="auto">
+            <Select
+              showSearch
+              allowClear
+              placeholder="Seleccionar cliente (opcional)"
+              style={{ width: "100%" }}
+              value={clienteId}
+              onChange={setClienteId}
+              filterOption={(input, opt) =>
+                (opt?.label as string || "").toLowerCase().includes(input.toLowerCase())
+              }
+              options={clientes.map((c) => ({
+                value: c.id,
+                label: c.nombre_completo,
+              }))}
+            />
+          </Col>
+          <Col>
+            <Tooltip title="Crear nuevo cliente">
+              <Button
+                icon={<PlusOutlined />}
+                onClick={() => setNuevoClienteOpen(true)}
+                style={{ borderColor: "#d81b87", color: "#d81b87" }}
+              />
+            </Tooltip>
+          </Col>
+        </Row>
         {clienteSeleccionado && (
           <div style={{ marginTop: 6, padding: "6px 10px", background: "#f9f0ff", borderRadius: 8 }}>
             <Space>
@@ -791,6 +835,48 @@ export default function VentasPage() {
             </Col>
           </Row>
         </div>
+      </Modal>
+
+      {/* MODAL NUEVO CLIENTE RÁPIDO */}
+      <Modal
+        title={<Space><UserOutlined style={{ color: "#d81b87" }} />Nuevo cliente</Space>}
+        open={nuevoClienteOpen}
+        onCancel={() => { setNuevoClienteOpen(false); nuevoClienteForm.resetFields(); }}
+        onOk={crearClienteRapido}
+        confirmLoading={creandoCliente}
+        okText="Crear cliente"
+        cancelText="Cancelar"
+        width={420}
+        destroyOnHidden
+      >
+        <Form form={nuevoClienteForm} layout="vertical" style={{ marginTop: 12 }}>
+          <Form.Item
+            name="nombre_completo"
+            label="Nombre completo"
+            rules={[{ required: true, message: "El nombre es requerido" }]}
+          >
+            <Input placeholder="Ej: María García" prefix={<UserOutlined />} />
+          </Form.Item>
+          <Form.Item
+            name="cedula"
+            label="Cédula"
+            rules={[{ required: true, message: "La cédula es requerida" }]}
+          >
+            <Input placeholder="Ej: 1234567890" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="telefono" label="Teléfono">
+                <Input placeholder="300 000 0000" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="email" label="Email">
+                <Input placeholder="correo@ejemplo.com" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
       </Modal>
     </>
   );
