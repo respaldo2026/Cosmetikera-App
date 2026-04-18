@@ -671,8 +671,8 @@ export default function ClientesPage() {
           </Form.Item>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="cedula" label="Cédula">
-                <Input prefix={<IdcardOutlined />} placeholder="1234567890" maxLength={12} />
+              <Form.Item name="cedula" label="Cédula" rules={[{ required: true, message: "La cédula es obligatoria — es el acceso al portal Club" }, { pattern: /^\d{4,15}$/, message: "Solo dígitos, entre 4 y 15 caracteres" }]}>
+                <Input prefix={<IdcardOutlined />} placeholder="1234567890" maxLength={15} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -687,8 +687,11 @@ export default function ClientesPage() {
           <Form.Item name="fecha_nacimiento" label="Fecha de nacimiento">
             <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="DD/MM/AAAA" />
           </Form.Item>
-          <div style={{ background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 8, padding: "10px 14px" }}>
+          <div style={{ background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
             <Text style={{ fontSize: 12 }}>🌟 El cliente recibirá <strong>50 puntos de bienvenida</strong></Text>
+          </div>
+          <div style={{ background: "#f0f5ff", border: "1px solid #adc6ff", borderRadius: 8, padding: "10px 14px" }}>
+            <Text style={{ fontSize: 12 }}>🔑 La <strong>cédula</strong> será el acceso del cliente al <strong>Portal Club</strong> en <code>/club</code></Text>
           </div>
         </Form>
       </Modal>

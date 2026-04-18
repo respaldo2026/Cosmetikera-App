@@ -10,7 +10,6 @@ import {
   SearchOutlined, GiftOutlined, TrophyOutlined, StarOutlined,
   LockOutlined, PhoneOutlined,
 } from "@ant-design/icons";
-import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
@@ -100,37 +99,39 @@ export default function ClubPage() {
   const [error, setError] = useState("");
 
   const buscar = async () => {
-    const val = cedula.trim();
+    const val = cedula.trim().replace(/\D/g, "");
     if (!val) return;
     setBuscando(true);
     setCliente(null);
     setHistorial([]);
     setError("");
 
-    const { data, error: dbError } = await supabaseBrowserClient
-      .from("perfiles")
-      .select("id,nombre_completo,telefono,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento,total_compras,logros,racha_visitas")
-      .eq("cedula", val)
-      .eq("rol", "cliente")
-      .maybeSingle();
+    try {
+      const res = await fetch(`/api/club?cedula=${encodeURIComponent(val)}`);
+      const json = await res.json();
 
-    if (dbError || !data) {
-      setError("No encontramos una cuenta con esa cédula. Verifica el número o visítanos en tienda.");
+      if (res.status === 404 || !json.data) {
+        setError("No encontramos una cuenta con esa cédula. Verifica el número o visítanos en tienda.");
+        setBuscando(false);
+        return;
+      }
+      if (!res.ok) throw new Error(json.error || "Error");
+
+      setCliente(json.data);
+
+      // Cargar historial de puntos
+      const histRes = await fetch("/api/club", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ perfil_id: json.data.id }),
+      });
+      const histJson = await histRes.json();
+      setHistorial(histJson.data || []);
+    } catch {
+      setError("Error al conectar. Intenta nuevamente.");
+    } finally {
       setBuscando(false);
-      return;
     }
-
-    setCliente(data);
-
-    const { data: hist } = await supabaseBrowserClient
-      .from("puntos_historial")
-      .select("id,tipo,puntos,concepto,created_at")
-      .eq("perfil_id", data.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    setHistorial(hist || []);
-    setBuscando(false);
   };
 
   const nivel = cliente ? getNivel(cliente.puntos_fidelidad || 0) : null;

@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from("perfiles")
-      .select("id,nombre_completo,telefono,email,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,total_compras,activo,created_at")
+      .select("id,nombre_completo,telefono,email,cedula,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,total_compras,activo,created_at")
       .eq("rol", rol)
       .order("nombre_completo");
 
@@ -76,6 +76,20 @@ export async function POST(request: Request) {
     if (!nombre_completo?.trim()) {
       return NextResponse.json(
         { error: "nombre_completo es obligatorio" },
+        { status: 400 }
+      );
+    }
+
+    if (!cedula?.trim()) {
+      return NextResponse.json(
+        { error: "La cédula es obligatoria — es el acceso del cliente al portal Club" },
+        { status: 400 }
+      );
+    }
+
+    if (!/^\d{4,15}$/.test(cedula.trim())) {
+      return NextResponse.json(
+        { error: "La cédula debe contener solo dígitos (4-15 caracteres)" },
         { status: 400 }
       );
     }
