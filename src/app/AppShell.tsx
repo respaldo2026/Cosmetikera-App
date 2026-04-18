@@ -52,7 +52,7 @@ import {
   GiftOutlined,
   TagsOutlined,
   ThunderboltOutlined,
-  WalletOutlined,
+  WalletOutlined, // reserved
   TeamOutlined,
 } from "@ant-design/icons";
 import routerProvider from "@refinedev/nextjs-router";
@@ -93,15 +93,6 @@ const allResources = [
     meta: {
       label: "Historial",
       icon: <HistoryOutlined />,
-    },
-  },
-  {
-    key: "caja",
-    name: "caja",
-    list: "/caja",
-    meta: {
-      label: "Caja / POS",
-      icon: <WalletOutlined />,
     },
   },
   // ── CATÁLOGO ──────────────────────────────────────────────────────
