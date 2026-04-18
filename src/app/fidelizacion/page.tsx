@@ -20,6 +20,8 @@ import type { ColumnsType } from "antd/es/table";
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+const limpiarTelefono = (tel: string) => tel.replace(/\D/g, "");
+
 type Cliente = {
   id: string;
   nombre_completo: string;
@@ -195,7 +197,7 @@ function TabDashboard({ clientes, loading }: { clientes: Cliente[]; loading: boo
             <Tag key={c.id} color="pink" style={{ fontSize: 13, padding: "2px 10px" }}>
               🎉 {c.nombre_completo}
               {c.telefono && <Button size="small" type="link" style={{ color: "#25D366", padding: "0 4px" }} icon={<span>📱</span>}
-                onClick={() => window.open(`https://wa.me/57${c.telefono?.replace(/\D/g,"")}?text=¡Hola ${c.nombre_completo}! 🎂 ¡Feliz cumpleaños! Tienes puntos dobles en tu próxima compra 🎁`, "_blank")} />}
+                onClick={() => window.open(`https://wa.me/57${limpiarTelefono(c.telefono || "")}?text=¡Hola ${c.nombre_completo}! 🎂 ¡Feliz cumpleaños! Tienes puntos dobles en tu próxima compra 🎁`, "_blank")} />}
             </Tag>
           ))}</Space>}
         />
@@ -312,7 +314,7 @@ function TabRanking({ clientes, loading, onRecargar }: { clientes: Cliente[]; lo
       render: (_: unknown, c: Cliente) => (
         <Space>
           <Tooltip title="Gestionar puntos"><Button size="small" type="primary" icon={<StarOutlined />} style={{ background: "#faad14", borderColor: "#faad14" }} onClick={() => { setModalCliente(c); setPuntos(0); setConcepto("Ajuste manual"); }} /></Tooltip>
-          {c.telefono && <Tooltip title="WhatsApp"><Button size="small" icon={<span>📱</span>} style={{ color: "#25D366", borderColor: "#25D366" }} onClick={() => window.open(`https://wa.me/57${c.telefono?.replace(/\D/g, "")}`, "_blank")} /></Tooltip>}
+          {c.telefono && <Tooltip title="WhatsApp"><Button size="small" icon={<span>📱</span>} style={{ color: "#25D366", borderColor: "#25D366" }} onClick={() => window.open(`https://wa.me/57${limpiarTelefono(c.telefono || "")}`, "_blank")} /></Tooltip>}
         </Space>
       ),
     },
