@@ -21,6 +21,9 @@ import { useRouter } from "next/navigation";
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+const formatPrecio = (v: number | string | undefined) =>
+  `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
 const CATEGORIAS_DEFAULT = [
   "Esmaltes", "Bases y Tops", "Maquillaje", "Cuidado de piel",
   "Cejas y pestañas", "Accesorios", "Herramientas", "Insumos",
@@ -902,12 +905,12 @@ export default function ArticulosPage() {
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item name="precio_venta" label="Precio venta ($)" rules={[{ required: true }]}>
-                <InputNumber min={0} style={{ width: "100%" }} formatter={(v) => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} />
+                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item name="precio_costo" label="Precio costo ($)">
-                <InputNumber min={0} style={{ width: "100%" }} formatter={(v) => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} />
+                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
               </Form.Item>
             </Col>
             <Col span={8}>
