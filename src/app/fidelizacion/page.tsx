@@ -263,7 +263,7 @@ function TabRanking({ clientes, loading, onRecargar }: { clientes: Cliente[]; lo
       const nivelNuevo = getNivel(nuevos);
       const { error } = await supabaseBrowserClient.from("perfiles").update({ puntos_fidelidad: nuevos, nivel_fidelidad: nivelNuevo.key }).eq("id", modalCliente.id);
       if (error) throw error;
-      await supabaseBrowserClient.from("puntos_historial").insert({ perfil_id: modalCliente.id, tipo: puntos > 0 ? "bonificacion" : "ajuste", puntos, concepto }).catch(() => {});
+      await supabaseBrowserClient.from("puntos_historial").insert({ perfil_id: modalCliente.id, tipo: puntos > 0 ? "bonificacion" : "ajuste", puntos, concepto });
       message.success(`${puntos > 0 ? "+" : ""}${puntos} puntos aplicados`);
       if (nivelAnterior !== nivelNuevo.key) message.success(`🎉 ¡Subió a nivel ${nivelNuevo.label}!`);
       setModalCliente(null);
@@ -430,8 +430,8 @@ function TabCanje({ clientes, onRecargar }: { clientes: Cliente[]; onRecargar: (
       const nivel = getNivel(nuevos);
       const { error } = await supabaseBrowserClient.from("perfiles").update({ puntos_fidelidad: nuevos, nivel_fidelidad: nivel.key, puntos_canjeados: (cliente.puntos_canjeados || 0) + puntosACanjear }).eq("id", cliente.id);
       if (error) throw error;
-      await supabaseBrowserClient.from("canjes").insert({ perfil_id: cliente.id, puntos: puntosACanjear, valor_cop: valorDescuento, descripcion: `Canje ${puntosACanjear} pts = $${valorDescuento.toLocaleString()}`, estado: "aplicado" }).catch(() => {});
-      await supabaseBrowserClient.from("puntos_historial").insert({ perfil_id: cliente.id, tipo: "canjeados", puntos: -puntosACanjear, concepto: `Canje por $${valorDescuento.toLocaleString()} de descuento` }).catch(() => {});
+      await supabaseBrowserClient.from("canjes").insert({ perfil_id: cliente.id, puntos: puntosACanjear, valor_cop: valorDescuento, descripcion: `Canje ${puntosACanjear} pts = $${valorDescuento.toLocaleString()}`, estado: "aplicado" });
+      await supabaseBrowserClient.from("puntos_historial").insert({ perfil_id: cliente.id, tipo: "canjeados", puntos: -puntosACanjear, concepto: `Canje por $${valorDescuento.toLocaleString()} de descuento` });
       message.success(`🎁 Canje exitoso: -${puntosACanjear} pts = $${valorDescuento.toLocaleString()}`);
       setPuntosACanjear(100);
       onRecargar();

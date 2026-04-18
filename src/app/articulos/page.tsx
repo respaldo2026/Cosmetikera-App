@@ -169,7 +169,14 @@ export default function ArticulosPage() {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
+        const firstSheetName = wb.SheetNames[0];
+        if (!firstSheetName) {
+          throw new Error("El archivo no contiene hojas válidas");
+        }
+        const ws = wb.Sheets[firstSheetName];
+        if (!ws) {
+          throw new Error("No se pudo acceder a la hoja del archivo");
+        }
         const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
         setImportRows(rows);
       } catch {

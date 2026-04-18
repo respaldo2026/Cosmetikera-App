@@ -240,7 +240,7 @@ function DrawerCliente({
           <div>
             <Text strong style={{ fontSize: 15 }}>{cliente.nombre_completo}</Text>
             <div>
-              <Tag style={{ background: nivel.color, color: "#fff", border: "none", fontSize: 11 }}>{nivel.icon ?? NIVEL_ICONS[nivel.key]} {nivel.label}</Tag>
+              <Tag style={{ background: nivel.color, color: "#fff", border: "none", fontSize: 11 }}>{NIVEL_ICONS[nivel.key]} {nivel.label}</Tag>
               {cliente.cedula && <Text type="secondary" style={{ fontSize: 11 }}>CC: {cliente.cedula}</Text>}
             </div>
           </div>
