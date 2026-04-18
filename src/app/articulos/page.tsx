@@ -276,20 +276,28 @@ export default function ArticulosPage() {
     setSaving(true);
     try {
       if (editing) {
-        const { error } = await supabaseBrowserClient
-          .from("articulos").update(values).eq("id", editing.id);
-        if (error) throw error;
+        const res = await fetch(`/api/articulos?id=${editing.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Error al actualizar");
         message.success("Artículo actualizado");
       } else {
-        const { error } = await supabaseBrowserClient
-          .from("articulos").insert([values]);
-        if (error) throw error;
+        const res = await fetch("/api/articulos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ articulo: values }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Error al crear");
         message.success("Artículo creado");
       }
       setModalOpen(false);
       cargar();
-    } catch (e: any) {
-      message.error(e?.message || "Error al guardar");
+    } catch (e: unknown) {
+      message.error((e as Error)?.message || "Error al guardar");
     } finally {
       setSaving(false);
     }
@@ -303,9 +311,9 @@ export default function ArticulosPage() {
       okText: "Eliminar",
       cancelText: "Cancelar",
       onOk: async () => {
-        const { error } = await supabaseBrowserClient
-          .from("articulos").delete().eq("id", art.id);
-        if (error) { message.error(error.message); return; }
+        const res = await fetch(`/api/articulos?id=${art.id}`, { method: "DELETE" });
+        const json = await res.json();
+        if (!res.ok) { message.error(json.error || "Error al eliminar"); return; }
         message.success("Eliminado");
         cargar();
       },

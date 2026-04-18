@@ -56,13 +56,28 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH /api/articulos — actualización masiva de precios
-// body: { updates: [{ id, precio_venta?, precio_costo? }, ...] }
+// PATCH /api/articulos?id=xxx  — editar un artículo
+// PATCH /api/articulos          — actualización masiva de precios { updates: [...] }
 export async function PATCH(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
     const body = await request.json();
     const supabase = getAdminClient();
 
+    // Edición individual
+    if (id) {
+      const { data, error } = await supabase
+        .from("articulos")
+        .update(body)
+        .eq("id", id)
+        .select("id")
+        .single();
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ data });
+    }
+
+    // Actualización masiva de precios
     if (!Array.isArray(body.updates) || body.updates.length === 0)
       return NextResponse.json({ error: "updates requerido (array)" }, { status: 400 });
 
@@ -88,6 +103,24 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, actualizados: body.updates.length });
   } catch (err) {
     console.error("[PATCH /api/articulos]", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
+// DELETE /api/articulos?id=xxx
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
+
+    const supabase = getAdminClient();
+    const { error } = await supabase.from("articulos").delete().eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[DELETE /api/articulos]", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
