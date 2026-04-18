@@ -12,7 +12,9 @@ import {
   InboxOutlined, BarcodeOutlined, ShopOutlined, AppstoreOutlined,
   UnorderedListOutlined, CameraOutlined, EyeOutlined, PercentageOutlined,
   DollarOutlined, RiseOutlined, FallOutlined, ControlOutlined, CopyOutlined,
+  FileExcelOutlined, UploadOutlined,
 } from "@ant-design/icons";
+import * as XLSX from "xlsx";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -66,6 +68,12 @@ export default function ArticulosPage() {
   const [ajusteValor, setAjusteValor] = useState<number>(0);
   const [ajusteCampo, setAjusteCampo] = useState<"precio_venta" | "precio_costo" | "ambos">("precio_venta");
   const [aplicandoAjuste, setAplicandoAjuste] = useState(false);
+
+  // Importación Excel
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<Record<string, unknown>[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importFileName, setImportFileName] = useState("");
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -124,26 +132,115 @@ export default function ArticulosPage() {
     if (!ajusteValor || ajusteValor <= 0) { message.warning("Ingresa un valor mayor a 0"); return; }
     setAplicandoAjuste(true);
     try {
-      let errores = 0;
-      for (const art of articulosAjuste) {
-        const update: Record<string, number> = {};
-        if (ajusteCampo !== "precio_costo") update.precio_venta = art.nuevo_precio_venta;
-        if (ajusteCampo !== "precio_venta") update.precio_costo = art.nuevo_precio_costo;
-        const { error } = await supabaseBrowserClient.from("articulos").update(update).eq("id", art.id);
-        if (error) errores++;
-      }
-      if (errores > 0) message.warning(`${errores} artículo(s) no se pudieron actualizar`);
+      const updates = articulosAjuste.map((art) => {
+        const item: Record<string, unknown> = { id: art.id };
+        if (ajusteCampo !== "precio_costo") item.precio_venta = art.nuevo_precio_venta;
+        if (ajusteCampo !== "precio_venta") item.precio_costo = art.nuevo_precio_costo;
+        return item;
+      });
+      const res = await fetch("/api/articulos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+      const json = await res.json();
+      if (!res.ok && res.status !== 207) throw new Error(json.error || "Error de servidor");
+      if (json.errores > 0) message.warning(`${json.errores} artículo(s) no se pudieron actualizar`);
       else message.success(`✅ ${articulosAjuste.length} artículo(s) actualizados`);
       setAjusteOpen(false);
       setAjusteValor(0);
       setAjusteFiltroCategoria([]);
       setAjusteFiltrMarca([]);
       cargar();
-    } catch {
-      message.error("Error al aplicar ajuste masivo");
+    } catch (e: unknown) {
+      message.error((e as Error)?.message || "Error al aplicar ajuste masivo");
     } finally {
       setAplicandoAjuste(false);
     }
+  };
+
+  const handleArchivoImport = (file: File) => {
+    setImportFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+        setImportRows(rows);
+      } catch {
+        message.error("No se pudo leer el archivo. Asegúrate que sea .xlsx, .xls o .csv");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    return false; // prevent auto-upload
+  };
+
+  const COLUMNAS_IMPORT = [
+    { key: "nombre",            label: "nombre (requerido)" },
+    { key: "referencia",        label: "referencia" },
+    { key: "codigo_secundario", label: "codigo_secundario" },
+    { key: "categoria",         label: "categoria" },
+    { key: "marca",             label: "marca" },
+    { key: "precio_venta",      label: "precio_venta" },
+    { key: "precio_costo",      label: "precio_costo" },
+    { key: "stock",             label: "stock" },
+    { key: "stock_minimo",      label: "stock_minimo" },
+    { key: "descripcion",       label: "descripcion" },
+  ];
+
+  const confirmarImport = async () => {
+    if (importRows.length === 0) { message.warning("No hay filas para importar"); return; }
+    setImportLoading(true);
+    try {
+      const articulos_nuevos = importRows.map((row) => ({
+        nombre:            String(row["nombre"] || row["Nombre"] || "").trim(),
+        referencia:        String(row["referencia"] || row["Referencia"] || row["Código"] || row["Codigo"] || "").trim() || undefined,
+        codigo_secundario: String(row["codigo_secundario"] || row["Codigo_secundario"] || "").trim() || undefined,
+        categoria:         String(row["categoria"] || row["Categoria"] || row["Categoría"] || "").trim() || undefined,
+        marca:             String(row["marca"] || row["Marca"] || "").trim() || undefined,
+        precio_venta:      Number(row["precio_venta"] || row["Precio_venta"] || row["Precio venta"] || row["PrecioVenta"] || 0),
+        precio_costo:      Number(row["precio_costo"] || row["Precio_costo"] || row["Precio costo"] || row["PrecioCosto"] || 0) || undefined,
+        stock:             Number(row["stock"] || row["Stock"] || 0),
+        stock_minimo:      Number(row["stock_minimo"] || row["Stock_minimo"] || row["Stock minimo"] || 3) || undefined,
+        descripcion:       String(row["descripcion"] || row["Descripcion"] || row["Descripción"] || "").trim() || undefined,
+        activo:            true,
+      })).filter((a) => a.nombre);
+
+      if (articulos_nuevos.length === 0) {
+        message.error("Ninguna fila tiene columna 'nombre' válida");
+        return;
+      }
+
+      const res = await fetch("/api/articulos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articulos: articulos_nuevos }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error al importar");
+
+      message.success(`✅ ${articulos_nuevos.length} artículo(s) importados`);
+      setImportOpen(false);
+      setImportRows([]);
+      setImportFileName("");
+      cargar();
+    } catch (e: unknown) {
+      message.error((e as Error)?.message || "Error al importar");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const descargarPlantilla = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["nombre", "referencia", "codigo_secundario", "categoria", "marca", "precio_venta", "precio_costo", "stock", "stock_minimo", "descripcion"],
+      ["Esmalte Ejemplo", "COD-001", "REF-A", "Esmaltes", "OPI", 15000, 8000, 20, 3, "Esmalte de ejemplo"],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Artículos");
+    XLSX.writeFile(wb, "plantilla_articulos.xlsx");
   };
 
   const openModal = (art?: Articulo) => {
@@ -309,6 +406,12 @@ export default function ArticulosPage() {
               />
               <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
               <Button
+                icon={<FileExcelOutlined />}
+                onClick={() => setImportOpen(true)}
+              >
+                {isMobile ? "Importar" : "Importar Excel"}
+              </Button>
+              <Button
                 icon={<ControlOutlined />}
                 onClick={() => setAjusteOpen(true)}
               >
@@ -403,6 +506,70 @@ export default function ArticulosPage() {
             Agregar artículo
           </Button>
         </Empty>
+      ) : vista === "lista" ? (
+        <Card style={{ borderRadius: 10 }} bodyStyle={{ padding: 0 }}>
+          <Table
+            dataSource={articulosFiltrados}
+            rowKey="id"
+            size="small"
+            pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} artículos` }}
+            scroll={{ x: 700 }}
+            columns={[
+              {
+                title: "Artículo", key: "nombre",
+                render: (_: unknown, a: Articulo) => (
+                  <Space size={4} direction="vertical" style={{ lineHeight: 1.3 }}>
+                    <Text strong style={{ fontSize: 13 }}>{a.nombre}</Text>
+                    {a.marca && <Text type="secondary" style={{ fontSize: 11 }}>{a.marca}</Text>}
+                  </Space>
+                ),
+              },
+              {
+                title: "Código", key: "ref", width: 130,
+                render: (_: unknown, a: Articulo) => (
+                  <Space direction="vertical" size={2}>
+                    {a.referencia && <Tag color="blue" style={{ fontSize: 10 }}>{a.referencia}</Tag>}
+                    {a.codigo_secundario && <Tag color="geekblue" style={{ fontSize: 10 }}>{a.codigo_secundario}</Tag>}
+                    {!a.referencia && !a.codigo_secundario && <Text type="secondary">—</Text>}
+                  </Space>
+                ),
+              },
+              {
+                title: "Categoría", dataIndex: "categoria", width: 120,
+                render: (c?: string) => c ? <Tag color="purple" style={{ fontSize: 10 }}>{c}</Tag> : <Text type="secondary">—</Text>,
+              },
+              {
+                title: "P. Venta", dataIndex: "precio_venta", width: 110, align: "right" as const,
+                render: (v: number) => <Text strong style={{ color: "#d81b87" }}>${Number(v).toLocaleString()}</Text>,
+                sorter: (a: Articulo, b: Articulo) => a.precio_venta - b.precio_venta,
+              },
+              {
+                title: "P. Costo", dataIndex: "precio_costo", width: 100, align: "right" as const,
+                render: (v?: number) => v ? <Text type="secondary">${Number(v).toLocaleString()}</Text> : <Text type="secondary">—</Text>,
+              },
+              {
+                title: "Stock", dataIndex: "stock", width: 90, align: "center" as const,
+                render: (v: number, a: Articulo) => getStockTag(a),
+                sorter: (a: Articulo, b: Articulo) => a.stock - b.stock,
+              },
+              {
+                title: "Estado", dataIndex: "activo", width: 80, align: "center" as const,
+                render: (v?: boolean) => v === false ? <Tag color="default">Inactivo</Tag> : <Tag color="success">Activo</Tag>,
+              },
+              {
+                title: "Acciones", key: "actions", width: 130, align: "center" as const, fixed: "right" as const,
+                render: (_: unknown, a: Articulo) => (
+                  <Space size={4}>
+                    <Tooltip title="Ver"><Button size="small" icon={<EyeOutlined />} onClick={() => router.push(`/articulos/show/${a.id}`)} /></Tooltip>
+                    <Tooltip title="Editar"><Button size="small" icon={<EditOutlined />} onClick={() => openModal(a)} /></Tooltip>
+                    <Tooltip title="Duplicar"><Button size="small" icon={<CopyOutlined />} onClick={() => duplicarArticulo(a)} /></Tooltip>
+                    <Tooltip title="Eliminar"><Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleEliminar(a)} /></Tooltip>
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        </Card>
       ) : (
         <Row gutter={[12, 12]}>
           {articulosFiltrados.map(renderCard)}
@@ -592,7 +759,102 @@ export default function ArticulosPage() {
         </Row>
       </Modal>
 
-      {/* ── MODAL EDICIÓN ── */}
+      {/* ── MODAL IMPORTACIÓN EXCEL ── */}
+      <Modal
+        title={<Space><FileExcelOutlined style={{ color: "#52c41a" }} />Importar artículos desde Excel / CSV</Space>}
+        open={importOpen}
+        onCancel={() => { setImportOpen(false); setImportRows([]); setImportFileName(""); }}
+        width={900}
+        footer={null}
+        destroyOnClose
+      >
+        <Space direction="vertical" style={{ width: "100%" }} size={16}>
+          {/* Plantilla */}
+          <Card size="small" style={{ background: "#f6ffed", border: "1px solid #b7eb8f" }}>
+            <Row justify="space-between" align="middle">
+              <Col>
+                <Text>Descarga la plantilla para ver el formato esperado:</Text>
+              </Col>
+              <Col>
+                <Button icon={<FileExcelOutlined />} size="small" onClick={descargarPlantilla}>
+                  Descargar plantilla
+                </Button>
+              </Col>
+            </Row>
+            <div style={{ marginTop: 6 }}>
+              {COLUMNAS_IMPORT.map((c) => (
+                <Tag key={c.key} style={{ fontSize: 10, marginBottom: 2 }}
+                  color={c.key === "nombre" ? "red" : "default"}>
+                  {c.label}
+                </Tag>
+              ))}
+            </div>
+          </Card>
+
+          {/* Subir archivo */}
+          <Upload.Dragger
+            name="file"
+            accept=".xlsx,.xls,.csv"
+            showUploadList={false}
+            beforeUpload={handleArchivoImport}
+            style={{ borderRadius: 8 }}
+          >
+            <p className="ant-upload-drag-icon">
+              <UploadOutlined style={{ fontSize: 40, color: "#1677ff" }} />
+            </p>
+            <p className="ant-upload-text">Arrastra tu archivo aquí o haz clic para seleccionar</p>
+            <p className="ant-upload-hint">Formatos soportados: .xlsx, .xls, .csv</p>
+            {importFileName && (
+              <Tag color="blue" style={{ marginTop: 8 }}>📄 {importFileName}</Tag>
+            )}
+          </Upload.Dragger>
+
+          {/* Preview */}
+          {importRows.length > 0 && (
+            <Card size="small"
+              title={<Text strong>Vista previa — {importRows.length} fila(s) detectadas</Text>}
+            >
+              <Table
+                dataSource={importRows.slice(0, 10)}
+                rowKey={(_, i) => String(i)}
+                size="small"
+                pagination={false}
+                scroll={{ x: 600 }}
+                columns={Object.keys(importRows[0] || {}).slice(0, 8).map((k) => ({
+                  title: k,
+                  dataIndex: k,
+                  width: 120,
+                  ellipsis: true,
+                  render: (v: unknown) => String(v ?? ""),
+                }))}
+              />
+              {importRows.length > 10 && (
+                <Text type="secondary" style={{ fontSize: 11 }}>...y {importRows.length - 10} filas más</Text>
+              )}
+            </Card>
+          )}
+
+          <Row justify="end" gutter={8}>
+            <Col>
+              <Button onClick={() => { setImportOpen(false); setImportRows([]); setImportFileName(""); }}>Cancelar</Button>
+            </Col>
+            <Col>
+              <Button
+                type="primary"
+                icon={<FileExcelOutlined />}
+                loading={importLoading}
+                disabled={importRows.length === 0}
+                onClick={confirmarImport}
+                style={{ background: "#52c41a", borderColor: "#52c41a" }}
+              >
+                Importar {importRows.length > 0 ? `${importRows.length} artículo(s)` : ""}
+              </Button>
+            </Col>
+          </Row>
+        </Space>
+      </Modal>
+
+      {/* ── MODAL EDICIÓN ── */
       <Modal
         title={editing ? "Editar artículo" : "Nuevo artículo"}
         open={modalOpen}

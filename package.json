@@ -44,7 +44,8 @@
     "qz-tray": "^2.2.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-live": "^4.1.8"
+    "react-live": "^4.1.8",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",
