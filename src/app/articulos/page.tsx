@@ -11,7 +11,7 @@ import {
   WarningOutlined, TagsOutlined, SearchOutlined, ReloadOutlined,
   InboxOutlined, BarcodeOutlined, ShopOutlined, AppstoreOutlined,
   UnorderedListOutlined, CameraOutlined, EyeOutlined, PercentageOutlined,
-  DollarOutlined, RiseOutlined, FallOutlined, ControlOutlined,
+  DollarOutlined, RiseOutlined, FallOutlined, ControlOutlined, CopyOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -150,6 +150,24 @@ export default function ArticulosPage() {
     setModalOpen(true);
   };
 
+  const duplicarArticulo = (art: Articulo) => {
+    setEditing(null); // es nuevo, no edición
+    form.setFieldsValue({
+      nombre: `${art.nombre} (copia)`,
+      categoria: art.categoria,
+      marca: art.marca,
+      descripcion: art.descripcion,
+      precio_venta: art.precio_venta,
+      precio_costo: art.precio_costo,
+      stock: 0,
+      stock_minimo: art.stock_minimo,
+      imagen_url: art.imagen_url,
+      activo: true,
+      referencia: undefined, // se omite el código intencionalmente
+    });
+    setModalOpen(true);
+  };
+
   const handleGuardar = async () => {
     const values = await form.validateFields();
     setSaving(true);
@@ -229,6 +247,9 @@ export default function ArticulosPage() {
           </Tooltip>,
           <Tooltip key="edit" title="Editar">
             <EditOutlined onClick={() => openModal(art)} />
+          </Tooltip>,
+          <Tooltip key="copy" title="Duplicar artículo">
+            <CopyOutlined style={{ color: "#1677ff" }} onClick={() => duplicarArticulo(art)} />
           </Tooltip>,
           <Tooltip key="del" title="Eliminar">
             <DeleteOutlined style={{ color: "#ff4d4f" }} onClick={() => handleEliminar(art)} />
