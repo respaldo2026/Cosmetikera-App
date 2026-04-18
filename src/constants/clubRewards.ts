@@ -227,7 +227,7 @@ export function buildRewardCanjeDescription(reward: ClubReward, code: string) {
 export function parseRewardCanjeDescription(description?: string | null) {
   if (!description) return null;
   const match = description.match(/\[club_reward=([^;\]]+);club_code=([^\]]+)\]/i);
-  if (!match) return null;
+  if (!match?.[1] || !match?.[2]) return null;
   return {
     rewardKey: match[1],
     code: match[2].toUpperCase(),
