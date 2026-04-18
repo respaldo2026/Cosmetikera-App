@@ -857,7 +857,7 @@ export default function ArticulosPage() {
         </Space>
       </Modal>
 
-      {/* ── MODAL EDICIÓN ── */
+      {/* ── MODAL EDICIÓN ── */}
       <Modal
         title={editing ? "Editar artículo" : "Nuevo artículo"}
         open={modalOpen}
