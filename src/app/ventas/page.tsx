@@ -31,6 +31,18 @@ type CarritoItem = Articulo & { cantidad: number; subtotal: number };
 type Cliente = { id: string; nombre_completo: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; total_compras?: number; rol?: string; activo?: boolean };
 type MetodoPago = "efectivo" | "tarjeta" | "transferencia" | "mixto";
 type PagoMixto = { efectivo: number; tarjeta: number; transferencia: number };
+type ClubVoucher = {
+  id: string;
+  perfilId: string;
+  code: string;
+  puntos: number;
+  valueCop: number;
+  status: string;
+  rewardKey?: string | null;
+  rewardTitle: string;
+  rewardIcon: string;
+  description: string;
+};
 
 const NIVEL_COLORS: Record<string, string> = {
   bronce: "#cd7f32", plata: "#aaa", oro: "#faad14", diamante: "#13c2c2",
@@ -83,15 +95,36 @@ export default function VentasPage() {
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [efectivoRecibido, setEfectivoRecibido] = useState(0);
+  const [codigoVoucherClub, setCodigoVoucherClub] = useState("");
+  const [voucherClub, setVoucherClub] = useState<ClubVoucher | null>(null);
+  const [validandoVoucher, setValidandoVoucher] = useState(false);
   const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
   const [ultimoTicket, setUltimoTicket] = useState<DatosTicket | null>(null);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [pagoMixto, setPagoMixto] = useState<PagoMixto>({ efectivo: 0, tarjeta: 0, transferencia: 0 });
 
-  // Crear cliente rápido desde caja
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
   const [nuevoClienteForm] = Form.useForm();
   const [creandoCliente, setCreandoCliente] = useState(false);
+
+  const subtotalCarrito = carrito.reduce((s, i) => s + i.subtotal, 0);
+  const descuentoVal = Math.round(subtotalCarrito * (descuento / 100));
+  const descuentoVoucherClub = Math.min(voucherClub?.valueCop || 0, Math.max(0, subtotalCarrito - descuentoVal));
+  const totalFinal = Math.max(0, subtotalCarrito - descuentoVal - descuentoVoucherClub);
+  const vuelta = efectivoRecibido - totalFinal;
+  const totalPagoMixto = useMemo(
+    () => Object.values(pagoMixto).reduce((acc, monto) => acc + Number(monto || 0), 0),
+    [pagoMixto]
+  );
+  const clienteSeleccionado = clientes.find((c) => c.id === clienteId);
+
+  useEffect(() => {
+    if (!voucherClub) return;
+    if (!clienteId || voucherClub.perfilId !== clienteId) {
+      setVoucherClub(null);
+      setCodigoVoucherClub("");
+    }
+  }, [clienteId, voucherClub]);
 
   const crearClienteRapido = async () => {
     const values = await nuevoClienteForm.validateFields();
@@ -107,7 +140,6 @@ export default function VentasPage() {
       message.success(`✅ Cliente ${values.nombre_completo} creado`);
       setNuevoClienteOpen(false);
       nuevoClienteForm.resetFields();
-      // Recargar clientes y seleccionar el nuevo
       const r = await fetch("/api/perfiles?rol=cliente");
       const rj = await r.json();
       setClientes(rj.data || []);
@@ -117,6 +149,42 @@ export default function VentasPage() {
     } finally {
       setCreandoCliente(false);
     }
+  };
+
+  const validarVoucherClub = async () => {
+    const code = codigoVoucherClub.trim().toUpperCase();
+    if (!code) {
+      message.warning("Ingresa un código del club");
+      return;
+    }
+    if (!clienteId) {
+      message.warning("Selecciona el cliente antes de aplicar un voucher del club");
+      return;
+    }
+
+    setValidandoVoucher(true);
+    try {
+      const response = await fetch("/api/club/voucher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validate", code, clienteId }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "No se pudo validar el voucher");
+      setVoucherClub(json.data);
+      setCodigoVoucherClub(json.data.code);
+      message.success(`Voucher ${json.data.code} aplicado`);
+    } catch (error: any) {
+      setVoucherClub(null);
+      message.error(error?.message || "No se pudo validar el voucher");
+    } finally {
+      setValidandoVoucher(false);
+    }
+  };
+
+  const removerVoucherClub = () => {
+    setVoucherClub(null);
+    setCodigoVoucherClub("");
   };
 
   const cargar = useCallback(async () => {
@@ -149,16 +217,6 @@ export default function VentasPage() {
   );
 
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
-
-  const subtotalCarrito = carrito.reduce((s, i) => s + i.subtotal, 0);
-  const descuentoVal = Math.round(subtotalCarrito * (descuento / 100));
-  const totalFinal = subtotalCarrito - descuentoVal;
-  const vuelta = efectivoRecibido - totalFinal;
-  const totalPagoMixto = useMemo(
-    () => Object.values(pagoMixto).reduce((acc, monto) => acc + Number(monto || 0), 0),
-    [pagoMixto]
-  );
-  const clienteSeleccionado = clientes.find((c) => c.id === clienteId);
 
   const agregarAlCarrito = (art: Articulo) => {
     setCarrito((prev) => {
@@ -197,6 +255,8 @@ export default function VentasPage() {
     setMetodoPago("efectivo");
     setEfectivoRecibido(0);
     setPagoMixto({ efectivo: 0, tarjeta: 0, transferencia: 0 });
+    setCodigoVoucherClub("");
+    setVoucherClub(null);
   };
 
   const procesarVenta = async () => {
@@ -222,7 +282,7 @@ export default function VentasPage() {
           cliente_id: clienteId,
           fecha: dayjs().toISOString(),
           subtotal: subtotalCarrito,
-          descuento: descuentoVal,
+          descuento: descuentoVal + descuentoVoucherClub,
           total: totalFinal,
           metodo_pago: metodoPagoPersistido,
           items: carrito.map((i) => ({ id: i.id, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio_venta, subtotal: i.subtotal })),
@@ -279,12 +339,35 @@ export default function VentasPage() {
           descripcion: [
             `Items: ${carrito.map((item) => `${item.nombre} x${item.cantidad}`).join(", ")}`,
             detallePagoMixto ? `Pago: ${detallePagoMixto}` : null,
+            voucherClub ? `Voucher club: ${voucherClub.code} (${voucherClub.rewardTitle})` : null,
           ].filter(Boolean).join(" | "),
           estudiante_id: clienteId,
           created_by: user?.id || null,
         });
       } catch {
         // El asiento financiero no debe bloquear la venta.
+      }
+
+      if (voucherClub && clienteId && venta?.id) {
+        try {
+          const voucherResponse = await fetch("/api/club/voucher", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "consume",
+              code: voucherClub.code,
+              clienteId,
+              ventaId: venta.id,
+            }),
+          });
+          const voucherJson = await voucherResponse.json();
+          if (!voucherResponse.ok) {
+            throw new Error(voucherJson.error || "No se pudo consumir el voucher");
+          }
+        } catch (voucherError) {
+          console.error("No se pudo cerrar el voucher del club", voucherError);
+          message.warning("La venta quedó registrada, pero el voucher requiere revisión manual.");
+        }
       }
 
       const ticketDatos: DatosTicket = {
@@ -295,7 +378,7 @@ export default function VentasPage() {
         metodoPago: metodoPago === "mixto" ? `Mixto (${getDetallePagoMixto(pagoMixto)})` : metodoPago,
         cambio: metodoPago === "efectivo" ? Math.max(0, vuelta) : undefined,
         puntosFidelidad: clienteSeleccionado ? puntosGanados : undefined,
-        mensaje: "¡Gracias por tu compra en La Cosmetikera!",
+        mensaje: voucherClub ? `Voucher aplicado: ${voucherClub.code}. Gracias por tu compra en La Cosmetikera.` : "¡Gracias por tu compra en La Cosmetikera!",
         lineas: [
           { tipo: "titulo", texto: "DETALLE DE VENTA" },
           { tipo: "linea" },
@@ -306,6 +389,9 @@ export default function VentasPage() {
                 { tipo: "total" as const, etiqueta: "Subtotal", valor: subtotalCarrito },
                 { tipo: "total" as const, etiqueta: `Descuento (${descuento}%)`, valor: -descuentoVal },
               ]
+            : []),
+          ...(voucherClub
+            ? [{ tipo: "total" as const, etiqueta: `Voucher club ${voucherClub.code}`, valor: -descuentoVoucherClub }]
             : []),
           ...(metodoPago === "mixto"
             ? Object.entries(pagoMixto)
@@ -527,6 +613,29 @@ export default function VentasPage() {
             </Space>
           </div>
         )}
+        <div style={{ marginTop: 10, padding: "10px", background: voucherClub ? "#f6ffed" : "#fff7fb", borderRadius: 10, border: `1px solid ${voucherClub ? "#b7eb8f" : "#ffd6e7"}` }}>
+          <Text strong style={{ fontSize: 12, display: "block", marginBottom: 8 }}>Voucher Club</Text>
+          <Space.Compact style={{ width: "100%" }}>
+            <Input
+              value={codigoVoucherClub}
+              onChange={(event) => setCodigoVoucherClub(event.target.value.toUpperCase())}
+              placeholder="Ej: CLUB-ABC123"
+              disabled={!!voucherClub}
+            />
+            <Button onClick={voucherClub ? removerVoucherClub : validarVoucherClub} loading={validandoVoucher} style={voucherClub ? undefined : { borderColor: "#d81b87", color: "#d81b87" }}>
+              {voucherClub ? "Quitar" : "Aplicar"}
+            </Button>
+          </Space.Compact>
+          <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 6 }}>
+            Selecciona el cliente y aplica aquí el código emitido desde el portal club.
+          </Text>
+          {voucherClub && (
+            <Space wrap style={{ marginTop: 8 }}>
+              <Tag color="success">{voucherClub.rewardIcon} {voucherClub.rewardTitle}</Tag>
+              <Tag color="green">-${descuentoVoucherClub.toLocaleString()}</Tag>
+            </Space>
+          )}
+        </div>
       </div>
 
       <Divider style={{ margin: "8px 0" }} />
@@ -610,6 +719,12 @@ export default function VentasPage() {
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <Text type="secondary">Descuento ({descuento}%)</Text>
             <Text style={{ color: "#52c41a" }}>-${descuentoVal.toLocaleString()}</Text>
+          </div>
+        )}
+        {voucherClub && (
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text type="secondary">Voucher Club {voucherClub.code}</Text>
+            <Text style={{ color: "#389e0d" }}>-${descuentoVoucherClub.toLocaleString()}</Text>
           </div>
         )}
         <div style={{
