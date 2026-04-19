@@ -584,6 +584,7 @@ export default function VentasPage() {
               style={{ width: "100%" }}
               value={clienteId}
               onChange={setClienteId}
+              optionLabelProp="label"
               filterOption={(input, opt) => {
                 const q = input.toLowerCase().trim();
                 if (!q) return true;
@@ -595,17 +596,18 @@ export default function VentasPage() {
                   (c.telefono || "").replace(/\D/g, "").includes(q.replace(/\D/g, ""))
                 );
               }}
-              options={clientes.map((c) => ({
-                value: c.id,
-                label: (
+              optionRender={(opt) => {
+                const c = clientes.find((x) => x.id === opt.value);
+                return (
                   <div style={{ lineHeight: 1.3 }}>
-                    <div style={{ fontWeight: 500 }}>{c.nombre_completo}</div>
+                    <div style={{ fontWeight: 500 }}>{c?.nombre_completo}</div>
                     <div style={{ fontSize: 11, color: "#888" }}>
-                      {[c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · ")}
+                      {[c?.cedula ? `CC ${c.cedula}` : null, c?.telefono || null].filter(Boolean).join(" · ")}
                     </div>
                   </div>
-                ),
-              }))}
+                );
+              }}
+              options={clientes.map((c) => ({ value: c.id, label: c.nombre_completo }))}
             />
           </Col>
           <Col>
@@ -883,6 +885,7 @@ export default function VentasPage() {
                   style={{ width: "100%" }}
                   value={clienteId}
                   onChange={setClienteId}
+                  optionLabelProp="label"
                   filterOption={(input, opt) => {
                     const q = input.toLowerCase().trim();
                     if (!q) return true;
@@ -894,17 +897,18 @@ export default function VentasPage() {
                       (c.telefono || "").replace(/\D/g, "").includes(q.replace(/\D/g, ""))
                     );
                   }}
-                  options={clientes.map((c) => ({
-                    value: c.id,
-                    label: (
+                  optionRender={(opt) => {
+                    const c = clientes.find((x) => x.id === opt.value);
+                    return (
                       <div style={{ lineHeight: 1.3 }}>
-                        <div style={{ fontWeight: 500 }}>{c.nombre_completo}</div>
+                        <div style={{ fontWeight: 500 }}>{c?.nombre_completo}</div>
                         <div style={{ fontSize: 11, color: "#888" }}>
-                          {[c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · ")}
+                          {[c?.cedula ? `CC ${c.cedula}` : null, c?.telefono || null].filter(Boolean).join(" · ")}
                         </div>
                       </div>
-                    ),
-                  }))}
+                    );
+                  }}
+                  options={clientes.map((c) => ({ value: c.id, label: c.nombre_completo }))}
                 />
               </Col>
               <Col>
