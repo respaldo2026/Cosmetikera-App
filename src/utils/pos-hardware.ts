@@ -73,7 +73,9 @@ export type DatosTicket = {
   lineas: LineaTicket[];
   metodoPago: string;
   cambio?: number;
-  puntosFidelidad?: number;
+  puntosFidelidad?: number;     // puntos ganados EN esta compra
+  puntosAcumulados?: number;    // puntos totales del cliente tras la compra
+  nivelFidelidad?: string;      // nivel actual del cliente
   mensaje?: string;
 };
 
@@ -186,7 +188,15 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   if (datos.puntosFidelidad && datos.puntosFidelidad > 0) {
     cmds.push(sep + LF);
     cmds.push(`${ESC}a\x01`);
+    cmds.push(`${ESC}!\x08`); // negrita
     cmds.push(`★ Ganaste ${datos.puntosFidelidad} puntos` + LF);
+    cmds.push(`${ESC}!\x00`);
+    if (datos.puntosAcumulados !== undefined) {
+      cmds.push(`Total acumulado: ${datos.puntosAcumulados.toLocaleString("es-CO")} pts` + LF);
+    }
+    if (datos.nivelFidelidad) {
+      cmds.push(`Nivel: ${datos.nivelFidelidad.toUpperCase()}` + LF);
+    }
     cmds.push(`${ESC}a\x00`);
   }
 
@@ -290,8 +300,162 @@ export async function abrirCajon(
   }
 }
 
-// ── Listar impresoras ─────────────────────────────────────────────────────────
+// ── Impresión por navegador (fallback sin QZ Tray) ────────────────────────────
 
+/**
+ * Genera un HTML de ticket de venta y abre el diálogo de impresión del navegador.
+ * Se usa como fallback cuando QZ Tray no está disponible.
+ */
+export function imprimirTicketNavegador(datos: DatosTicket): void {
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const fmtPrecio = (v: number) =>
+    "$" + v.toLocaleString("es-CO");
+
+  // Construir filas del detalle
+  const filasDetalle = datos.lineas.map((linea) => {
+    if (linea.tipo === "item") {
+      return `
+        <tr>
+          <td>${esc(linea.descripcion)}</td>
+          <td class="center">${linea.cantidad}</td>
+          <td class="right">${fmtPrecio(linea.precio)}</td>
+          <td class="right">${fmtPrecio(linea.precio * linea.cantidad)}</td>
+        </tr>`;
+    }
+    if (linea.tipo === "total") {
+      const clase = linea.etiqueta === "TOTAL" ? "total-row" : "subtotal-row";
+      return `
+        <tr class="${clase}">
+          <td colspan="3">${esc(linea.etiqueta)}</td>
+          <td class="right">${fmtPrecio(linea.valor)}</td>
+        </tr>`;
+    }
+    if (linea.tipo === "linea") {
+      return `<tr><td colspan="4"><hr class="sep" /></td></tr>`;
+    }
+    if (linea.tipo === "texto") {
+      return `<tr><td colspan="4" class="center small">${esc(linea.texto)}</td></tr>`;
+    }
+    return "";
+  }).join("");
+
+  const puntosHtml = datos.puntosFidelidad && datos.puntosFidelidad > 0 ? `
+    <div class="puntos">
+      <span class="star">★</span> Ganaste <strong>${datos.puntosFidelidad}</strong> puntos en esta compra
+      ${datos.puntosAcumulados !== undefined
+        ? `<br/>Total acumulado: <strong>${datos.puntosAcumulados.toLocaleString("es-CO")}</strong> pts`
+        : ""}
+      ${datos.nivelFidelidad
+        ? `<br/>Nivel: <strong>${datos.nivelFidelidad.toUpperCase()}</strong>`
+        : ""}
+    </div>` : "";
+
+  const cambioHtml = datos.cambio !== undefined && datos.cambio > 0
+    ? `<p class="cambio">Cambio: <strong>${fmtPrecio(datos.cambio)}</strong></p>` : "";
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ticket #${esc(datos.numeroVenta)}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      width: 80mm;
+      margin: 0 auto;
+      padding: 8px 6px;
+      color: #111;
+    }
+    .header { text-align: center; margin-bottom: 8px; }
+    .header h1 { font-size: 16px; font-weight: 900; letter-spacing: 1px; }
+    .header p { font-size: 10px; color: #444; }
+    hr.sep { border: none; border-top: 1px dashed #999; margin: 6px 0; }
+    .info-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+    .info-row span:first-child { font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+    th { font-size: 10px; border-bottom: 1px solid #333; padding: 2px 0; }
+    td { padding: 2px 0; vertical-align: top; }
+    .center { text-align: center; }
+    .right { text-align: right; }
+    .small { font-size: 10px; }
+    .subtotal-row td { font-size: 10px; color: #555; }
+    .total-row td { font-size: 13px; font-weight: 900; border-top: 2px solid #111; padding-top: 4px; }
+    .pago { margin-top: 6px; font-size: 11px; }
+    .cambio { font-size: 11px; margin-top: 2px; }
+    .puntos {
+      margin-top: 8px;
+      background: #fff8e1;
+      border: 1px dashed #f5a623;
+      border-radius: 4px;
+      padding: 6px 8px;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .star { color: #f5a623; font-size: 14px; }
+    .footer { text-align: center; margin-top: 10px; font-size: 10px; color: #555; }
+    @media print {
+      body { width: 80mm; }
+      @page { margin: 0; size: 80mm auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${esc(datos.nombreTienda)}</h1>
+    ${datos.nit ? `<p>NIT: ${esc(datos.nit)}</p>` : ""}
+    ${datos.direccion ? `<p>${esc(datos.direccion)}</p>` : ""}
+    ${datos.telefono ? `<p>Tel: ${esc(datos.telefono)}</p>` : ""}
+  </div>
+
+  <hr class="sep" />
+  <div class="info-row"><span>Ticket #</span><span>${esc(datos.numeroVenta)}</span></div>
+  <div class="info-row"><span>Fecha</span><span>${esc(datos.fecha)}</span></div>
+  ${datos.cajero ? `<div class="info-row"><span>Cajero</span><span>${esc(datos.cajero)}</span></div>` : ""}
+  ${datos.cliente ? `<div class="info-row"><span>Cliente</span><span>${esc(datos.cliente)}</span></div>` : ""}
+  <hr class="sep" />
+
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left">Artículo</th>
+        <th class="center">Cant</th>
+        <th class="right">P.Unit</th>
+        <th class="right">Total</th>
+      </tr>
+    </thead>
+    <tbody>${filasDetalle}</tbody>
+  </table>
+
+  <hr class="sep" />
+  <p class="pago">Método de pago: <strong>${esc(datos.metodoPago.toUpperCase())}</strong></p>
+  ${cambioHtml}
+  ${puntosHtml}
+  <div class="footer">
+    <hr class="sep" />
+    <p>${esc(datos.mensaje || "¡Gracias por tu compra!")}</p>
+    <p style="margin-top:4px;font-weight:bold;">${esc(datos.nombreTienda)}</p>
+  </div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank", "width=400,height=600");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  // Esperar que cargue y luego imprimir
+  win.onload = () => { win.print(); };
+  setTimeout(() => {
+    try { win.print(); } catch (_) {}
+  }, 600);
+}
+
+// ── Listar impresoras ─────────────────────────────────────────────────────────
 export async function listarImpresoras(): Promise<string[]> {
   try {
     const q = await cargarQZ();

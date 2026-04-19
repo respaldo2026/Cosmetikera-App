@@ -15,7 +15,7 @@ import {
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
-import { imprimirTicketTermico, abrirCajon, DatosTicket } from "@utils/pos-hardware";
+import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, DatosTicket } from "@utils/pos-hardware";
 import { PrinterOutlined, GoldOutlined } from "@ant-design/icons";
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -378,6 +378,12 @@ export default function VentasPage() {
         metodoPago: metodoPago === "mixto" ? `Mixto (${getDetallePagoMixto(pagoMixto)})` : metodoPago,
         cambio: metodoPago === "efectivo" ? Math.max(0, vuelta) : undefined,
         puntosFidelidad: clienteSeleccionado ? puntosGanados : undefined,
+        puntosAcumulados: clienteSeleccionado
+          ? Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados
+          : undefined,
+        nivelFidelidad: clienteSeleccionado
+          ? getNivelFidelidad(Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados)
+          : undefined,
         mensaje: voucherClub ? `Voucher aplicado: ${voucherClub.code}. Gracias por tu compra en La Cosmetikera.` : "¡Gracias por tu compra en La Cosmetikera!",
         lineas: [
           { tipo: "titulo", texto: "DETALLE DE VENTA" },
@@ -444,19 +450,28 @@ export default function VentasPage() {
   const imprimirUltimaVenta = async () => {
     if (!ultimoTicket && !ultimaVentaId) return;
     setImprimiendo(true);
-    const result = await imprimirTicketTermico(
-      ultimoTicket || {
-        nombreTienda: "La Cosmetikera",
-        numeroVenta: ultimaVentaId?.slice(-6).toUpperCase() ?? "------",
-        fecha: dayjs().format("DD/MM/YYYY HH:mm"),
-        metodoPago,
-        mensaje: "¡Gracias por tu compra en La Cosmetikera!",
-        lineas: [{ tipo: "total", etiqueta: "TOTAL", valor: totalFinal }],
-      }
-    );
+
+    const ticketParaImprimir = ultimoTicket || {
+      nombreTienda: "La Cosmetikera",
+      numeroVenta: ultimaVentaId?.slice(-6).toUpperCase() ?? "------",
+      fecha: dayjs().format("DD/MM/YYYY HH:mm"),
+      metodoPago,
+      mensaje: "¡Gracias por tu compra en La Cosmetikera!",
+      lineas: [{ tipo: "total" as const, etiqueta: "TOTAL", valor: totalFinal }],
+    };
+
+    // Intentar con QZ Tray (impresora térmica)
+    const result = await imprimirTicketTermico(ticketParaImprimir);
+
     if (!result.ok) {
-      message.warning(result.error || "No se pudo imprimir. Verifica QZ Tray.");
+      // Fallback: impresión por navegador
+      try {
+        imprimirTicketNavegador(ticketParaImprimir);
+      } catch (e) {
+        message.warning("No se pudo imprimir. Verifica QZ Tray o permite ventanas emergentes.");
+      }
     }
+
     setImprimiendo(false);
   };
 
