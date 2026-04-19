@@ -28,7 +28,7 @@ type Articulo = {
   stock: number; categoria?: string; marca?: string; imagen_url?: string;
 };
 type CarritoItem = Articulo & { cantidad: number; subtotal: number };
-type Cliente = { id: string; nombre_completo: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; total_compras?: number; rol?: string; activo?: boolean };
+type Cliente = { id: string; nombre_completo: string; cedula?: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; total_compras?: number; rol?: string; activo?: boolean };
 type MetodoPago = "efectivo" | "tarjeta" | "transferencia" | "mixto";
 type PagoMixto = { efectivo: number; tarjeta: number; transferencia: number };
 type ClubVoucher = {
@@ -193,7 +193,7 @@ export default function VentasPage() {
       supabaseBrowserClient.from("articulos").select("*").eq("activo", true).order("nombre"),
       supabaseBrowserClient
         .from("perfiles")
-        .select("id,nombre_completo,telefono,puntos_fidelidad,nivel_fidelidad,total_compras,rol,activo")
+        .select("id,nombre_completo,cedula,telefono,puntos_fidelidad,nivel_fidelidad,total_compras,rol,activo")
         .eq("rol", "cliente")
         .eq("activo", true)
         .order("nombre_completo"),
@@ -580,16 +580,31 @@ export default function VentasPage() {
             <Select
               showSearch
               allowClear
-              placeholder="Seleccionar cliente (opcional)"
+              placeholder="Buscar por nombre, cédula o teléfono..."
               style={{ width: "100%" }}
               value={clienteId}
               onChange={setClienteId}
-              filterOption={(input, opt) =>
-                (opt?.label as string || "").toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, opt) => {
+                const q = input.toLowerCase().trim();
+                if (!q) return true;
+                const c = clientes.find((x) => x.id === opt?.value);
+                if (!c) return false;
+                return (
+                  c.nombre_completo.toLowerCase().includes(q) ||
+                  (c.cedula || "").toLowerCase().includes(q) ||
+                  (c.telefono || "").replace(/\D/g, "").includes(q.replace(/\D/g, ""))
+                );
+              }}
               options={clientes.map((c) => ({
                 value: c.id,
-                label: c.nombre_completo,
+                label: (
+                  <div style={{ lineHeight: 1.3 }}>
+                    <div style={{ fontWeight: 500 }}>{c.nombre_completo}</div>
+                    <div style={{ fontSize: 11, color: "#888" }}>
+                      {[c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                ),
               }))}
             />
           </Col>
