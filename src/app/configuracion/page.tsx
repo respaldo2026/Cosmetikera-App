@@ -77,6 +77,7 @@ export default function ConfiguracionPage() {
     fecha: true,
     concepto: true,
     monto: true,
+    puntos: true,
     nota: true,
     pie: true,
     titulo: true,
@@ -1027,6 +1028,7 @@ export default function ConfiguracionPage() {
                     </div>
                     <Switch checked={ticketFields.nota} onChange={(value) => setTicketFields((prev) => ({ ...prev, nota: value }))} /> Mensaje adicional
                     <Switch checked={ticketFields.pie} onChange={(value) => setTicketFields((prev) => ({ ...prev, pie: value }))} /> Texto del pie
+                    <Switch checked={ticketFields.puntos} onChange={(value) => setTicketFields((prev) => ({ ...prev, puntos: value }))} /> Puntos de fidelidad
                   </Space>
                 </Col>
               </Row>
@@ -1086,6 +1088,14 @@ export default function ConfiguracionPage() {
                     {ticketFields.pie ? (
                       <div style={{ fontSize: 12, color: "#6b7280", marginTop: 10 }}>
                         {previewTicketPie || "Gracias por tu preferencia"}
+                      </div>
+                    ) : null}
+                    {ticketFields.puntos ? (
+                      <div style={{ marginTop: 10, background: "#fff8e1", border: "1px dashed #f5a623", borderRadius: 4, padding: "6px 8px", textAlign: "center", fontSize: 11 }}>
+                        <span style={{ color: "#f5a623", fontSize: 14 }}>★</span>
+                        {" "}Ganaste <strong>5 puntos</strong> en esta compra<br />
+                        Total acumulado: <strong>150 pts</strong><br />
+                        Nivel: <strong>PLATA</strong>
                       </div>
                     ) : null}
                   </div>

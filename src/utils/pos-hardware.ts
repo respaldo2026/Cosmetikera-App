@@ -185,15 +185,17 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   }
 
   // PUNTOS FIDELIDAD
-  if (datos.puntosFidelidad && datos.puntosFidelidad > 0) {
+  if (datos.puntosAcumulados !== undefined) {
     cmds.push(sep + LF);
     cmds.push(`${ESC}a\x01`);
     cmds.push(`${ESC}!\x08`); // negrita
-    cmds.push(`★ Ganaste ${datos.puntosFidelidad} puntos` + LF);
-    cmds.push(`${ESC}!\x00`);
-    if (datos.puntosAcumulados !== undefined) {
-      cmds.push(`Total acumulado: ${datos.puntosAcumulados.toLocaleString("es-CO")} pts` + LF);
+    if (datos.puntosFidelidad !== undefined && datos.puntosFidelidad > 0) {
+      cmds.push(`\u2605 Ganaste ${datos.puntosFidelidad} puntos` + LF);
+    } else {
+      cmds.push(`\u2605 Puntos de fidelidad` + LF);
     }
+    cmds.push(`${ESC}!\x00`);
+    cmds.push(`Total acumulado: ${datos.puntosAcumulados.toLocaleString("es-CO")} pts` + LF);
     if (datos.nivelFidelidad) {
       cmds.push(`Nivel: ${datos.nivelFidelidad.toUpperCase()}` + LF);
     }
@@ -341,12 +343,13 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
     return "";
   }).join("");
 
-  const puntosHtml = datos.puntosFidelidad && datos.puntosFidelidad > 0 ? `
+  const puntosHtml = datos.puntosAcumulados !== undefined ? `
     <div class="puntos">
-      <span class="star">★</span> Ganaste <strong>${datos.puntosFidelidad}</strong> puntos en esta compra
-      ${datos.puntosAcumulados !== undefined
-        ? `<br/>Total acumulado: <strong>${datos.puntosAcumulados.toLocaleString("es-CO")}</strong> pts`
-        : ""}
+      <span class="star">&#9733;</span>
+      ${datos.puntosFidelidad !== undefined && datos.puntosFidelidad > 0
+        ? `Ganaste <strong>${datos.puntosFidelidad}</strong> puntos en esta compra<br/>`
+        : `<strong>Puntos de fidelidad</strong><br/>`}
+      Total acumulado: <strong>${datos.puntosAcumulados.toLocaleString("es-CO")}</strong> pts
       ${datos.nivelFidelidad
         ? `<br/>Nivel: <strong>${datos.nivelFidelidad.toUpperCase()}</strong>`
         : ""}
