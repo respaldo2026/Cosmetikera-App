@@ -841,11 +841,82 @@ export default function VentasPage() {
                 ${totalFinal.toLocaleString()}
               </Text>
             </div>
-            {clienteSeleccionado && (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Cliente: {clienteSeleccionado.nombre_completo}
-              </Text>
+            {clienteSeleccionado ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                <Avatar size="small" icon={<UserOutlined />} style={{ background: "#d81b87", flexShrink: 0 }} />
+                <Text type="secondary" style={{ fontSize: 12, flex: 1 }}>
+                  {clienteSeleccionado.nombre_completo}
+                  {clienteSeleccionado.nivel_fidelidad && (
+                    <Tag
+                      color={NIVEL_COLORS[clienteSeleccionado.nivel_fidelidad] || "purple"}
+                      style={{ marginLeft: 4, fontSize: 10 }}
+                    >
+                      {clienteSeleccionado.nivel_fidelidad}
+                    </Tag>
+                  )}
+                </Text>
+                <Button
+                  size="small"
+                  type="link"
+                  style={{ padding: 0, fontSize: 11, color: "#d81b87" }}
+                  onClick={() => setClienteId(null)}
+                >
+                  Cambiar
+                </Button>
+              </div>
+            ) : (
+              <Text type="secondary" style={{ fontSize: 12 }}>Sin cliente asignado</Text>
             )}
+          </div>
+
+          {/* Selector de cliente en el modal de cobro */}
+          <div style={{ marginBottom: 16 }}>
+            <Text strong style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>
+              <UserOutlined /> Cliente (fidelización)
+            </Text>
+            <Row gutter={6}>
+              <Col flex="auto">
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder="Buscar por nombre, cédula o teléfono..."
+                  style={{ width: "100%" }}
+                  value={clienteId}
+                  onChange={setClienteId}
+                  filterOption={(input, opt) => {
+                    const q = input.toLowerCase().trim();
+                    if (!q) return true;
+                    const c = clientes.find((x) => x.id === opt?.value);
+                    if (!c) return false;
+                    return (
+                      c.nombre_completo.toLowerCase().includes(q) ||
+                      (c.cedula || "").toLowerCase().includes(q) ||
+                      (c.telefono || "").replace(/\D/g, "").includes(q.replace(/\D/g, ""))
+                    );
+                  }}
+                  options={clientes.map((c) => ({
+                    value: c.id,
+                    label: (
+                      <div style={{ lineHeight: 1.3 }}>
+                        <div style={{ fontWeight: 500 }}>{c.nombre_completo}</div>
+                        <div style={{ fontSize: 11, color: "#888" }}>
+                          {[c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                    ),
+                  }))}
+                />
+              </Col>
+              <Col>
+                <Tooltip title="Crear nuevo cliente">
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => setNuevoClienteOpen(true)}
+                    style={{ borderColor: "#d81b87", color: "#d81b87" }}
+                  />
+                </Tooltip>
+              </Col>
+            </Row>
           </div>
 
           <Text strong style={{ fontSize: 13, display: "block", marginBottom: 8 }}>Método de pago</Text>
