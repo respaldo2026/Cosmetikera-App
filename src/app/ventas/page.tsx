@@ -189,17 +189,12 @@ export default function VentasPage() {
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    const [{ data: arts }, { data: cls }] = await Promise.all([
+    const [{ data: arts }, clientesRes] = await Promise.all([
       supabaseBrowserClient.from("articulos").select("*").eq("activo", true).order("nombre"),
-      supabaseBrowserClient
-        .from("perfiles")
-        .select("id,nombre_completo,cedula,telefono,puntos_fidelidad,nivel_fidelidad,total_compras,rol,activo")
-        .eq("rol", "cliente")
-        .eq("activo", true)
-        .order("nombre_completo"),
+      fetch("/api/perfiles?rol=cliente").then((r) => r.json()),
     ]);
     setArticulos((arts || []).filter((a: Articulo) => a.stock > 0));
-    setClientes(cls || []);
+    setClientes((clientesRes.data || []).filter((c: Cliente) => c.activo !== false));
     setLoading(false);
   }, []);
 
