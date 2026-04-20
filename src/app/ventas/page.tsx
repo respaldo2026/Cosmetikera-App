@@ -20,6 +20,7 @@ import { PrinterOutlined, GoldOutlined, BarcodeOutlined } from "@ant-design/icon
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { isBirthdayMonth } from "@/constants/clubRewards";
+import { useClubConfig, getNivelDinamico, getMultiplicadorCumple, calcularPuntosVenta } from "@/hooks/useClubConfig";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -108,6 +109,7 @@ export default function VentasPage() {
   const [nuevoClienteForm] = Form.useForm();
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [clientesFiltrados, setClientesFiltrados] = useState<Cliente[]>([]);
+  const { reglas: reglasClub } = useClubConfig();
 
   const subtotalCarrito = carrito.reduce((s, i) => s + i.subtotal, 0);
   const descuentoVal = Math.round(subtotalCarrito * (descuento / 100));
@@ -295,16 +297,16 @@ export default function VentasPage() {
     try {
       const metodoPagoPersistido = getMetodoPagoPersistido(metodoPago, pagoMixto);
 
-      // Multiplicador de cumpleaños según nivel
+      // Multiplicador de cumpleaños según nivel (desde reglas dinámicas)
       const esCumpleCliente = clienteSeleccionado?.fecha_nacimiento
         ? isBirthdayMonth(clienteSeleccionado.fecha_nacimiento)
         : false;
-      const nivelCliente = clienteSeleccionado?.nivel_fidelidad ?? "bronce";
+      const nivelCliente = (clienteSeleccionado?.nivel_fidelidad ?? getNivelDinamico(Number(clienteSeleccionado?.puntos_fidelidad ?? 0), reglasClub)) as import("@/constants/clubRewards").ClubLevelKey;
       const multiplicadorCumple = esCumpleCliente
-        ? nivelCliente === "diamante" ? 3 : 2
+        ? getMultiplicadorCumple(nivelCliente, reglasClub)
         : 1;
 
-      const puntosBase = clienteId ? Math.floor(totalFinal / 1000) : 0;
+      const puntosBase = clienteId ? calcularPuntosVenta(totalFinal, reglasClub) : 0;
       const puntosGanados = puntosBase * multiplicadorCumple;
 
       // Registrar venta en Supabase
@@ -896,8 +898,9 @@ export default function VentasPage() {
             <div style={{ flex: 1 }}>
               {(() => {
                 const esCumple = clienteSeleccionado?.fecha_nacimiento && isBirthdayMonth(clienteSeleccionado.fecha_nacimiento);
-                const mult = esCumple ? (clienteSeleccionado?.nivel_fidelidad === "diamante" ? 3 : 2) : 1;
-                const base = Math.floor(totalFinal / 1000);
+                const niv = (clienteSeleccionado?.nivel_fidelidad ?? getNivelDinamico(Number(clienteSeleccionado?.puntos_fidelidad ?? 0), reglasClub)) as import("@/constants/clubRewards").ClubLevelKey;
+                const mult = esCumple ? getMultiplicadorCumple(niv, reglasClub) : 1;
+                const base = calcularPuntosVenta(totalFinal, reglasClub);
                 const total = base * mult;
                 return (
                   <>

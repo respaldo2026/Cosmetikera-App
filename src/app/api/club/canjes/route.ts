@@ -3,11 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import {
   buildRewardCanjeDescription,
   buildVoucherCode,
-  getClubLevel,
-  getEligibleRewards,
-  getRewardByKey,
   parseRewardCanjeDescription,
 } from "@/constants/clubRewards";
+import { isRewardEligibleDynamic, getNivelDinamico, DEFAULT_REGLAS, type DynamicClubReward, type ClubReglas } from "@/hooks/useClubConfig";
+import { isBirthdayMonth } from "@/constants/clubRewards";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zgqrhzuhrwudckweslzr.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -61,37 +60,71 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "perfilId y rewardKey son requeridos" }, { status: 400 });
     }
 
-    const { data: client, error: clientError } = await supabaseAdmin
-      .from("perfiles")
-      .select("id,nombre_completo,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento")
-      .eq("id", perfilId)
-      .single();
+    // Cargar config dinámica (recompensas + reglas) desde la BD
+    const [clientRes, configRes] = await Promise.all([
+      supabaseAdmin
+        .from("perfiles")
+        .select("id,nombre_completo,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento")
+        .eq("id", perfilId)
+        .single(),
+      supabaseAdmin
+        .from("club_recompensas_config")
+        .select("*")
+        .eq("activa", true),
+    ]);
 
-    if (clientError || !client) {
-      return NextResponse.json({ error: clientError?.message || "Cliente no encontrado" }, { status: 404 });
+    const [reglasDbRes] = await Promise.all([
+      supabaseAdmin.from("club_reglas_config").select("clave,valor"),
+    ]);
+
+    if (clientRes.error || !clientRes.data) {
+      return NextResponse.json({ error: clientRes.error?.message || "Cliente no encontrado" }, { status: 404 });
+    }
+    const client = clientRes.data;
+
+    // Construir reglas dinámicas (con fallback a defaults)
+    const reglasRaw = reglasDbRes.data ?? [];
+    const reglas: ClubReglas = { ...DEFAULT_REGLAS };
+    for (const row of reglasRaw) {
+      const num = Number(row.valor);
+      if (Number.isFinite(num)) (reglas as any)[row.clave] = num;
     }
 
-    const reward = getRewardByKey(rewardKey);
+    // Buscar la recompensa en el catálogo dinámico
+    const catalogoDinamico: DynamicClubReward[] = configRes.data ?? [];
+    const reward = catalogoDinamico.find(r => r.key === rewardKey);
     if (!reward) {
-      return NextResponse.json({ error: "Recompensa no encontrada" }, { status: 404 });
+      return NextResponse.json({ error: "Recompensa no encontrada en el catálogo activo" }, { status: 404 });
     }
 
-    const unlockedRewards = getEligibleRewards(client);
-    if (!unlockedRewards.some((item) => item.key === reward.key)) {
+    const esCumple = client.fecha_nacimiento ? isBirthdayMonth(client.fecha_nacimiento) : false;
+
+    if (!isRewardEligibleDynamic(reward, client, reglas, esCumple)) {
       return NextResponse.json({ error: "No cumples las condiciones para esta recompensa" }, { status: 403 });
     }
 
     const voucherCode = buildVoucherCode();
     const currentPoints = client.puntos_fidelidad || 0;
-    const nextPoints = currentPoints - reward.pointsCost;
-    const nextLevel = getClubLevel(nextPoints);
+    const nextPoints = currentPoints - reward.points_cost;
+    const nextLevel = getNivelDinamico(nextPoints, reglas);
+
+    // Construir ClubReward compatible para buildRewardCanjeDescription
+    const rewardCompat = {
+      key: reward.key,
+      icon: reward.icon,
+      title: reward.title,
+      description: reward.description,
+      category: reward.category,
+      pointsCost: reward.points_cost,
+      valueCop: reward.value_cop,
+    };
 
     const { error: updateError } = await supabaseAdmin
       .from("perfiles")
       .update({
         puntos_fidelidad: nextPoints,
-        puntos_canjeados: (client.puntos_canjeados || 0) + reward.pointsCost,
-        nivel_fidelidad: nextLevel.key,
+        puntos_canjeados: (client.puntos_canjeados || 0) + reward.points_cost,
+        nivel_fidelidad: nextLevel,
       })
       .eq("id", client.id);
 
@@ -103,9 +136,9 @@ export async function POST(request: NextRequest) {
       .from("canjes")
       .insert({
         perfil_id: client.id,
-        puntos: reward.pointsCost,
-        valor_cop: reward.valueCop,
-        descripcion: buildRewardCanjeDescription(reward, voucherCode),
+        puntos: reward.points_cost,
+        valor_cop: reward.value_cop,
+        descripcion: buildRewardCanjeDescription(rewardCompat as any, voucherCode),
         estado: "emitido",
       })
       .select("id,perfil_id,puntos,valor_cop,descripcion,estado,created_at")
@@ -118,12 +151,12 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from("puntos_historial").insert({
       perfil_id: client.id,
       tipo: "canjeados",
-      puntos: -reward.pointsCost,
+      puntos: -reward.points_cost,
       concepto: `Canje ${reward.title} · código ${voucherCode}`,
     });
 
     return NextResponse.json({ data: normalizeCanje(insertedCanje) });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Error inesperado" }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: (error as Error)?.message || "Error inesperado" }, { status: 500 });
   }
 }

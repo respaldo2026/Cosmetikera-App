@@ -180,6 +180,16 @@ const allResources = [
       icon: <SettingOutlined />,
     },
   },
+  {
+    key: "configuracion-club",
+    name: "configuracion-club",
+    list: "/configuracion/club",
+    meta: {
+      label: "Config. Club",
+      icon: <GiftOutlined />,
+      parent: "configuracion",
+    },
+  },
 ];
 
 const LOGOUT_MENU_KEY = "__logout";

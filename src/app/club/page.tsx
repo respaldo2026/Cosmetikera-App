@@ -34,17 +34,15 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
-  CLUB_REWARDS,
-  getActiveBenefits,
-  getClubLevel,
-  getClubProgress,
-  getEligibleRewards,
-  getRecommendedNextReward,
   getReferralCode,
   getReferralShareMessage,
   isBirthdayMonth,
-  isRewardUnlocked,
 } from "@/constants/clubRewards";
+import {
+  useClubConfig,
+  isRewardEligibleDynamic,
+  getNivelDinamico,
+} from "@/hooks/useClubConfig";
 
 const { Title, Text } = Typography;
 
@@ -190,8 +188,8 @@ export default function ClubPage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || "No se pudo generar el voucher");
 
-      const reward = CLUB_REWARDS.find((item) => item.key === rewardKey);
-      const costo = reward?.pointsCost || 0;
+      const reward = catalogoDinamico.find((item) => item.key === rewardKey);
+      const costo = reward?.points_cost || 0;
       setCliente((current) => current ? {
         ...current,
         puntos_fidelidad: Math.max(0, (current.puntos_fidelidad || 0) - costo),
@@ -206,7 +204,7 @@ export default function ClubPage() {
         created_at: new Date().toISOString(),
       }, ...current]);
       message.success(`Voucher emitido: ${json.data.code}`);
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       message.error(requestError?.message || "No se pudo emitir la recompensa");
     } finally {
       setCanjeando(null);
@@ -251,13 +249,89 @@ export default function ClubPage() {
     }
   }, [cliente, codigoReferidoIngresado, message]);
 
-  const nivel = useMemo(() => cliente ? getClubLevel(cliente.puntos_fidelidad || 0) : null, [cliente]);
-  const progreso = useMemo(() => cliente ? getClubProgress(cliente.puntos_fidelidad || 0) : null, [cliente]);
-  const logros = useMemo(() => cliente ? calcularLogros(cliente) : [], [cliente]);
+  const { recompensas: catalogoDinamico, reglas, loading: loadingConfig } = useClubConfig();
+
   const esCumple = !!cliente?.fecha_nacimiento && isBirthdayMonth(cliente.fecha_nacimiento);
-  const beneficiosActivos = useMemo(() => getActiveBenefits(cliente), [cliente]);
-  const recompensasDisponibles = useMemo(() => getEligibleRewards(cliente), [cliente]);
-  const siguienteRecompensa = useMemo(() => getRecommendedNextReward(cliente), [cliente]);
+
+  const nivel = useMemo(() => {
+    if (!cliente) return null;
+    const pts = cliente.puntos_fidelidad || 0;
+    const key = getNivelDinamico(pts, reglas);
+    const NIVEL_META: Record<string, { label: string; color: string; icon: string }> = {
+      bronce:   { label: "Bronce",   color: "#cd7f32", icon: "🥉" },
+      plata:    { label: "Plata",    color: "#8c8c8c", icon: "🥈" },
+      oro:      { label: "Oro",      color: "#faad14", icon: "🥇" },
+      diamante: { label: "Diamante", color: "#13c2c2", icon: "💎" },
+    };
+    return { key, ...NIVEL_META[key] };
+  }, [cliente, reglas]);
+
+  const progreso = useMemo(() => {
+    if (!cliente || !nivel) return null;
+    const pts = cliente.puntos_fidelidad || 0;
+    const umbrales: Record<string, number> = {
+      plata: reglas.puntos_min_plata, oro: reglas.puntos_min_oro, diamante: reglas.puntos_min_diamante,
+    };
+    const NIVEL_ORDER = ["bronce", "plata", "oro", "diamante"] as const;
+    const NIVEL_META: Record<string, { label: string; color: string; icon: string; min: number }> = {
+      bronce:   { label: "Bronce",   color: "#cd7f32", icon: "🥉", min: 0 },
+      plata:    { label: "Plata",    color: "#8c8c8c", icon: "🥈", min: reglas.puntos_min_plata },
+      oro:      { label: "Oro",      color: "#faad14", icon: "🥇", min: reglas.puntos_min_oro },
+      diamante: { label: "Diamante", color: "#13c2c2", icon: "💎", min: reglas.puntos_min_diamante },
+    };
+    const idx = NIVEL_ORDER.indexOf(nivel.key as typeof NIVEL_ORDER[number]);
+    if (idx === -1 || idx === NIVEL_ORDER.length - 1) return null;
+    const siguiente = NIVEL_META[NIVEL_ORDER[idx + 1]];
+    const current = NIVEL_META[nivel.key];
+    const span = Math.max(1, siguiente.min - current.min);
+    const pct = Math.min(100, Math.round(((pts - current.min) / span) * 100));
+    return { siguiente, pct, faltantes: Math.max(0, siguiente.min - pts) };
+  }, [cliente, nivel, reglas]);
+
+  const logros = useMemo(() => cliente ? calcularLogros(cliente) : [], [cliente]);
+  const beneficiosActivos = useMemo(() => [
+    {
+      key: "level_discount",
+      icon: nivel?.icon ?? "🥉",
+      title: nivel && reglas[`descuento_${nivel.key}` as keyof typeof reglas]
+        ? `${reglas[`descuento_${nivel.key}` as keyof typeof reglas]}% de descuento por nivel`
+        : "Acumula para desbloquear descuentos",
+      description: nivel && Number(reglas[`descuento_${nivel.key}` as keyof typeof reglas]) > 0
+        ? `Tu nivel ${nivel.label} ya activa descuento base en tienda.`
+        : "Sube a Plata para activar descuentos automáticos.",
+      active: nivel ? Number(reglas[`descuento_${nivel.key}` as keyof typeof reglas] ?? 0) > 0 : false,
+    },
+    {
+      key: "birthday_multiplier",
+      icon: "🎂",
+      title: esCumple ? "Puntos extra de cumpleaños activos" : "Campaña de cumpleaños",
+      description: esCumple
+        ? `Este mes acumulas puntos con multiplicador ${reglas[`multiplicador_cumple_${nivel?.key ?? "bronce"}` as keyof typeof reglas] ?? 1}×.`
+        : "En tu mes de cumpleaños activas un multiplicador especial y acceso a premios temáticos.",
+      active: esCumple,
+    },
+    {
+      key: "referral",
+      icon: "🤝",
+      title: "Campaña de referidos",
+      description: "Comparte tu código y gana 300 pts cuando tu referida compre por primera vez.",
+      active: true,
+    },
+  ], [nivel, esCumple, reglas]);
+
+  const recompensasDisponibles = useMemo(
+    () => cliente ? catalogoDinamico.filter(r => isRewardEligibleDynamic(r, cliente, reglas, esCumple)) : [],
+    [catalogoDinamico, cliente, reglas, esCumple]
+  );
+
+  const siguienteRecompensa = useMemo(() => {
+    if (!cliente) return null;
+    const pts = cliente.puntos_fidelidad ?? 0;
+    return catalogoDinamico
+      .filter(r => !isRewardEligibleDynamic(r, cliente, reglas, esCumple) && r.points_cost > pts)
+      .sort((a, b) => a.points_cost - b.points_cost)[0] ?? null;
+  }, [catalogoDinamico, cliente, reglas, esCumple]);
+
   const referralCode = useMemo(() => getReferralCode(cliente), [cliente]);
 
   return (
@@ -339,7 +413,7 @@ export default function ClubPage() {
                 <Statistic title={<Text style={{ fontSize: 12 }}>Rewards desbloqueadas</Text>} value={recompensasDisponibles.length} valueStyle={{ color: "#d81b87" }} />
               </Col>
               <Col xs={12} md={6}>
-                <Statistic title={<Text style={{ fontSize: 12 }}>Valor canjeable hoy</Text>} value={recompensasDisponibles.reduce((sum, reward) => sum + reward.valueCop, 0)} prefix="$" valueStyle={{ color: "#722ed1" }} formatter={(value) => Number(value).toLocaleString()} />
+                <Statistic title={<Text style={{ fontSize: 12 }}>Valor canjeable hoy</Text>} value={recompensasDisponibles.reduce((sum, reward) => sum + reward.value_cop, 0)} prefix="$" valueStyle={{ color: "#722ed1" }} formatter={(value) => Number(value).toLocaleString()} />
               </Col>
             </Row>
 
@@ -359,10 +433,10 @@ export default function ClubPage() {
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={14}>
               <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined style={{ color: "#d81b87" }} /><Text strong>Catálogo de recompensas</Text></Space>} extra={<Tag color="magenta">{recompensasDisponibles.length} disponibles</Tag>}>
-                <Row gutter={[12, 12]}>
-                  {CLUB_REWARDS.map((reward) => {
-                    const unlocked = isRewardUnlocked(reward, cliente);
-                    const faltantes = Math.max(0, reward.pointsCost - (cliente.puntos_fidelidad || 0));
+<Row gutter={[12, 12]}>
+                  {loadingConfig ? <Col span={24}><Spin /></Col> : catalogoDinamico.map((reward) => {
+                    const unlocked = isRewardEligibleDynamic(reward, cliente, reglas, esCumple);
+                    const faltantes = Math.max(0, reward.points_cost - (cliente.puntos_fidelidad || 0));
                     return (
                       <Col xs={24} md={12} key={reward.key}>
                         <Card size="small" style={{ borderRadius: 14, border: unlocked ? "1px solid #f0d6ff" : "1px solid #f0f0f0", minHeight: 220, background: unlocked ? "linear-gradient(180deg,#fff,#fff7fb)" : "#fafafa" }}>
@@ -374,16 +448,16 @@ export default function ClubPage() {
                             </Space>
                             <Text type="secondary" style={{ fontSize: 12 }}>{reward.description}</Text>
                             <Space wrap>
-                              <Tag color="purple">{reward.pointsCost.toLocaleString()} pts</Tag>
-                              <Tag color="green">${reward.valueCop.toLocaleString()}</Tag>
-                              {reward.levelMin && <Tag>{reward.levelMin}</Tag>}
-                              {reward.birthdayOnly && <Tag color="pink">solo cumpleaños</Tag>}
+                              <Tag color="purple">{reward.points_cost.toLocaleString()} pts</Tag>
+                              <Tag color="green">${reward.value_cop.toLocaleString()}</Tag>
+                              {reward.level_min && <Tag>{reward.level_min}</Tag>}
+                              {reward.birthday_only && <Tag color="pink">solo cumpleaños</Tag>}
                             </Space>
                             {!unlocked && (
                               <Alert
                                 type="info"
                                 showIcon
-                                message={reward.birthdayOnly && !esCumple ? "Disponible solo en tu mes de cumpleaños" : faltantes > 0 ? `Te faltan ${faltantes.toLocaleString()} pts` : "Tu nivel aún no la desbloquea"}
+                                message={reward.birthday_only && !esCumple ? "Disponible solo en tu mes de cumpleaños" : faltantes > 0 ? `Te faltan ${faltantes.toLocaleString()} pts` : "Tu nivel aún no la desbloquea"}
                                 style={{ borderRadius: 10 }}
                               />
                             )}
@@ -464,10 +538,10 @@ export default function ClubPage() {
                     <Text strong style={{ fontSize: 16 }}>{siguienteRecompensa.icon} {siguienteRecompensa.title}</Text>
                     <Text type="secondary">{siguienteRecompensa.description}</Text>
                     <Space wrap>
-                      <Tag color="purple">{siguienteRecompensa.pointsCost.toLocaleString()} pts</Tag>
-                      <Tag color="green">${siguienteRecompensa.valueCop.toLocaleString()}</Tag>
+                      <Tag color="purple">{siguienteRecompensa.points_cost.toLocaleString()} pts</Tag>
+                      <Tag color="green">${siguienteRecompensa.value_cop.toLocaleString()}</Tag>
                     </Space>
-                    <Alert type="info" showIcon message={`Te faltan ${Math.max(0, siguienteRecompensa.pointsCost - (cliente.puntos_fidelidad || 0)).toLocaleString()} pts para desbloquearla.`} style={{ borderRadius: 10 }} />
+                    <Alert type="info" showIcon message={`Te faltan ${Math.max(0, siguienteRecompensa.points_cost - (cliente.puntos_fidelidad || 0)).toLocaleString()} pts para desbloquearla.`} style={{ borderRadius: 10 }} />
                   </Space>
                 ) : (
                   <Alert type="success" showIcon message="Ya tienes desbloqueadas todas las recompensas compatibles con tu nivel actual." style={{ borderRadius: 10 }} />
