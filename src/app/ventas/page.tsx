@@ -16,7 +16,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
 import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, DatosTicket } from "@utils/pos-hardware";
-import { PrinterOutlined, GoldOutlined } from "@ant-design/icons";
+import { PrinterOutlined, GoldOutlined, BarcodeOutlined } from "@ant-design/icons";
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -496,89 +496,96 @@ export default function VentasPage() {
   const panelProductos = (
     <div>
       {/* Escáner de código de barras / QR */}
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: 12 }}>
         <EscanerCodigo
           onCodigo={buscarPorCodigo}
           placeholder="Escanear código de barras o QR del producto..."
           conCamara
         />
       </div>
-      {/* Búsqueda manual */}
-      <Row gutter={8} style={{ marginBottom: 12 }}>
-        <Col flex="auto">
-          <Input
-            placeholder="Buscar artículo por nombre o marca..."
-            prefix={<SearchOutlined />}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            allowClear
-            size="large"
-          />
-        </Col>
-        <Col>
-          <Select
-            placeholder="Categoría"
-            allowClear
-            style={{ minWidth: 130 }}
-            value={filtroCategoria}
-            onChange={setFiltroCategoria}
-            size="large"
-            options={categorias.map((c) => ({ label: c, value: c }))}
-          />
-        </Col>
-      </Row>
 
-      {loading ? (
-        <div style={{ textAlign: "center", padding: 40 }}><Spin /></div>
-      ) : articulosFiltrados.length === 0 ? (
-        <Empty description="Sin artículos" />
-      ) : (
-        <Row gutter={[8, 8]}>
-          {articulosFiltrados.map((art) => {
-            const enCarrito = carrito.find((i) => i.id === art.id);
-            return (
-              <Col key={art.id} xs={12} sm={8} lg={6} xl={isMobile ? 12 : 6}>
-                <Card
-                  hoverable
+      {/* Búsqueda manual por nombre o código */}
+      <Input
+        placeholder="🔍 Buscar por nombre, marca o referencia..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        allowClear
+        size="large"
+        style={{ marginBottom: 8 }}
+      />
+
+      {/* Resultados solo cuando hay 3+ caracteres */}
+      {search.trim().length >= 3 && (
+        loading ? (
+          <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
+        ) : articulosFiltrados.length === 0 ? (
+          <Empty description="Sin resultados" style={{ padding: 24 }} />
+        ) : (
+          <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #f0d6ff" }}>
+            {articulosFiltrados.slice(0, 8).map((art, idx) => {
+              const enCarrito = carrito.find((i) => i.id === art.id);
+              return (
+                <div
+                  key={art.id}
                   onClick={() => agregarAlCarrito(art)}
                   style={{
-                    borderRadius: 10,
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 14px",
+                    background: enCarrito ? "#fce4f8" : idx % 2 === 0 ? "#fff" : "#fdf5ff",
+                    borderBottom: idx < Math.min(articulosFiltrados.length, 8) - 1 ? "1px solid #f0d6ff" : "none",
                     cursor: "pointer",
-                    border: enCarrito ? "2px solid #d81b87" : undefined,
-                    transition: "all 0.15s",
+                    transition: "background 0.15s",
+                    borderLeft: enCarrito ? "4px solid #d81b87" : "4px solid transparent",
                   }}
-                  styles={{ body: { padding: 8 } }}
-                  cover={
-                    <div style={{
-                      height: 80, background: "linear-gradient(135deg,#fce4f8,#f0d6ff)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      position: "relative",
-                    }}>
-                      {art.imagen_url
-                        ? <img src={art.imagen_url} alt={art.nombre} style={{ height: "100%", width: "100%", objectFit: "cover" }} />
-                        : <TagsOutlined style={{ fontSize: 28, color: "#d81b87", opacity: 0.5 }} />
-                      }
-                      {enCarrito && (
-                        <Badge
-                          count={enCarrito.cantidad}
-                          style={{ position: "absolute", top: 4, right: 4, background: "#d81b87" }}
-                        />
-                      )}
-                    </div>
-                  }
                 >
-                  <Text style={{ fontSize: 11, fontWeight: 600, display: "block" }} ellipsis>{art.nombre}</Text>
-                  <Text style={{ fontSize: 12, color: "#d81b87", fontWeight: 700 }}>
-                    ${Number(art.precio_venta).toLocaleString()}
-                  </Text>
-                  <div>
-                    <Tag style={{ fontSize: 10, padding: "0 4px" }}>{art.stock} en stock</Tag>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: 600, fontSize: 13, display: "block" }} ellipsis>
+                      {art.nombre}
+                    </Text>
+                    {art.marca && (
+                      <Text style={{ fontSize: 11, color: "#aaa" }}>{art.marca}</Text>
+                    )}
                   </div>
-                </Card>
-              </Col>
-            );
-          })}
-        </Row>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <Text style={{ color: "#d81b87", fontWeight: 700, fontSize: 14, display: "block" }}>
+                      ${Number(art.precio_venta).toLocaleString()}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#aaa" }}>{art.stock} en stock</Text>
+                  </div>
+                  {enCarrito ? (
+                    <Badge count={enCarrito.cantidad} style={{ background: "#d81b87" }} />
+                  ) : (
+                    <PlusOutlined style={{ color: "#d81b87", fontSize: 16 }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Instrucción cuando no hay búsqueda */}
+      {search.trim().length === 0 && (
+        <div style={{
+          marginTop: 40, textAlign: "center",
+          padding: "32px 24px",
+          background: "linear-gradient(135deg,#fce4f8,#f0d6ff)",
+          borderRadius: 16,
+        }}>
+          <BarcodeOutlined style={{ fontSize: 56, color: "#d81b87", opacity: 0.4, display: "block", marginBottom: 12 }} />
+          <Text style={{ fontSize: 15, color: "#9c27b0", fontWeight: 600, display: "block" }}>
+            Escanea el código de barras
+          </Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            o escribe el nombre del producto para buscarlo
+          </Text>
+        </div>
+      )}
+
+      {search.trim().length > 0 && search.trim().length < 3 && (
+        <div style={{ textAlign: "center", padding: "16px 0" }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>Escribe al menos 3 caracteres para buscar...</Text>
+        </div>
       )}
     </div>
   );
