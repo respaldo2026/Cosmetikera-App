@@ -475,7 +475,7 @@ export default function VentasPage() {
     setImprimiendo(false);
   };
 
-  const PanelProductos = () => (
+  const panelProductos = (
     <div>
       {/* Escáner de código de barras / QR */}
       <div style={{ marginBottom: 8 }}>
@@ -565,7 +565,7 @@ export default function VentasPage() {
     </div>
   );
 
-  const PanelCarrito = () => (
+  const panelCarrito = (
     <Card
       style={{ borderRadius: 12, height: "100%", display: "flex", flexDirection: "column" }}
       bodyStyle={{ padding: 12, display: "flex", flexDirection: "column", height: "100%" }}
@@ -817,10 +817,10 @@ export default function VentasPage() {
       {/* LAYOUT POS */}
       <Row gutter={[12, 12]} style={{ height: "calc(100vh - 200px)", minHeight: 500 }}>
         <Col xs={24} lg={16} style={{ height: "100%", overflowY: "auto" }}>
-          <PanelProductos />
+          {panelProductos}
         </Col>
         <Col xs={24} lg={8} style={{ height: "100%" }}>
-          <PanelCarrito />
+          {panelCarrito}
         </Col>
       </Row>
 
