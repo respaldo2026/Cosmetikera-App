@@ -19,6 +19,7 @@ import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, DatosTicket
 import { PrinterOutlined, GoldOutlined, BarcodeOutlined } from "@ant-design/icons";
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { isBirthdayMonth } from "@/constants/clubRewards";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -28,7 +29,7 @@ type Articulo = {
   stock: number; categoria?: string; marca?: string; imagen_url?: string;
 };
 type CarritoItem = Articulo & { cantidad: number; subtotal: number };
-type Cliente = { id: string; nombre_completo: string; cedula?: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; total_compras?: number; rol?: string; activo?: boolean };
+type Cliente = { id: string; nombre_completo: string; cedula?: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; fecha_nacimiento?: string; total_compras?: number; rol?: string; activo?: boolean };
 type MetodoPago = "efectivo" | "tarjeta" | "transferencia" | "mixto";
 type PagoMixto = { efectivo: number; tarjeta: number; transferencia: number };
 type ClubVoucher = {
@@ -293,7 +294,18 @@ export default function VentasPage() {
     setProcesando(true);
     try {
       const metodoPagoPersistido = getMetodoPagoPersistido(metodoPago, pagoMixto);
-      const puntosGanados = clienteId ? Math.floor(totalFinal / 1000) : 0;
+
+      // Multiplicador de cumpleaños según nivel
+      const esCumpleCliente = clienteSeleccionado?.fecha_nacimiento
+        ? isBirthdayMonth(clienteSeleccionado.fecha_nacimiento)
+        : false;
+      const nivelCliente = clienteSeleccionado?.nivel_fidelidad ?? "bronce";
+      const multiplicadorCumple = esCumpleCliente
+        ? nivelCliente === "diamante" ? 3 : 2
+        : 1;
+
+      const puntosBase = clienteId ? Math.floor(totalFinal / 1000) : 0;
+      const puntosGanados = puntosBase * multiplicadorCumple;
 
       // Registrar venta en Supabase
       const { data: venta, error: ventaErr } = await supabaseBrowserClient
@@ -320,30 +332,48 @@ export default function VentasPage() {
           .eq("id", i.id)
       ));
 
-      // Puntos de fidelidad (1 punto por cada $1000)
-      if (clienteId && clienteSeleccionado) {
-        try {
-          await supabaseBrowserClient.rpc("sumar_puntos_cliente", {
-            p_cliente_id: clienteId,
-            p_puntos: puntosGanados,
-          });
-        } catch {
-          const nuevosPuntos = Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados;
-          await supabaseBrowserClient
-            .from("perfiles")
-            .update({
-              puntos_fidelidad: nuevosPuntos,
-              nivel_fidelidad: getNivelFidelidad(nuevosPuntos),
-            })
-            .eq("id", clienteId);
-        }
+      // Puntos de fidelidad (1 punto por cada $1000, con multiplicador de cumpleaños)
+      if (clienteId && clienteSeleccionado && puntosGanados > 0) {
+        const nuevosPuntos = Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados;
+        const nuevoPuntosGanados = Number((clienteSeleccionado as any).puntos_ganados || 0) + puntosGanados;
 
-        await supabaseBrowserClient
-          .from("perfiles")
-          .update({
+        await fetch(`/api/perfiles?id=${encodeURIComponent(clienteId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            puntos_fidelidad: nuevosPuntos,
+            nivel_fidelidad: getNivelFidelidad(nuevosPuntos),
+            puntos_ganados: nuevoPuntosGanados,
             total_compras: Number(clienteSeleccionado.total_compras || 0) + totalFinal,
-          })
-          .eq("id", clienteId);
+          }),
+        });
+
+        // Registrar en historial (service role)
+        const tipo = esCumpleCliente ? "cumpleanos" : "ganados";
+        const conceptoHistorial = esCumpleCliente
+          ? `Compra POS${venta?.id ? ` #${String(venta.id).slice(-6).toUpperCase()}` : ""} · ${multiplicadorCumple}x cumpleaños 🎂 (${puntosBase} base × ${multiplicadorCumple})`
+          : `Compra POS${venta?.id ? ` #${String(venta.id).slice(-6).toUpperCase()}` : ""} · $${totalFinal.toLocaleString()}`;
+
+        fetch("/api/club/puntos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            perfil_id: clienteId,
+            tipo,
+            puntos: puntosGanados,
+            concepto: conceptoHistorial,
+            referencia: venta?.id || null,
+          }),
+        }).catch(() => { /* no bloquea la venta */ });
+      } else if (clienteId && clienteSeleccionado) {
+        // Solo actualizar total_compras aunque no se acumulen puntos
+        await fetch(`/api/perfiles?id=${encodeURIComponent(clienteId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            total_compras: Number(clienteSeleccionado.total_compras || 0) + totalFinal,
+          }),
+        });
       }
 
       try {
@@ -853,18 +883,34 @@ export default function VentasPage() {
         clienteId && clienteSeleccionado ? (
           <div style={{
             marginBottom: 10, padding: "8px 12px",
-            background: "linear-gradient(90deg,#f9f0ff,#fff0f6)",
-            borderRadius: 8, border: "1px solid #d3adf7",
+            background: clienteSeleccionado?.fecha_nacimiento && isBirthdayMonth(clienteSeleccionado.fecha_nacimiento)
+              ? "linear-gradient(90deg,#fff1f0,#fff0f6)"
+              : "linear-gradient(90deg,#f9f0ff,#fff0f6)",
+            borderRadius: 8,
+            border: clienteSeleccionado?.fecha_nacimiento && isBirthdayMonth(clienteSeleccionado.fecha_nacimiento)
+              ? "1px solid #ffadd2"
+              : "1px solid #d3adf7",
             display: "flex", alignItems: "center", gap: 8,
           }}>
             <GiftOutlined style={{ color: "#722ed1", fontSize: 16, flexShrink: 0 }} />
-            <div>
-              <Text style={{ fontSize: 12, color: "#722ed1", fontWeight: 600, display: "block" }}>
-                +{Math.floor(totalFinal / 1000)} puntos en esta compra
-              </Text>
-              <Text style={{ fontSize: 11, color: "#888" }}>
-                Total acumulado: {Number(clienteSeleccionado.puntos_fidelidad || 0) + Math.floor(totalFinal / 1000)} pts · {getNivelFidelidad(Number(clienteSeleccionado.puntos_fidelidad || 0) + Math.floor(totalFinal / 1000))}
-              </Text>
+            <div style={{ flex: 1 }}>
+              {(() => {
+                const esCumple = clienteSeleccionado?.fecha_nacimiento && isBirthdayMonth(clienteSeleccionado.fecha_nacimiento);
+                const mult = esCumple ? (clienteSeleccionado?.nivel_fidelidad === "diamante" ? 3 : 2) : 1;
+                const base = Math.floor(totalFinal / 1000);
+                const total = base * mult;
+                return (
+                  <>
+                    <Text style={{ fontSize: 12, color: esCumple ? "#c41d7f" : "#722ed1", fontWeight: 600, display: "block" }}>
+                      +{total} puntos en esta compra
+                      {esCumple && <Tag color="magenta" style={{ marginLeft: 6, fontSize: 10, padding: "0 4px" }}>🎂 x{mult} cumpleaños</Tag>}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#888" }}>
+                      Total acumulado: {Number(clienteSeleccionado.puntos_fidelidad || 0) + total} pts · {getNivelFidelidad(Number(clienteSeleccionado.puntos_fidelidad || 0) + total)}
+                    </Text>
+                  </>
+                );
+              })()}
             </div>
           </div>
         ) : (
