@@ -683,7 +683,8 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
     return (
       pathname.startsWith("/login") ||
       pathname.startsWith("/register") ||
-      pathname.startsWith("/auth")
+      pathname.startsWith("/auth") ||
+      pathname.startsWith("/club")
     );
   }, [pathname]);
 
@@ -719,10 +720,10 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   React.useEffect(() => {
-    if (!userLoading && !user && !isAuthRoute) {
+    if (!userLoading && !user && !isAuthRoute && !pathname?.startsWith("/club")) {
       router.replace("/login");
     }
-  }, [user, userLoading, isAuthRoute, router]);
+  }, [user, userLoading, isAuthRoute, router, pathname]);
 
   const resources = useMemo(() => {
     if (userLoading || !user) {
