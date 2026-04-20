@@ -280,6 +280,10 @@ export default function ArticulosPage() {
 
   const handleGuardar = async () => {
     const values = await form.validateFields();
+    // El Select con mode="tags" devuelve array; normalizar a string
+    if (Array.isArray(values.categoria)) {
+      values.categoria = values.categoria[0] ?? undefined;
+    }
     setSaving(true);
     try {
       if (editing) {
@@ -905,9 +909,15 @@ export default function ArticulosPage() {
             <Col span={8}>
               <Form.Item name="categoria" label="Categoría">
                 <Select
-                  showSearch allowClear
-                  placeholder="Seleccionar categoría"
-                  options={CATEGORIAS_DEFAULT.map((c) => ({ label: c, value: c }))}
+                  showSearch
+                  allowClear
+                  mode="tags"
+                  maxCount={1}
+                  placeholder="Seleccionar o escribir nueva categoría..."
+                  options={[
+                    ...CATEGORIAS_DEFAULT,
+                    ...categorias.filter((c) => c && !CATEGORIAS_DEFAULT.includes(c)),
+                  ].map((c) => ({ label: c, value: c }))}
                 />
               </Form.Item>
             </Col>
