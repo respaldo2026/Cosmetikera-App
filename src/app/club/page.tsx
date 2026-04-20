@@ -233,7 +233,7 @@ export default function ClubPage() {
   const referralCode = useMemo(() => getReferralCode(cliente), [cliente]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fff0f8 0%, #f9f0ff 50%, #fffbe6 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 16px" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fff0f8 0%, #f9f0ff 50%, #fffbe6 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "clamp(16px, 5vw, 40px) 16px" }}>
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <div style={{ width: 72, height: 72, borderRadius: 20, background: "linear-gradient(135deg,#faad14,#d81b87)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", boxShadow: "0 4px 20px rgba(216,27,135,0.3)" }}>
           <GiftOutlined style={{ color: "#fff", fontSize: 34 }} />
@@ -266,7 +266,7 @@ export default function ClubPage() {
       {buscando && <Spin size="large" style={{ margin: "32px 0" }} />}
 
       {cliente && nivel && (
-        <div style={{ width: "100%", maxWidth: 980 }}>
+        <div style={{ width: "100%", maxWidth: 980, boxSizing: "border-box" }}>
           <Card style={{ borderRadius: 16, marginBottom: 16, background: `linear-gradient(135deg, ${nivel.color}18, ${nivel.color}30)`, border: `2px solid ${nivel.color}` }}>
             <Row align="middle" gutter={[16, 16]}>
               <Col>
@@ -385,8 +385,8 @@ export default function ClubPage() {
                           </Col>
                           <Col>
                             {canje.code ? (
-                              <Space direction="vertical" size={6}>
-                                <Tag style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8 }}>{canje.code}</Tag>
+                              <Space direction="vertical" size={6} style={{ textAlign: "center" }}>
+                                <Tag style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8, wordBreak: "break-all" }}>{canje.code}</Tag>
                                 <Button icon={<CopyOutlined />} onClick={() => canje.code && copiar(canje.code)} disabled={canje.estado === "redimido"}>Copiar</Button>
                               </Space>
                             ) : null}
@@ -447,7 +447,7 @@ export default function ClubPage() {
                     <Space direction="vertical" size={6} style={{ width: "100%" }}>
                       <Text strong>🤝 Campaña de referidos</Text>
                       <Text type="secondary" style={{ fontSize: 12 }}>Tu código personal suma 300 pts cuando tu referida haga su primera compra.</Text>
-                      <Space wrap>
+                      <Space wrap style={{ width: "100%" }}>
                         <Tag color="purple" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8 }}>{referralCode}</Tag>
                         <Button icon={<CopyOutlined />} onClick={() => copiar(referralCode)}>Copiar código</Button>
                         <Button icon={<ShareAltOutlined />} onClick={compartirReferido}>Compartir</Button>
@@ -463,7 +463,7 @@ export default function ClubPage() {
                   {LOGROS_CATALOGO.map((achievement) => {
                     const unlocked = logros.includes(achievement.key);
                     return (
-                      <Col key={achievement.key} span={6} style={{ textAlign: "center" }}>
+                      <Col key={achievement.key} xs={8} sm={6} style={{ textAlign: "center" }}>
                         <Tooltip title={`${achievement.titulo}: ${achievement.desc}`}>
                           <div>
                             <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 4px", background: unlocked ? "linear-gradient(135deg,#fff7e6,#ffe7ba)" : "#f5f5f5", border: `2px solid ${unlocked ? "#faad14" : "#e0e0e0"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, opacity: unlocked ? 1 : 0.35, filter: unlocked ? "none" : "grayscale(100%)", boxShadow: unlocked ? "0 2px 8px rgba(250,173,20,0.35)" : "none" }}>
