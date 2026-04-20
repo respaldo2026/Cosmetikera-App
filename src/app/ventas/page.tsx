@@ -529,7 +529,7 @@ export default function VentasPage() {
                     border: enCarrito ? "2px solid #d81b87" : undefined,
                     transition: "all 0.15s",
                   }}
-                  bodyStyle={{ padding: 8 }}
+                  styles={{ body: { padding: 8 } }}
                   cover={
                     <div style={{
                       height: 80, background: "linear-gradient(135deg,#fce4f8,#f0d6ff)",
@@ -568,7 +568,7 @@ export default function VentasPage() {
   const panelCarrito = (
     <Card
       style={{ borderRadius: 12, height: "100%", display: "flex", flexDirection: "column" }}
-      bodyStyle={{ padding: 12, display: "flex", flexDirection: "column", height: "100%" }}
+      styles={{ body: { padding: 12, display: "flex", flexDirection: "column", height: "100%" } }}
     >
       {/* Cliente */}
       <div style={{ marginBottom: 12 }}>
@@ -678,7 +678,7 @@ export default function VentasPage() {
           <Empty
             image={<ShoppingCartOutlined style={{ fontSize: 40, color: "#ccc" }} />}
             description="Toca un producto para agregar"
-            imageStyle={{ height: 50 }}
+            styles={{ image: { height: 50 } }}
           />
         ) : (
           carrito.map((item) => (
@@ -791,7 +791,7 @@ export default function VentasPage() {
   return (
     <>
       {/* HEADER */}
-      <Card style={{ marginBottom: 12, borderRadius: 12 }} bodyStyle={{ padding: "10px 16px" }}>
+      <Card style={{ marginBottom: 12, borderRadius: 12 }} styles={{ body: { padding: "10px 16px" } }}>
         <Row align="middle" justify="space-between">
           <Col>
             <Space>

@@ -49,8 +49,17 @@ export default function EscanerCodigo({
   // ── Foco automático para lectores USB HID ──────────────────────────────────
   useEffect(() => {
     // Mantener el input enfocado para capturar el lector USB (actúa como teclado)
+    // IMPORTANTE: No robar foco si el usuario está escribiendo en otro input/select
     const intervalo = setInterval(() => {
-      if (!camaraAbierta && document.activeElement !== inputRef.current?.input) {
+      const activeEl = document.activeElement;
+      const esOtroInput =
+        activeEl &&
+        activeEl !== inputRef.current?.input &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          (activeEl as HTMLElement).isContentEditable ||
+          activeEl.closest(".ant-select-dropdown") !== null);
+      if (!camaraAbierta && !esOtroInput) {
         inputRef.current?.focus();
       }
     }, 2000);
