@@ -106,6 +106,7 @@ export default function VentasPage() {
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
   const [nuevoClienteForm] = Form.useForm();
   const [creandoCliente, setCreandoCliente] = useState(false);
+  const [clientesFiltrados, setClientesFiltrados] = useState<Cliente[]>([]);
 
   const subtotalCarrito = carrito.reduce((s, i) => s + i.subtotal, 0);
   const descuentoVal = Math.round(subtotalCarrito * (descuento / 100));
@@ -252,6 +253,7 @@ export default function VentasPage() {
     setPagoMixto({ efectivo: 0, tarjeta: 0, transferencia: 0 });
     setCodigoVoucherClub("");
     setVoucherClub(null);
+    setClientesFiltrados([]);
   };
 
   const procesarVenta = async () => {
@@ -625,16 +627,24 @@ export default function VentasPage() {
               value={clienteId}
               onChange={setClienteId}
               optionLabelProp="label"
-              filterOption={(input, opt) => {
-                const q = input.toLowerCase().trim();
-                if (!q) return true;
-                const c = clientes.find((x) => x.id === opt?.value);
-                if (!c) return false;
-                return (
-                  c.nombre_completo.toLowerCase().includes(q) ||
-                  (c.cedula || "").toLowerCase().includes(q) ||
-                  (c.telefono || "").replace(/\D/g, "").includes(q.replace(/\D/g, ""))
-                );
+              notFoundContent={null}
+              filterOption={false}
+              onSearch={(input) => {
+                const q = input.trim();
+                if (q.length < 3) {
+                  setClientesFiltrados([]);
+                  return;
+                }
+                const ql = q.toLowerCase();
+                const qd = q.replace(/\D/g, "");
+                const matches = clientes
+                  .filter((c) =>
+                    c.nombre_completo.toLowerCase().includes(ql) ||
+                    (c.cedula || "").toLowerCase().includes(ql) ||
+                    (qd && (c.telefono || "").replace(/\D/g, "").includes(qd))
+                  )
+                  .slice(0, 5);
+                setClientesFiltrados(matches);
               }}
               optionRender={(opt) => {
                 const c = clientes.find((x) => x.id === opt.value);
@@ -647,7 +657,7 @@ export default function VentasPage() {
                   </div>
                 );
               }}
-              options={clientes.map((c) => ({ value: c.id, label: c.nombre_completo }))}
+              options={clientesFiltrados.map((c) => ({ value: c.id, label: c.nombre_completo }))}
             />
           </Col>
           <Col>
