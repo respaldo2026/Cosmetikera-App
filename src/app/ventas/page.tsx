@@ -131,20 +131,43 @@ export default function VentasPage() {
     const values = await nuevoClienteForm.validateFields();
     setCreandoCliente(true);
     try {
+      const { codigo_referido, ...clienteData } = values;
       const res = await fetch("/api/perfiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...values, rol: "cliente", activo: true }),
+        body: JSON.stringify({ ...clienteData, rol: "cliente", activo: true }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al crear cliente");
-      message.success(`✅ Cliente ${values.nombre_completo} creado`);
+
+      // Aplicar código de referido si se ingresó
+      const nuevoId = json.data?.id;
+      if (nuevoId && codigo_referido?.trim()) {
+        try {
+          const refRes = await fetch("/api/club/referido", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codigo: codigo_referido.trim().toUpperCase(), nuevoClienteId: nuevoId }),
+          });
+          const refJson = await refRes.json();
+          if (refRes.ok) {
+            message.success(`✅ Cliente creado · +300 pts acreditados a ${refJson.referidor?.nombre}`);
+          } else {
+            message.warning(`Cliente creado, pero el código de referido no pudo aplicarse: ${refJson.error}`);
+          }
+        } catch {
+          message.warning("Cliente creado, pero no se pudo aplicar el código de referido.");
+        }
+      } else {
+        message.success(`✅ Cliente ${values.nombre_completo} creado`);
+      }
+
       setNuevoClienteOpen(false);
       nuevoClienteForm.resetFields();
       const r = await fetch("/api/perfiles?rol=cliente");
       const rj = await r.json();
       setClientes(rj.data || []);
-      if (json.data?.id) setClienteId(json.data.id);
+      if (nuevoId) setClienteId(nuevoId);
     } catch (e: unknown) {
       message.error((e as Error)?.message || "Error al crear cliente");
     } finally {
@@ -1186,6 +1209,20 @@ export default function VentasPage() {
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item
+            name="codigo_referido"
+            label={<Space size={4}><span>¿La refirió alguien?</span><span style={{ color: "#888", fontWeight: 400, fontSize: 12 }}>(opcional)</span></Space>}
+          >
+            <Input
+              placeholder="COSM-XXXXXXXX"
+              style={{ textTransform: "uppercase", letterSpacing: 1 }}
+              onChange={e => {
+                const v = e.target.value.toUpperCase();
+                nuevoClienteForm.setFieldValue("codigo_referido", v);
+              }}
+              suffix={<span style={{ color: "#aaa", fontSize: 11 }}>+300 pts a quien refirió</span>}
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </>

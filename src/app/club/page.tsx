@@ -126,6 +126,9 @@ export default function ClubPage() {
   const [historial, setHistorial] = useState<PuntosLog[]>([]);
   const [canjes, setCanjes] = useState<ClubCanje[]>([]);
   const [error, setError] = useState("");
+  const [codigoReferidoIngresado, setCodigoReferidoIngresado] = useState("");
+  const [aplicandoReferido, setAplicandoReferido] = useState(false);
+  const [referidoAplicado, setReferidoAplicado] = useState(false);
 
   const cargarCanjes = useCallback(async (perfilId: string) => {
     const response = await fetch(`/api/club/canjes?perfil_id=${encodeURIComponent(perfilId)}`);
@@ -155,6 +158,8 @@ export default function ClubPage() {
       if (!res.ok) throw new Error(json.error || "Error");
 
       setCliente(json.data);
+      setReferidoAplicado(false);
+      setCodigoReferidoIngresado("");
 
       const [histRes] = await Promise.all([
         fetch("/api/club", {
@@ -223,6 +228,29 @@ export default function ClubPage() {
     window.open(`https://wa.me/?text=${texto}`, "_blank");
   }, [cliente]);
 
+  const aplicarCodigoReferido = useCallback(async () => {
+    if (!cliente || !codigoReferidoIngresado.trim()) return;
+    setAplicandoReferido(true);
+    try {
+      const res = await fetch("/api/club/referido", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codigo: codigoReferidoIngresado.trim().toUpperCase(),
+          nuevoClienteId: cliente.id,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "No se pudo aplicar el código");
+      setReferidoAplicado(true);
+      message.success(`¡Código aplicado! ${json.referidor?.nombre} recibió 300 puntos 🎉`);
+    } catch (e: any) {
+      message.error(e?.message || "No se pudo aplicar el código de referido");
+    } finally {
+      setAplicandoReferido(false);
+    }
+  }, [cliente, codigoReferidoIngresado, message]);
+
   const nivel = useMemo(() => cliente ? getClubLevel(cliente.puntos_fidelidad || 0) : null, [cliente]);
   const progreso = useMemo(() => cliente ? getClubProgress(cliente.puntos_fidelidad || 0) : null, [cliente]);
   const logros = useMemo(() => cliente ? calcularLogros(cliente) : [], [cliente]);
@@ -289,7 +317,7 @@ export default function ClubPage() {
                   <Text type="secondary" style={{ fontSize: 12 }}>Tu portal ya puede emitir vouchers para usar en caja.</Text>
                   <Button
                     size="small"
-                    onClick={() => { setCliente(null); setCedula(""); setError(""); setHistorial([]); setCanjes([]); }}
+                    onClick={() => { setCliente(null); setCedula(""); setError(""); setHistorial([]); setCanjes([]); setReferidoAplicado(false); setCodigoReferidoIngresado(""); }}
                     style={{ marginTop: 4, color: "#888", borderColor: "#ddd", fontSize: 11 }}
                   >
                     ← Cambiar cédula
@@ -465,6 +493,30 @@ export default function ClubPage() {
                         <Button icon={<CopyOutlined />} onClick={() => copiar(referralCode)}>Copiar código</Button>
                         <Button icon={<ShareAltOutlined />} onClick={compartirReferido}>Compartir</Button>
                       </Space>
+                      <Divider style={{ margin: "8px 0" }} />
+                      <Text type="secondary" style={{ fontSize: 12 }}>¿Alguien te refirió? Ingresa su código y le acreditamos 300 puntos:</Text>
+                      {referidoAplicado ? (
+                        <Tag color="success" style={{ fontSize: 12 }}>✅ Código de referido ya aplicado</Tag>
+                      ) : (
+                        <Space.Compact style={{ width: "100%" }}>
+                          <Input
+                            placeholder="COSM-XXXXXXXX"
+                            value={codigoReferidoIngresado}
+                            onChange={e => setCodigoReferidoIngresado(e.target.value.toUpperCase())}
+                            style={{ textTransform: "uppercase", letterSpacing: 1 }}
+                            maxLength={13}
+                            onPressEnter={aplicarCodigoReferido}
+                          />
+                          <Button
+                            type="primary"
+                            loading={aplicandoReferido}
+                            onClick={aplicarCodigoReferido}
+                            disabled={!codigoReferidoIngresado.trim()}
+                          >
+                            Aplicar
+                          </Button>
+                        </Space.Compact>
+                      )}
                     </Space>
                   </div>
                 </Space>
