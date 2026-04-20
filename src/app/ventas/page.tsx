@@ -592,26 +592,41 @@ export default function VentasPage() {
       styles={{ body: { padding: 12, display: "flex", flexDirection: "column", height: "100%" } }}
     >
       {/* Cliente */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-          <CrownOutlined style={{ color: "#d81b87", fontSize: 13 }} />
-          <Text strong style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#d81b87" }}>
+      <div style={{
+        marginBottom: 12,
+        padding: "10px 12px",
+        borderRadius: 10,
+        background: clienteId
+          ? "linear-gradient(135deg,#f9f0ff,#fff0f6)"
+          : "linear-gradient(135deg,#fff7e6,#fff1f0)",
+        border: `2px solid ${clienteId ? "#d81b87" : "#ffbb96"}`,
+        transition: "all 0.3s",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <CrownOutlined style={{ color: "#d81b87", fontSize: 15 }} />
+          <Text strong style={{ fontSize: 13, color: "#d81b87", letterSpacing: 0.5 }}>
             Cliente · Fidelización
           </Text>
           {!clienteId && carrito.length > 0 && (
-            <Tag color="warning" style={{ fontSize: 10, marginLeft: "auto", cursor: "default" }}>
+            <Tag color="warning" style={{ fontSize: 10, marginLeft: "auto", cursor: "default", fontWeight: 600 }}>
               ⚠ Sin cliente
             </Tag>
           )}
+          {clienteId && (
+            <Tag color="success" style={{ fontSize: 10, marginLeft: "auto", cursor: "default" }}>
+              ✓ Asignado
+            </Tag>
+          )}
         </div>
-        <Row gutter={6} style={{ marginTop: 4 }}>
+        <Row gutter={6}>
           <Col flex="auto">
             <Select
               showSearch
               allowClear
-              placeholder="Buscar por nombre, cédula o teléfono..."
+              placeholder="👤 Buscar por nombre, cédula o teléfono..."
               status={carrito.length > 0 && !clienteId ? "warning" : ""}
-              style={{ width: "100%" }}
+              size="large"
+              style={{ width: "100%", fontSize: 13 }}
               value={clienteId}
               onChange={setClienteId}
               optionLabelProp="label"
@@ -629,8 +644,8 @@ export default function VentasPage() {
               optionRender={(opt) => {
                 const c = clientes.find((x) => x.id === opt.value);
                 return (
-                  <div style={{ lineHeight: 1.3 }}>
-                    <div style={{ fontWeight: 500 }}>{c?.nombre_completo}</div>
+                  <div style={{ lineHeight: 1.4, padding: "2px 0" }}>
+                    <div style={{ fontWeight: 600 }}>{c?.nombre_completo}</div>
                     <div style={{ fontSize: 11, color: "#888" }}>
                       {[c?.cedula ? `CC ${c.cedula}` : null, c?.telefono || null].filter(Boolean).join(" · ")}
                     </div>
@@ -643,9 +658,10 @@ export default function VentasPage() {
           <Col>
             <Tooltip title="Crear nuevo cliente">
               <Button
+                size="large"
                 icon={<PlusOutlined />}
                 onClick={() => setNuevoClienteOpen(true)}
-                style={{ borderColor: "#d81b87", color: "#d81b87" }}
+                style={{ borderColor: "#d81b87", color: "#d81b87", background: "#fff0f6" }}
               />
             </Tooltip>
           </Col>
