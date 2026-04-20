@@ -10,7 +10,7 @@ import {
   ShoppingCartOutlined, SearchOutlined, UserOutlined, PlusOutlined,
   MinusOutlined, DeleteOutlined, CheckOutlined, DollarOutlined,
   CreditCardOutlined, MobileOutlined, BarChartOutlined, TagsOutlined,
-  GiftOutlined, CrownOutlined, ReloadOutlined,
+  GiftOutlined, CrownOutlined, ReloadOutlined, ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
@@ -475,6 +475,27 @@ export default function VentasPage() {
     setImprimiendo(false);
   };
 
+  const handleCobrar = () => {
+    if (!clienteId && carrito.length > 0) {
+      modal.confirm({
+        title: "¿Vender sin cliente?",
+        icon: <ExclamationCircleOutlined style={{ color: "#faad14" }} />,
+        content: (
+          <div>
+            <p>Los <strong>{Math.floor(totalFinal / 1000)} puntos</strong> de esta compra no se acumularán.</p>
+            <p style={{ color: "#888", fontSize: 12 }}>Puedes asignar o crear un cliente en el panel del carrito antes de cobrar.</p>
+          </div>
+        ),
+        okText: "Continuar sin cliente",
+        cancelText: "← Asignar cliente",
+        okButtonProps: { danger: true },
+        onOk: () => setModalPagoOpen(true),
+      });
+    } else {
+      setModalPagoOpen(true);
+    }
+  };
+
   const panelProductos = (
     <div>
       {/* Escáner de código de barras / QR */}
@@ -572,15 +593,24 @@ export default function VentasPage() {
     >
       {/* Cliente */}
       <div style={{ marginBottom: 12 }}>
-        <Text strong style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#888" }}>
-          Cliente
-        </Text>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <CrownOutlined style={{ color: "#d81b87", fontSize: 13 }} />
+          <Text strong style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#d81b87" }}>
+            Cliente · Fidelización
+          </Text>
+          {!clienteId && carrito.length > 0 && (
+            <Tag color="warning" style={{ fontSize: 10, marginLeft: "auto", cursor: "default" }}>
+              ⚠ Sin cliente
+            </Tag>
+          )}
+        </div>
         <Row gutter={6} style={{ marginTop: 4 }}>
           <Col flex="auto">
             <Select
               showSearch
               allowClear
               placeholder="Buscar por nombre, cédula o teléfono..."
+              status={carrito.length > 0 && !clienteId ? "warning" : ""}
               style={{ width: "100%" }}
               value={clienteId}
               onChange={setClienteId}
@@ -645,29 +675,28 @@ export default function VentasPage() {
             </Space>
           </div>
         )}
-        <div style={{ marginTop: 10, padding: "10px", background: voucherClub ? "#f6ffed" : "#fff7fb", borderRadius: 10, border: `1px solid ${voucherClub ? "#b7eb8f" : "#ffd6e7"}` }}>
-          <Text strong style={{ fontSize: 12, display: "block", marginBottom: 8 }}>Voucher Club</Text>
-          <Space.Compact style={{ width: "100%" }}>
-            <Input
-              value={codigoVoucherClub}
-              onChange={(event) => setCodigoVoucherClub(event.target.value.toUpperCase())}
-              placeholder="Ej: CLUB-ABC123"
-              disabled={!!voucherClub}
-            />
-            <Button onClick={voucherClub ? removerVoucherClub : validarVoucherClub} loading={validandoVoucher} style={voucherClub ? undefined : { borderColor: "#d81b87", color: "#d81b87" }}>
-              {voucherClub ? "Quitar" : "Aplicar"}
-            </Button>
-          </Space.Compact>
-          <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 6 }}>
-            Selecciona el cliente y aplica aquí el código emitido desde el portal club.
-          </Text>
-          {voucherClub && (
-            <Space wrap style={{ marginTop: 8 }}>
-              <Tag color="success">{voucherClub.rewardIcon} {voucherClub.rewardTitle}</Tag>
-              <Tag color="green">-${descuentoVoucherClub.toLocaleString()}</Tag>
-            </Space>
-          )}
-        </div>
+        {clienteId && (
+          <div style={{ marginTop: 10, padding: "10px", background: voucherClub ? "#f6ffed" : "#fff7fb", borderRadius: 10, border: `1px solid ${voucherClub ? "#b7eb8f" : "#ffd6e7"}` }}>
+            <Text strong style={{ fontSize: 12, display: "block", marginBottom: 8 }}>Voucher Club</Text>
+            <Space.Compact style={{ width: "100%" }}>
+              <Input
+                value={codigoVoucherClub}
+                onChange={(event) => setCodigoVoucherClub(event.target.value.toUpperCase())}
+                placeholder="Ej: CLUB-ABC123"
+                disabled={!!voucherClub}
+              />
+              <Button onClick={voucherClub ? removerVoucherClub : validarVoucherClub} loading={validandoVoucher} style={voucherClub ? undefined : { borderColor: "#d81b87", color: "#d81b87" }}>
+                {voucherClub ? "Quitar" : "Aplicar"}
+              </Button>
+            </Space.Compact>
+            {voucherClub && (
+              <Space wrap style={{ marginTop: 8 }}>
+                <Tag color="success">{voucherClub.rewardIcon} {voucherClub.rewardTitle}</Tag>
+                <Tag color="green">-${descuentoVoucherClub.toLocaleString()}</Tag>
+              </Space>
+            )}
+          </div>
+        )}
       </div>
 
       <Divider style={{ margin: "8px 0" }} />
@@ -768,6 +797,39 @@ export default function VentasPage() {
         </div>
       </div>
 
+      {/* Preview fidelización */}
+      {carrito.length > 0 && (
+        clienteId && clienteSeleccionado ? (
+          <div style={{
+            marginBottom: 10, padding: "8px 12px",
+            background: "linear-gradient(90deg,#f9f0ff,#fff0f6)",
+            borderRadius: 8, border: "1px solid #d3adf7",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <GiftOutlined style={{ color: "#722ed1", fontSize: 16, flexShrink: 0 }} />
+            <div>
+              <Text style={{ fontSize: 12, color: "#722ed1", fontWeight: 600, display: "block" }}>
+                +{Math.floor(totalFinal / 1000)} puntos en esta compra
+              </Text>
+              <Text style={{ fontSize: 11, color: "#888" }}>
+                Total acumulado: {Number(clienteSeleccionado.puntos_fidelidad || 0) + Math.floor(totalFinal / 1000)} pts · {getNivelFidelidad(Number(clienteSeleccionado.puntos_fidelidad || 0) + Math.floor(totalFinal / 1000))}
+              </Text>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            marginBottom: 10, padding: "8px 12px",
+            background: "#fffbe6", borderRadius: 8, border: "1px solid #ffe58f",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <ExclamationCircleOutlined style={{ color: "#faad14", fontSize: 14, flexShrink: 0 }} />
+            <Text style={{ fontSize: 11, color: "#ad6800" }}>
+              Asigna un cliente para acumular <strong>{Math.floor(totalFinal / 1000)} puntos</strong>
+            </Text>
+          </div>
+        )
+      )}
+
       {/* Botones */}
       <Space direction="vertical" style={{ width: "100%" }}>
         <Button
@@ -776,7 +838,7 @@ export default function VentasPage() {
           block
           icon={<CheckOutlined />}
           disabled={carrito.length === 0}
-          onClick={() => setModalPagoOpen(true)}
+          onClick={handleCobrar}
           style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)", border: "none", height: 44 }}
         >
           Cobrar ${totalFinal.toLocaleString()}
