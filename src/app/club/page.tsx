@@ -242,26 +242,32 @@ export default function ClubPage() {
         <Text type="secondary">Puntos, recompensas, vouchers y campañas activas del club</Text>
       </div>
 
-      <Card style={{ width: "100%", maxWidth: 560, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 24 }}>
-        <Title level={5} style={{ marginTop: 0 }}>Consulta y canjea tus beneficios</Title>
-        <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>Ingresa tu cédula para abrir tu wallet del club</Text>
-        <Form onFinish={buscar}>
-          <Space.Compact style={{ width: "100%" }}>
-            <Input
-              prefix={<SearchOutlined style={{ color: "#d81b87" }} />}
-              placeholder="Ej: 1234567890"
-              value={cedula}
-              onChange={(event) => setCedula(event.target.value.replace(/\D/g, ""))}
-              size="large"
-              maxLength={12}
-            />
-            <Button type="primary" size="large" loading={buscando} onClick={buscar} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
-              Buscar
-            </Button>
-          </Space.Compact>
-        </Form>
-        {error && <Alert type="warning" message={error} showIcon style={{ marginTop: 12, borderRadius: 8 }} />}
-      </Card>
+      {!cliente && (
+        <Card style={{ width: "100%", maxWidth: 560, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 24 }}>
+          <Title level={5} style={{ marginTop: 0 }}>Consulta y canjea tus beneficios</Title>
+          <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>Ingresa tu cédula para abrir tu wallet del club</Text>
+          <Form onFinish={buscar}>
+            <Space.Compact style={{ width: "100%" }}>
+              <Input
+                prefix={<SearchOutlined style={{ color: "#d81b87" }} />}
+                placeholder="Ej: 1234567890"
+                value={cedula}
+                onChange={(event) => setCedula(event.target.value.replace(/\D/g, ""))}
+                size="large"
+                maxLength={12}
+              />
+              <Button type="primary" size="large" loading={buscando} onClick={buscar} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
+                Buscar
+              </Button>
+            </Space.Compact>
+          </Form>
+          {error && <Alert type="warning" message={error} showIcon style={{ marginTop: 12, borderRadius: 8 }} />}
+        </Card>
+      )}
+
+      {error && cliente === null && !buscando && cedula && (
+        <Alert type="warning" message={error} showIcon style={{ width: "100%", maxWidth: 560, marginBottom: 16, borderRadius: 8 }} />
+      )}
 
       {buscando && <Spin size="large" style={{ margin: "32px 0" }} />}
 
@@ -281,6 +287,13 @@ export default function ClubPage() {
                   </Space>
                   {cliente.cedula && <Text type="secondary" style={{ fontSize: 12 }}>CC: {cliente.cedula}</Text>}
                   <Text type="secondary" style={{ fontSize: 12 }}>Tu portal ya puede emitir vouchers para usar en caja.</Text>
+                  <Button
+                    size="small"
+                    onClick={() => { setCliente(null); setCedula(""); setError(""); setHistorial([]); setCanjes([]); }}
+                    style={{ marginTop: 4, color: "#888", borderColor: "#ddd", fontSize: 11 }}
+                  >
+                    ← Cambiar cédula
+                  </Button>
                 </Space>
               </Col>
             </Row>
