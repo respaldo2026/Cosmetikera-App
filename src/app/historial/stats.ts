@@ -55,6 +55,19 @@ export type HistorialStatsReport = {
   ventasPorFormaPago: SerieDato[];
 };
 
+export type RangeBounds = {
+  start: dayjs.Dayjs;
+  end: dayjs.Dayjs;
+  label: string;
+};
+
+export type ComparisonMetric = {
+  current: number;
+  previous: number;
+  delta: number;
+  deltaPercent: number | null;
+};
+
 const DIAS_SEMANA = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
 
 function normalizeMetodoPago(value?: string | null) {
@@ -69,6 +82,104 @@ function normalizeMetodoPago(value?: string | null) {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+export function buildEmptyHistorialStats(): HistorialStatsReport {
+  return {
+    totalVentas: 0,
+    totalFacturado: 0,
+    beneficioTotal: 0,
+    ticketPromedio: 0,
+    unidadesVendidas: 0,
+    topProductos: [],
+    topCategorias: [],
+    topClientes: [],
+    ventasPorCliente: [],
+    ventasPorDiaSemana: [],
+    ventasPorMes: [],
+    beneficioPorCategoria: [],
+    ventasPorFormaPago: [],
+  };
+}
+
+export function buildComparisonMetric(current: number, previous: number): ComparisonMetric {
+  const safeCurrent = round2(current);
+  const safePrevious = round2(previous);
+  const delta = round2(safeCurrent - safePrevious);
+  const deltaPercent = safePrevious === 0 ? (safeCurrent === 0 ? 0 : null) : round2((delta / safePrevious) * 100);
+
+  return {
+    current: safeCurrent,
+    previous: safePrevious,
+    delta,
+    deltaPercent,
+  };
+}
+
+export function getCurrentAndPreviousRanges(
+  periodo: "hoy" | "semana" | "mes" | "personalizado" | "todo",
+  rango: [dayjs.Dayjs, dayjs.Dayjs] | null,
+  now = dayjs()
+): { current: RangeBounds | null; previous: RangeBounds | null } {
+  if (periodo === "todo") {
+    return { current: null, previous: null };
+  }
+
+  if (periodo === "hoy") {
+    const start = now.startOf("day");
+    const end = now.endOf("day");
+    return {
+      current: { start, end, label: "Hoy" },
+      previous: {
+        start: start.subtract(1, "day"),
+        end: end.subtract(1, "day"),
+        label: "Ayer",
+      },
+    };
+  }
+
+  if (periodo === "semana") {
+    const start = now.startOf("week");
+    const end = now.endOf("week");
+    return {
+      current: { start, end, label: "Esta semana" },
+      previous: {
+        start: start.subtract(1, "week"),
+        end: end.subtract(1, "week"),
+        label: "Semana anterior",
+      },
+    };
+  }
+
+  if (periodo === "mes") {
+    const start = now.startOf("month");
+    const end = now.endOf("month");
+    return {
+      current: { start, end, label: "Este mes" },
+      previous: {
+        start: start.subtract(1, "month"),
+        end: end.subtract(1, "month"),
+        label: "Mes anterior",
+      },
+    };
+  }
+
+  if (!rango) {
+    return { current: null, previous: null };
+  }
+
+  const start = rango[0].startOf("day");
+  const end = rango[1].endOf("day");
+  const durationDays = Math.max(1, end.diff(start, "day") + 1);
+
+  return {
+    current: { start, end, label: "Periodo actual" },
+    previous: {
+      start: start.subtract(durationDays, "day"),
+      end: start.subtract(1, "millisecond"),
+      label: "Periodo anterior equivalente",
+    },
+  };
 }
 
 function toTopSeries(map: Map<string, { value: number; count: number }>, limit = 10): SerieDobleDato[] {

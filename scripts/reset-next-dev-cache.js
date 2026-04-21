@@ -39,7 +39,7 @@ async function removeIfExists(targetPath) {
 
 async function main() {
   const projectRoot = path.resolve(__dirname, "..");
-  const nextDir = path.join(projectRoot, ".next");
+  const nextDir = path.join(projectRoot, ".next-dev");
 
   const devServerBusy = await isPortBusy(3001);
   if (devServerBusy) {

@@ -28,6 +28,7 @@ import {
 import {
   FilePdfOutlined,
   ArrowDownOutlined,
+  ArrowRightOutlined,
   ArrowUpOutlined,
   CreditCardOutlined,
   DollarOutlined,
@@ -43,7 +44,7 @@ import {
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { parseRewardCanjeDescription } from "@/constants/clubRewards";
-import { buildHistorialStats } from "./stats";
+import { buildComparisonMetric, buildHistorialStats, getCurrentAndPreviousRanges } from "./stats";
 import { descargarInformeHistorialPDF } from "@/utils/historial-report";
 
 const HistorialCharts = dynamic(() => import("./HistorialCharts"), {
@@ -285,6 +286,24 @@ function matchesPeriodo(fecha: string, periodo: PeriodoRapido, rango: [Dayjs, Da
   return current.isAfter(rango[0].startOf("day").subtract(1, "millisecond")) && current.isBefore(rango[1].endOf("day").add(1, "millisecond"));
 }
 
+function matchesExplicitRange(fecha: string, range: { start: Dayjs; end: Dayjs } | null) {
+  if (!range) return true;
+  const current = dayjs(fecha);
+  if (!current.isValid()) return false;
+  return current.isAfter(range.start.subtract(1, "millisecond")) && current.isBefore(range.end.add(1, "millisecond"));
+}
+
+function formatDelta(value: number) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toLocaleString()}`;
+}
+
+function formatPercent(value: number | null) {
+  if (value === null) return "Nuevo";
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toLocaleString()}%`;
+}
+
 export default function HistorialPage() {
   const { message } = App.useApp();
   const screens = useBreakpoint();
@@ -446,13 +465,12 @@ export default function HistorialPage() {
     );
   }, [data]);
 
-  const operacionesFiltradas = useMemo(() => {
+  const operacionesBaseFiltradas = useMemo(() => {
     const query = search.trim().toLowerCase();
 
     return operaciones.filter((operacion) => {
       const matchTipo = !tipoFiltro || operacion.tipo === tipoFiltro;
       const matchDireccion = !direccionFiltro || operacion.direccion === direccionFiltro;
-      const matchPeriodo = matchesPeriodo(operacion.fecha, periodo, rango);
       const metodo = parseMetodoPago(operacion.metodoPago).label.toLowerCase();
       const target = [
         operacion.titulo,
@@ -464,9 +482,36 @@ export default function HistorialPage() {
       ].join(" ").toLowerCase();
       const matchSearch = !query || target.includes(query);
 
-      return matchTipo && matchDireccion && matchPeriodo && matchSearch;
+      return matchTipo && matchDireccion && matchSearch;
     });
-  }, [direccionFiltro, operaciones, periodo, rango, search, tipoFiltro]);
+  }, [direccionFiltro, operaciones, search, tipoFiltro]);
+
+  const periodRanges = useMemo(
+    () => getCurrentAndPreviousRanges(periodo, rango),
+    [periodo, rango]
+  );
+
+  const operacionesFiltradas = useMemo(
+    () => operacionesBaseFiltradas.filter((operacion) => matchesPeriodo(operacion.fecha, periodo, rango)),
+    [operacionesBaseFiltradas, periodo, rango]
+  );
+
+  const ventasBaseFiltradas = useMemo(
+    () => operacionesBaseFiltradas.filter((item) => item.tipo === "venta"),
+    [operacionesBaseFiltradas]
+  );
+
+  const ventasFiltradas = useMemo(
+    () => ventasBaseFiltradas.filter((item) => matchesPeriodo(item.fecha, periodo, rango)),
+    [periodo, rango, ventasBaseFiltradas]
+  );
+
+  const ventasPeriodoAnterior = useMemo(
+    () => periodRanges.previous
+      ? ventasBaseFiltradas.filter((item) => matchesExplicitRange(item.fecha, periodRanges.previous))
+      : [],
+    [periodRanges.previous, ventasBaseFiltradas]
+  );
 
   const stats = useMemo(() => {
     const entradas = operacionesFiltradas
@@ -499,15 +544,22 @@ export default function HistorialPage() {
     };
   }, [operacionesFiltradas]);
 
-  const ventasFiltradas = useMemo(
-    () => operacionesFiltradas.filter((item) => item.tipo === "venta"),
-    [operacionesFiltradas]
-  );
-
   const salesStats = useMemo(
     () => buildHistorialStats(ventasFiltradas, data.articulos),
     [data.articulos, ventasFiltradas]
   );
+
+  const previousSalesStats = useMemo(
+    () => buildHistorialStats(ventasPeriodoAnterior, data.articulos),
+    [data.articulos, ventasPeriodoAnterior]
+  );
+
+  const comparison = useMemo(() => ({
+    totalVentas: buildComparisonMetric(salesStats.totalVentas, previousSalesStats.totalVentas),
+    totalFacturado: buildComparisonMetric(salesStats.totalFacturado, previousSalesStats.totalFacturado),
+    beneficioTotal: buildComparisonMetric(salesStats.beneficioTotal, previousSalesStats.beneficioTotal),
+    ticketPromedio: buildComparisonMetric(salesStats.ticketPromedio, previousSalesStats.ticketPromedio),
+  }), [previousSalesStats, salesStats]);
 
   const filtrosResumen = useMemo(() => {
     const partes = [
@@ -718,6 +770,75 @@ export default function HistorialPage() {
           </Card>
         </Col>
       </Row>
+
+      {periodRanges.previous ? (
+        <Card style={{ marginBottom: 16, borderRadius: 12 }} styles={{ body: { padding: "14px 16px" } }}>
+          <Space direction="vertical" size={14} style={{ width: "100%" }}>
+            <div>
+              <Title level={5} style={{ marginBottom: 4 }}>Comparacion de periodos</Title>
+              <Text type="secondary">
+                {periodRanges.current?.label || "Periodo actual"} frente a {periodRanges.previous.label} con los mismos filtros activos.
+              </Text>
+            </div>
+
+            <Row gutter={[12, 12]}>
+              <Col xs={24} md={12} xl={6}>
+                <Card size="small" style={{ borderRadius: 10 }}>
+                  <Statistic title="Ventas" value={comparison.totalVentas.current} suffix={<Text type="secondary">vs {comparison.totalVentas.previous}</Text>} />
+                  <div style={{ marginTop: 8 }}>
+                    <Text style={{ color: comparison.totalVentas.delta >= 0 ? "#389e0d" : "#cf1322" }}>
+                      {comparison.totalVentas.delta >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />} {formatDelta(comparison.totalVentas.delta)}
+                    </Text>
+                    <Text type="secondary"> <ArrowRightOutlined /> {formatPercent(comparison.totalVentas.deltaPercent)}</Text>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24} md={12} xl={6}>
+                <Card size="small" style={{ borderRadius: 10 }}>
+                  <Statistic title="Facturacion" value={comparison.totalFacturado.current} formatter={(value) => formatMoney(Number(value || 0))} />
+                  <div style={{ marginTop: 8 }}>
+                    <Text type="secondary">Anterior: {formatMoney(comparison.totalFacturado.previous)}</Text>
+                  </div>
+                  <div>
+                    <Text style={{ color: comparison.totalFacturado.delta >= 0 ? "#389e0d" : "#cf1322" }}>
+                      {comparison.totalFacturado.delta >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />} {formatMoney(comparison.totalFacturado.delta)}
+                    </Text>
+                    <Text type="secondary"> <ArrowRightOutlined /> {formatPercent(comparison.totalFacturado.deltaPercent)}</Text>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24} md={12} xl={6}>
+                <Card size="small" style={{ borderRadius: 10 }}>
+                  <Statistic title="Beneficio" value={comparison.beneficioTotal.current} formatter={(value) => formatMoney(Number(value || 0))} />
+                  <div style={{ marginTop: 8 }}>
+                    <Text type="secondary">Anterior: {formatMoney(comparison.beneficioTotal.previous)}</Text>
+                  </div>
+                  <div>
+                    <Text style={{ color: comparison.beneficioTotal.delta >= 0 ? "#389e0d" : "#cf1322" }}>
+                      {comparison.beneficioTotal.delta >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />} {formatMoney(comparison.beneficioTotal.delta)}
+                    </Text>
+                    <Text type="secondary"> <ArrowRightOutlined /> {formatPercent(comparison.beneficioTotal.deltaPercent)}</Text>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24} md={12} xl={6}>
+                <Card size="small" style={{ borderRadius: 10 }}>
+                  <Statistic title="Ticket promedio" value={comparison.ticketPromedio.current} formatter={(value) => formatMoney(Number(value || 0))} />
+                  <div style={{ marginTop: 8 }}>
+                    <Text type="secondary">Anterior: {formatMoney(comparison.ticketPromedio.previous)}</Text>
+                  </div>
+                  <div>
+                    <Text style={{ color: comparison.ticketPromedio.delta >= 0 ? "#389e0d" : "#cf1322" }}>
+                      {comparison.ticketPromedio.delta >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />} {formatMoney(comparison.ticketPromedio.delta)}
+                    </Text>
+                    <Text type="secondary"> <ArrowRightOutlined /> {formatPercent(comparison.ticketPromedio.deltaPercent)}</Text>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          </Space>
+        </Card>
+      ) : null}
 
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={12} lg={4}>

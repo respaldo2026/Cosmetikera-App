@@ -11,7 +11,7 @@ export async function descargarInformeHistorialPDF(stats: HistorialStatsReport, 
     stats,
     generatedAt,
     filtersSummary,
-  });
+  }) as React.ReactElement<any>;
   const blob = await pdf(doc).toBlob();
   const url = URL.createObjectURL(blob);
 
