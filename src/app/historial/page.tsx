@@ -325,6 +325,7 @@ export default function HistorialPage() {
   const [periodo, setPeriodo] = useState<PeriodoRapido>("mes");
   const [rango, setRango] = useState<[Dayjs, Dayjs] | null>(null);
   const [detalle, setDetalle] = useState<HistorialEntry | null>(null);
+  const [mostrarGraficas, setMostrarGraficas] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -574,6 +575,13 @@ export default function HistorialPage() {
 
     return partes.join(" | ") || "Sin filtros";
   }, [direccionFiltro, periodo, rango, search, tipoFiltro]);
+
+  const hayFiltrosActivos = useMemo(
+    () => Boolean(search.trim()) || Boolean(tipoFiltro) || Boolean(direccionFiltro) || periodo !== "mes" || Boolean(rango),
+    [direccionFiltro, periodo, rango, search, tipoFiltro]
+  );
+
+  const mostrarSeccionGraficas = mostrarGraficas || hayFiltrosActivos;
 
   const exportarPDF = useCallback(async () => {
     if (salesStats.totalVentas === 0) {
@@ -930,6 +938,14 @@ export default function HistorialPage() {
           ) : null}
         </Row>
         <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
+          <Button onClick={() => setMostrarGraficas((current) => !current)}>
+            {mostrarSeccionGraficas ? "Ocultar gráficas" : "Mostrar gráficas"}
+          </Button>
+          {!hayFiltrosActivos ? (
+            <Text type="secondary">Las gráficas se muestran cuando las abres manualmente o cuando aplicas filtros.</Text>
+          ) : null}
+        </Space>
+        <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
           <Tag color="magenta">Ventas: {stats.resumen.ventas}</Tag>
           <Tag color="blue">Compras: {stats.resumen.compras}</Tag>
           <Tag color="geekblue">Caja: {stats.resumen.movimientos}</Tag>
@@ -957,7 +973,7 @@ export default function HistorialPage() {
         )}
       </Card>
 
-      <HistorialCharts stats={salesStats} />
+      {mostrarSeccionGraficas ? <HistorialCharts stats={salesStats} /> : null}
 
       <Modal
         open={!!detalle}
