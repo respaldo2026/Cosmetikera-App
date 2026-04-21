@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const supabase = getAdminClient();
 
-    const [ventasRes, comprasRes, movimientosRes, puntosRes, canjesRes, perfilesRes] = await Promise.all([
+    const [ventasRes, comprasRes, movimientosRes, puntosRes, canjesRes, perfilesRes, articulosRes] = await Promise.all([
       supabase
         .from("ventas")
         .select("id,fecha,total,subtotal,descuento,metodo_pago,cliente_id,items,cliente:perfiles(nombre_completo,cedula)")
@@ -45,9 +45,14 @@ export async function GET() {
         .select("id,nombre_completo,cedula")
         .order("nombre_completo")
         .limit(2000),
+      supabase
+        .from("articulos")
+        .select("id,nombre,categoria,marca,precio_costo,precio_venta")
+        .order("nombre")
+        .limit(3000),
     ]);
 
-    const errors = [ventasRes.error, comprasRes.error, movimientosRes.error, puntosRes.error, canjesRes.error, perfilesRes.error].filter(Boolean);
+    const errors = [ventasRes.error, comprasRes.error, movimientosRes.error, puntosRes.error, canjesRes.error, perfilesRes.error, articulosRes.error].filter(Boolean);
     if (errors.length > 0) {
       return NextResponse.json(
         { error: errors.map((error: any) => error.message).join(" | ") },
@@ -62,6 +67,7 @@ export async function GET() {
       puntos: puntosRes.data ?? [],
       canjes: canjesRes.data ?? [],
       perfiles: perfilesRes.data ?? [],
+      articulos: articulosRes.data ?? [],
     });
   } catch (error: unknown) {
     return NextResponse.json(

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   App,
   Avatar,
@@ -25,6 +26,7 @@ import {
   Typography,
 } from "antd";
 import {
+  FilePdfOutlined,
   ArrowDownOutlined,
   ArrowUpOutlined,
   CreditCardOutlined,
@@ -41,12 +43,26 @@ import {
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { parseRewardCanjeDescription } from "@/constants/clubRewards";
+import { buildHistorialStats } from "./stats";
+import { descargarInformeHistorialPDF } from "@/utils/historial-report";
+
+const HistorialCharts = dynamic(() => import("./HistorialCharts"), {
+  ssr: false,
+  loading: () => (
+    <Card style={{ marginTop: 16, borderRadius: 12 }}>
+      <div style={{ textAlign: "center", padding: 32 }}>
+        <Spin size="large" />
+      </div>
+    </Card>
+  ),
+});
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { useBreakpoint } = Grid;
 
 type VentaItem = {
+  id?: string;
   nombre: string;
   cantidad: number;
   precio?: number;
@@ -121,6 +137,15 @@ type Perfil = {
   cedula?: string | null;
 };
 
+type ArticuloCatalogo = {
+  id: string;
+  nombre: string;
+  categoria?: string | null;
+  marca?: string | null;
+  precio_costo?: number | null;
+  precio_venta?: number | null;
+};
+
 type HistorialPayload = {
   ventas: Venta[];
   compras: Compra[];
@@ -128,6 +153,7 @@ type HistorialPayload = {
   puntos: Punto[];
   canjes: Canje[];
   perfiles: Perfil[];
+  articulos: ArticuloCatalogo[];
 };
 
 type TipoOperacion = "venta" | "compra" | "movimiento" | "puntos" | "voucher";
@@ -271,6 +297,7 @@ export default function HistorialPage() {
     puntos: [],
     canjes: [],
     perfiles: [],
+    articulos: [],
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -296,6 +323,7 @@ export default function HistorialPage() {
         puntos: json.puntos || [],
         canjes: json.canjes || [],
         perfiles: json.perfiles || [],
+        articulos: json.articulos || [],
       });
     } catch (error) {
       message.error(error instanceof Error ? error.message : "No se pudo cargar el historial");
@@ -471,6 +499,48 @@ export default function HistorialPage() {
     };
   }, [operacionesFiltradas]);
 
+  const ventasFiltradas = useMemo(
+    () => operacionesFiltradas.filter((item) => item.tipo === "venta"),
+    [operacionesFiltradas]
+  );
+
+  const salesStats = useMemo(
+    () => buildHistorialStats(ventasFiltradas, data.articulos),
+    [data.articulos, ventasFiltradas]
+  );
+
+  const filtrosResumen = useMemo(() => {
+    const partes = [
+      `Periodo: ${periodo}`,
+      tipoFiltro ? `Tipo: ${TIPO_META[tipoFiltro].label}` : null,
+      direccionFiltro ? `Direccion: ${direccionFiltro}` : null,
+      search ? `Busqueda: ${search}` : null,
+      periodo === "personalizado" && rango
+        ? `Rango: ${rango[0].format("DD/MM/YYYY")} - ${rango[1].format("DD/MM/YYYY")}`
+        : null,
+    ].filter(Boolean);
+
+    return partes.join(" | ") || "Sin filtros";
+  }, [direccionFiltro, periodo, rango, search, tipoFiltro]);
+
+  const exportarPDF = useCallback(async () => {
+    if (salesStats.totalVentas === 0) {
+      message.warning("No hay ventas en el filtro actual para generar el informe.");
+      return;
+    }
+
+    try {
+      await descargarInformeHistorialPDF(
+        salesStats,
+        dayjs().format("DD/MM/YYYY HH:mm"),
+        filtrosResumen
+      );
+      message.success("Informe estadistico generado en PDF");
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "No se pudo generar el PDF");
+    }
+  }, [filtrosResumen, message, salesStats]);
+
   const columns = [
     {
       title: "Fecha",
@@ -604,9 +674,14 @@ export default function HistorialPage() {
             </Space>
           </Col>
           <Col>
-            <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading}>
-              Actualizar
-            </Button>
+            <Space>
+              <Button icon={<FilePdfOutlined />} onClick={exportarPDF} disabled={salesStats.totalVentas === 0}>
+                PDF estadistico
+              </Button>
+              <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading}>
+                Actualizar
+              </Button>
+            </Space>
           </Col>
         </Row>
       </Card>
@@ -640,6 +715,34 @@ export default function HistorialPage() {
         <Col xs={12} lg={4}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
             <Statistic title="Clientes que compraron" value={stats.clientesConCompra} prefix={<UserOutlined />} />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Col xs={12} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic title="Numero de ventas" value={salesStats.totalVentas} prefix={<ShoppingCartOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={12} lg={5}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic title="Facturacion" value={salesStats.totalFacturado} formatter={(value) => formatMoney(Number(value || 0))} valueStyle={{ color: "#d81b87" }} />
+          </Card>
+        </Col>
+        <Col xs={12} lg={5}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic title="Beneficio" value={salesStats.beneficioTotal} formatter={(value) => formatMoney(Number(value || 0))} valueStyle={{ color: salesStats.beneficioTotal >= 0 ? "#389e0d" : "#cf1322" }} />
+          </Card>
+        </Col>
+        <Col xs={12} lg={5}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic title="Ticket promedio" value={salesStats.ticketPromedio} formatter={(value) => formatMoney(Number(value || 0))} />
+          </Card>
+        </Col>
+        <Col xs={12} lg={5}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic title="Unidades vendidas" value={salesStats.unidadesVendidas} />
           </Card>
         </Col>
       </Row>
@@ -732,6 +835,8 @@ export default function HistorialPage() {
           />
         )}
       </Card>
+
+      <HistorialCharts stats={salesStats} />
 
       <Modal
         open={!!detalle}
