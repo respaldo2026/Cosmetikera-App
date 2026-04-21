@@ -5,12 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Card, Tabs, Typography, Space, Button, Spin, Row, Col,
   Statistic, Tag, Table, Avatar, Empty, Form, Input,
-  InputNumber, Badge, Descriptions, App,
+  InputNumber, Badge, Descriptions, App, Switch,
 } from "antd";
 import {
   ArrowLeftOutlined, TagsOutlined, ShoppingOutlined,
   UserOutlined, GiftOutlined, HistoryOutlined, EditOutlined,
-  SaveOutlined, ShopOutlined,
+  SaveOutlined, ShopOutlined, BarcodeOutlined, CameraOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
@@ -22,6 +22,7 @@ type Articulo = {
   id: string;
   nombre: string;
   referencia?: string;
+  codigo_secundario?: string;
   categoria?: string;
   precio_venta: number;
   precio_costo?: number;
@@ -58,7 +59,10 @@ export default function ArticuloDetallePage() {
   const [loadingVentas, setLoadingVentas] = useState(false);
   const [editandoPromo, setEditandoPromo] = useState(false);
   const [savingPromo, setSavingPromo] = useState(false);
+  const [editandoFicha, setEditandoFicha] = useState(false);
+  const [savingFicha, setSavingFicha] = useState(false);
   const [formPromo] = Form.useForm();
+  const [formFicha] = Form.useForm();
 
   const cargarArticulo = useCallback(async () => {
     const { data, error } = await supabaseBrowserClient
@@ -66,9 +70,12 @@ export default function ArticuloDetallePage() {
       .select("*")
       .eq("id", id)
       .single();
-    if (!error && data) setArticulo(data as Articulo);
+    if (!error && data) {
+      setArticulo(data as Articulo);
+      formFicha.setFieldsValue(data);
+    }
     setLoading(false);
-  }, [id]);
+  }, [formFicha, id]);
 
   const cargarVentas = useCallback(async () => {
     setLoadingVentas(true);
@@ -130,6 +137,37 @@ export default function ArticuloDetallePage() {
       message.error(e?.message || "Error al guardar la promoción");
     } finally {
       setSavingPromo(false);
+    }
+  };
+
+  const guardarFicha = async () => {
+    const values = await formFicha.validateFields();
+    setSavingFicha(true);
+    try {
+      const { error } = await supabaseBrowserClient
+        .from("articulos")
+        .update({
+          ...values,
+          referencia: values.referencia || null,
+          codigo_secundario: values.codigo_secundario || null,
+          categoria: values.categoria || null,
+          marca: values.marca || null,
+          precio_costo: values.precio_costo ?? null,
+          stock_minimo: values.stock_minimo ?? null,
+          descripcion: values.descripcion || null,
+          imagen_url: values.imagen_url || null,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      message.success("Ficha del artículo actualizada");
+      setEditandoFicha(false);
+      cargarArticulo();
+    } catch (error) {
+      message.error((error instanceof Error ? error.message : "Error al guardar el artículo"));
+    } finally {
+      setSavingFicha(false);
     }
   };
 
@@ -227,6 +265,24 @@ export default function ArticuloDetallePage() {
               </div>
             </Space>
           </Col>
+          <Col>
+            <Button
+              type="primary"
+              icon={editandoFicha ? <SaveOutlined /> : <EditOutlined />}
+              loading={savingFicha}
+              onClick={() => {
+                if (editandoFicha) {
+                  guardarFicha();
+                  return;
+                }
+                formFicha.setFieldsValue(articulo);
+                setEditandoFicha(true);
+              }}
+              style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)" }}
+            >
+              {editandoFicha ? "Guardar cambios" : "Editar artículo"}
+            </Button>
+          </Col>
         </Row>
       </Card>
 
@@ -291,63 +347,145 @@ export default function ArticuloDetallePage() {
               key: "ficha",
               label: <Space><TagsOutlined />Ficha</Space>,
               children: (
-                <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
-                  <Descriptions.Item label="Nombre">{articulo.nombre}</Descriptions.Item>
-                  <Descriptions.Item label="Referencia / SKU">
-                    {articulo.referencia || <Text type="secondary">—</Text>}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Categoría">
-                    {articulo.categoria ? <Tag color="purple">{articulo.categoria}</Tag> : <Text type="secondary">—</Text>}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Marca">
-                    {articulo.marca || <Text type="secondary">—</Text>}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Precio de venta">
-                    <Text strong style={{ color: "#d81b87" }}>
-                      ${Number(articulo.precio_venta).toLocaleString()}
-                    </Text>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Precio de costo">
-                    {articulo.precio_costo
-                      ? `$${Number(articulo.precio_costo).toLocaleString()}`
-                      : <Text type="secondary">—</Text>}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Margen de ganancia">
-                    {articulo.precio_costo && articulo.precio_costo > 0 ? (
-                      <Tag color="blue">
-                        {(((articulo.precio_venta - articulo.precio_costo) / articulo.precio_costo) * 100).toFixed(1)}%
-                      </Tag>
-                    ) : <Text type="secondary">—</Text>}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Estado">
-                    {articulo.activo !== false
-                      ? <Tag color="success">Activo</Tag>
-                      : <Tag color="error">Inactivo</Tag>}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Stock actual">
+                editandoFicha ? (
+                  <Form form={formFicha} layout="vertical">
+                    <Row gutter={16}>
+                      <Col xs={24} md={16}>
+                        <Form.Item name="nombre" label="Nombre del artículo" rules={[{ required: true, message: "Requerido" }]}>
+                          <Input placeholder="Ej: Esmalte Base Coat 15ml" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="referencia" label="Código principal">
+                          <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="codigo_secundario" label="Referencia / 2° código">
+                          <Input placeholder="REF-001" prefix={<BarcodeOutlined />} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="categoria" label="Categoría">
+                          <Input placeholder="Ej: Esmaltes" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="marca" label="Marca">
+                          <Input placeholder="Ej: OPI" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="precio_venta" label="Precio de venta" rules={[{ required: true, message: "Requerido" }]}>
+                          <InputNumber min={0} style={{ width: "100%" }} addonBefore="$" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="precio_costo" label="Precio de costo">
+                          <InputNumber min={0} style={{ width: "100%" }} addonBefore="$" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="stock" label="Stock actual" rules={[{ required: true, message: "Requerido" }]}>
+                          <InputNumber min={0} style={{ width: "100%" }} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="stock_minimo" label="Stock mínimo">
+                          <InputNumber min={0} style={{ width: "100%" }} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item name="imagen_url" label="URL imagen">
+                          <Input placeholder="https://..." prefix={<CameraOutlined />} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={4}>
+                        <Form.Item name="activo" label="Activo" valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Form.Item name="descripcion" label="Descripción">
+                      <Input.TextArea rows={3} placeholder="Notas del producto..." />
+                    </Form.Item>
                     <Space>
-                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: getStockColor(articulo) }} />
-                      <Text strong>{articulo.stock} unidades</Text>
+                      <Button type="primary" icon={<SaveOutlined />} loading={savingFicha} onClick={guardarFicha} style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)" }}>
+                        Guardar cambios
+                      </Button>
+                      <Button onClick={() => { formFicha.setFieldsValue(articulo); setEditandoFicha(false); }}>
+                        Cancelar
+                      </Button>
                     </Space>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Stock mínimo">
-                    {articulo.stock_minimo ?? 3} unidades
-                  </Descriptions.Item>
-                  {articulo.descripcion && (
-                    <Descriptions.Item label="Descripción" span={2}>
-                      {articulo.descripcion}
+                  </Form>
+                ) : (
+                  <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
+                    <Descriptions.Item label="Nombre">{articulo.nombre}</Descriptions.Item>
+                    <Descriptions.Item label="Referencia / SKU">
+                      {articulo.referencia || <Text type="secondary">—</Text>}
                     </Descriptions.Item>
-                  )}
-                  {articulo.imagen_url && (
-                    <Descriptions.Item label="Imagen" span={2}>
-                      <img
-                        src={articulo.imagen_url}
-                        alt={articulo.nombre}
-                        style={{ maxHeight: 140, borderRadius: 8, objectFit: "cover" }}
-                      />
+                    <Descriptions.Item label="Código secundario">
+                      {articulo.codigo_secundario || <Text type="secondary">—</Text>}
                     </Descriptions.Item>
-                  )}
-                </Descriptions>
+                    <Descriptions.Item label="Categoría">
+                      {articulo.categoria ? <Tag color="purple">{articulo.categoria}</Tag> : <Text type="secondary">—</Text>}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Marca">
+                      {articulo.marca || <Text type="secondary">—</Text>}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Precio de venta">
+                      <Text strong style={{ color: "#d81b87" }}>
+                        ${Number(articulo.precio_venta).toLocaleString()}
+                      </Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Precio de costo">
+                      {articulo.precio_costo
+                        ? `$${Number(articulo.precio_costo).toLocaleString()}`
+                        : <Text type="secondary">—</Text>}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Margen de ganancia">
+                      {articulo.precio_costo && articulo.precio_costo > 0 ? (
+                        <Tag color="blue">
+                          {(((articulo.precio_venta - articulo.precio_costo) / articulo.precio_costo) * 100).toFixed(1)}%
+                        </Tag>
+                      ) : <Text type="secondary">—</Text>}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Estado">
+                      {articulo.activo !== false
+                        ? <Tag color="success">Activo</Tag>
+                        : <Tag color="error">Inactivo</Tag>}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Stock actual">
+                      <Space>
+                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: getStockColor(articulo) }} />
+                        <Text strong>{articulo.stock} unidades</Text>
+                      </Space>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Stock mínimo">
+                      {articulo.stock_minimo ?? 3} unidades
+                    </Descriptions.Item>
+                    {articulo.descripcion && (
+                      <Descriptions.Item label="Descripción" span={2}>
+                        {articulo.descripcion}
+                      </Descriptions.Item>
+                    )}
+                    {articulo.imagen_url && (
+                      <Descriptions.Item label="Imagen" span={2}>
+                        <img
+                          src={articulo.imagen_url}
+                          alt={articulo.nombre}
+                          style={{ maxHeight: 140, borderRadius: 8, objectFit: "cover" }}
+                        />
+                      </Descriptions.Item>
+                    )}
+                  </Descriptions>
+                )
               ),
             },
             {

@@ -343,12 +343,21 @@ export default function ArticulosPage() {
     return <Tag color="success">{art.stock} uds.</Tag>;
   };
 
+  const irADetalle = (id: string) => {
+    router.push(`/articulos/show/${id}`);
+  };
+
+  const detenerEvento = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
   const renderCard = (art: Articulo) => (
     <Col key={art.id} xs={12} sm={8} md={6} xl={4}>
       <Card
         hoverable
-        style={{ borderRadius: 12, overflow: "hidden", position: "relative" }}
+        style={{ borderRadius: 12, overflow: "hidden", position: "relative", cursor: "pointer" }}
         bodyStyle={{ padding: 12 }}
+        onClick={() => irADetalle(art.id)}
         cover={
           <div style={{
             height: 110, background: "linear-gradient(135deg,#fce4f8,#f0d6ff)",
@@ -365,16 +374,16 @@ export default function ArticulosPage() {
         }
         actions={[
           <Tooltip key="view" title="Ver detalle">
-            <EyeOutlined onClick={() => router.push(`/articulos/show/${art.id}`)} />
+            <EyeOutlined onClick={(event) => { detenerEvento(event); irADetalle(art.id); }} />
           </Tooltip>,
           <Tooltip key="edit" title="Editar">
-            <EditOutlined onClick={() => openModal(art)} />
+            <EditOutlined onClick={(event) => { detenerEvento(event); openModal(art); }} />
           </Tooltip>,
           <Tooltip key="copy" title="Duplicar artículo">
-            <CopyOutlined style={{ color: "#1677ff" }} onClick={() => duplicarArticulo(art)} />
+            <CopyOutlined style={{ color: "#1677ff" }} onClick={(event) => { detenerEvento(event); duplicarArticulo(art); }} />
           </Tooltip>,
           <Tooltip key="del" title="Eliminar">
-            <DeleteOutlined style={{ color: "#ff4d4f" }} onClick={() => handleEliminar(art)} />
+            <DeleteOutlined style={{ color: "#ff4d4f" }} onClick={(event) => { detenerEvento(event); handleEliminar(art); }} />
           </Tooltip>,
         ]}
       >
@@ -536,12 +545,16 @@ export default function ArticulosPage() {
             size="small"
             pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} artículos` }}
             scroll={{ x: 700 }}
+            onRow={(record) => ({
+              onClick: () => irADetalle(record.id),
+              style: { cursor: "pointer" },
+            })}
             columns={[
               {
                 title: "Artículo", key: "nombre",
                 render: (_: unknown, a: Articulo) => (
                   <Space size={4} direction="vertical" style={{ lineHeight: 1.3 }}>
-                    <Text strong style={{ fontSize: 13 }}>{a.nombre}</Text>
+                    <Text strong style={{ fontSize: 13, color: "#1677ff" }}>{a.nombre}</Text>
                     {a.marca && <Text type="secondary" style={{ fontSize: 11 }}>{a.marca}</Text>}
                   </Space>
                 ),
@@ -582,10 +595,10 @@ export default function ArticulosPage() {
                 title: "Acciones", key: "actions", width: 130, align: "center" as const, fixed: "right" as const,
                 render: (_: unknown, a: Articulo) => (
                   <Space size={4}>
-                    <Tooltip title="Ver"><Button size="small" icon={<EyeOutlined />} onClick={() => router.push(`/articulos/show/${a.id}`)} /></Tooltip>
-                    <Tooltip title="Editar"><Button size="small" icon={<EditOutlined />} onClick={() => openModal(a)} /></Tooltip>
-                    <Tooltip title="Duplicar"><Button size="small" icon={<CopyOutlined />} onClick={() => duplicarArticulo(a)} /></Tooltip>
-                    <Tooltip title="Eliminar"><Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleEliminar(a)} /></Tooltip>
+                    <Tooltip title="Ver"><Button size="small" icon={<EyeOutlined />} onClick={(event) => { detenerEvento(event); irADetalle(a.id); }} /></Tooltip>
+                    <Tooltip title="Editar"><Button size="small" icon={<EditOutlined />} onClick={(event) => { detenerEvento(event); openModal(a); }} /></Tooltip>
+                    <Tooltip title="Duplicar"><Button size="small" icon={<CopyOutlined />} onClick={(event) => { detenerEvento(event); duplicarArticulo(a); }} /></Tooltip>
+                    <Tooltip title="Eliminar"><Button size="small" danger icon={<DeleteOutlined />} onClick={(event) => { detenerEvento(event); handleEliminar(a); }} /></Tooltip>
                   </Space>
                 ),
               },
