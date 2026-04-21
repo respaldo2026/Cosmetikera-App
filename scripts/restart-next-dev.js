@@ -97,10 +97,12 @@ async function main() {
 
   await removeNextDir();
 
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  const child = spawn(npmCommand, ["run", "dev"], {
+  const npmCommand = process.platform === "win32" ? "npm run dev" : "npm";
+  const npmArgs = process.platform === "win32" ? [] : ["run", "dev"];
+  const child = spawn(npmCommand, npmArgs, {
     stdio: "inherit",
     env: process.env,
+    shell: process.platform === "win32",
   });
 
   child.on("exit", (code) => {
