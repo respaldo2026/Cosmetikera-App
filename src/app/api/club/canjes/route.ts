@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   buildRewardCanjeDescription,
   buildVoucherCode,
+  getRewardByKey,
   parseRewardCanjeDescription,
 } from "@/constants/clubRewards";
 import { isRewardEligibleDynamic, getNivelDinamico, DEFAULT_REGLAS, type DynamicClubReward, type ClubReglas } from "@/hooks/useClubConfig";

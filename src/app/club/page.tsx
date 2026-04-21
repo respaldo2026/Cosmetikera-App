@@ -205,7 +205,10 @@ export default function ClubPage() {
       }, ...current]);
       message.success(`Voucher emitido: ${json.data.code}`);
     } catch (requestError: unknown) {
-      message.error(requestError?.message || "No se pudo emitir la recompensa");
+      const errorMessage = requestError instanceof Error
+        ? requestError.message
+        : "No se pudo emitir la recompensa";
+      message.error(errorMessage);
     } finally {
       setCanjeando(null);
     }
@@ -281,8 +284,11 @@ export default function ClubPage() {
     };
     const idx = NIVEL_ORDER.indexOf(nivel.key as typeof NIVEL_ORDER[number]);
     if (idx === -1 || idx === NIVEL_ORDER.length - 1) return null;
-    const siguiente = NIVEL_META[NIVEL_ORDER[idx + 1]];
+    const nextKey = NIVEL_ORDER[idx + 1];
+    if (!nextKey) return null;
+    const siguiente = NIVEL_META[nextKey];
     const current = NIVEL_META[nivel.key];
+    if (!siguiente || !current) return null;
     const span = Math.max(1, siguiente.min - current.min);
     const pct = Math.min(100, Math.round(((pts - current.min) / span) * 100));
     return { siguiente, pct, faltantes: Math.max(0, siguiente.min - pts) };
@@ -423,7 +429,13 @@ export default function ClubPage() {
                   <Text style={{ fontSize: 12, color: "#666" }}>Progreso hacia {progreso.siguiente.icon} {progreso.siguiente.label}</Text>
                   <Text style={{ fontSize: 12, color: "#666" }}>Faltan {progreso.faltantes.toLocaleString()} pts</Text>
                 </Row>
-                <Progress percent={progreso.pct} strokeColor={{ "0%": nivel.color, "100%": progreso.siguiente.color }} />
+                <Progress
+                  percent={progreso.pct}
+                  strokeColor={{
+                    "0%": nivel?.color ?? "#cd7f32",
+                    "100%": progreso.siguiente.color ?? "#13c2c2",
+                  }}
+                />
               </div>
             ) : (
               <Alert style={{ marginTop: 12, borderRadius: 8 }} type="success" message="Estás en el nivel más alto del club." showIcon />

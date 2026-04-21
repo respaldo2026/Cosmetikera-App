@@ -18,7 +18,9 @@ function getAdminClient() {
 function resolveReferrerFromCode(code: string): string | null {
   const match = code.trim().toUpperCase().match(/^COSM-([A-Z0-9]{8})$/);
   if (!match) return null;
-  return match[1].toLowerCase(); // prefijo del UUID
+  const prefix = match[1];
+  if (!prefix) return null;
+  return prefix.toLowerCase(); // prefijo del UUID
 }
 
 /**
@@ -69,6 +71,12 @@ export async function POST(request: NextRequest) {
     }
 
     const referidor = perfiles[0];
+    if (!referidor) {
+      return NextResponse.json(
+        { error: "No se encontró ningún cliente con ese código de referido" },
+        { status: 404 }
+      );
+    }
 
     // 2. Verificar que el nuevo cliente no sea el mismo que el referidor
     if (referidor.id === nuevoClienteId) {
@@ -170,9 +178,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ valid: false, error: "Código no encontrado" });
     }
 
+    const referidor = perfiles[0];
+    if (!referidor) {
+      return NextResponse.json({ valid: false, error: "Código no encontrado" });
+    }
+
     return NextResponse.json({
       valid: true,
-      referidor: perfiles[0].nombre_completo,
+      referidor: referidor.nombre_completo,
     });
   } catch (err) {
     console.error("[GET /api/club/referido]", err);
