@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS=--max_old_space_size=6144 refine dev --port 3001",
+    "dev": "cross-env NODE_OPTIONS=--max_old_space_size=6144 REFINE_DEVTOOLS_PORT=5002 refine dev --port 3001",
+    "dev:restart": "node scripts/restart-next-dev.js",
     "dev:reset": "node scripts/reset-next-dev-cache.js",
     "build": "refine build",
     "start": "refine start",
