@@ -50,6 +50,7 @@ type Cliente = {
   id: string;
   nombre_completo: string;
   telefono?: string;
+  telefono_2?: string;
   cedula?: string;
   puntos_fidelidad?: number;
   puntos_canjeados?: number;
@@ -117,7 +118,7 @@ function calcularLogros(c: Cliente): string[] {
 
 export default function ClubPage() {
   const { message } = App.useApp();
-  const [cedula, setCedula] = useState("");
+  const [acceso, setAcceso] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [canjeando, setCanjeando] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
@@ -137,7 +138,7 @@ export default function ClubPage() {
   }, []);
 
   const buscar = useCallback(async () => {
-    const val = cedula.trim().replace(/\D/g, "");
+    const val = acceso.trim().replace(/\D/g, "");
     if (!val) return;
     setBuscando(true);
     setCliente(null);
@@ -146,11 +147,11 @@ export default function ClubPage() {
     setError("");
 
     try {
-      const res = await fetch(`/api/club?cedula=${encodeURIComponent(val)}`);
+      const res = await fetch(`/api/club?acceso=${encodeURIComponent(val)}`);
       const json = await res.json();
 
       if (res.status === 404 || !json.data) {
-        setError("No encontramos una cuenta con esa cédula. Verifica el número o visítanos en tienda.");
+        setError("No encontramos una cuenta con ese dato. Intenta con cédula, teléfono principal o teléfono alterno.");
         return;
       }
       if (!res.ok) throw new Error(json.error || "Error");
@@ -174,7 +175,7 @@ export default function ClubPage() {
     } finally {
       setBuscando(false);
     }
-  }, [cargarCanjes, cedula]);
+  }, [acceso, cargarCanjes]);
 
   const canjearRecompensa = useCallback(async (rewardKey: string) => {
     if (!cliente) return;
@@ -353,16 +354,16 @@ export default function ClubPage() {
       {!cliente && (
         <Card style={{ width: "100%", maxWidth: 560, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 24 }}>
           <Title level={5} style={{ marginTop: 0 }}>Consulta y canjea tus beneficios</Title>
-          <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>Ingresa tu cédula para abrir tu wallet del club</Text>
+          <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>Ingresa tu cédula, teléfono principal o teléfono alterno para abrir tu wallet del club</Text>
           <Form onFinish={buscar}>
             <Space.Compact style={{ width: "100%" }}>
               <Input
                 prefix={<SearchOutlined style={{ color: "#d81b87" }} />}
-                placeholder="Ej: 1234567890"
-                value={cedula}
-                onChange={(event) => setCedula(event.target.value.replace(/\D/g, ""))}
+                placeholder="Ej: 1234567890 o 3001234567"
+                value={acceso}
+                onChange={(event) => setAcceso(event.target.value.replace(/\D/g, ""))}
                 size="large"
-                maxLength={12}
+                maxLength={15}
               />
               <Button type="primary" size="large" loading={buscando} onClick={buscar} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
                 Buscar
@@ -373,7 +374,7 @@ export default function ClubPage() {
         </Card>
       )}
 
-      {error && cliente === null && !buscando && cedula && (
+      {error && cliente === null && !buscando && acceso && (
         <Alert type="warning" message={error} showIcon style={{ width: "100%", maxWidth: 560, marginBottom: 16, borderRadius: 8 }} />
       )}
 
@@ -394,13 +395,15 @@ export default function ClubPage() {
                     <Tag style={{ background: nivel.color, color: "#fff", border: "none", fontSize: 13, padding: "2px 12px" }}>{nivel.icon} {nivel.label}</Tag>
                   </Space>
                   {cliente.cedula && <Text type="secondary" style={{ fontSize: 12 }}>CC: {cliente.cedula}</Text>}
+                  {cliente.telefono && <Text type="secondary" style={{ fontSize: 12 }}><PhoneOutlined /> {cliente.telefono}</Text>}
+                  {cliente.telefono_2 && cliente.telefono_2 !== cliente.telefono && <Text type="secondary" style={{ fontSize: 12 }}><PhoneOutlined /> Alterno: {cliente.telefono_2}</Text>}
                   <Text type="secondary" style={{ fontSize: 12 }}>Tu portal ya puede emitir vouchers para usar en caja.</Text>
                   <Button
                     size="small"
-                    onClick={() => { setCliente(null); setCedula(""); setError(""); setHistorial([]); setCanjes([]); setReferidoAplicado(false); setCodigoReferidoIngresado(""); }}
+                    onClick={() => { setCliente(null); setAcceso(""); setError(""); setHistorial([]); setCanjes([]); setReferidoAplicado(false); setCodigoReferidoIngresado(""); }}
                     style={{ marginTop: 4, color: "#888", borderColor: "#ddd", fontSize: 11 }}
                   >
-                    ← Cambiar cédula
+                    ← Cambiar dato de acceso
                   </Button>
                 </Space>
               </Col>

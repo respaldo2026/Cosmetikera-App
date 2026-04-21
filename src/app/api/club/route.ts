@@ -10,22 +10,24 @@ function getAdminClient() {
 }
 
 /**
- * GET /api/club?cedula=1234567890
- * Busca el perfil de un cliente por cédula (acceso al portal /club).
+ * GET /api/club?acceso=1234567890
+ * Busca el perfil de un cliente por cédula, teléfono principal o alterno.
  * Usa service role para evitar problemas de RLS.
  */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const cedula = searchParams.get("cedula")?.trim();
+    const acceso = (searchParams.get("acceso") || searchParams.get("cedula") || "")
+      .replace(/\D/g, "")
+      .trim();
 
-    if (!cedula) {
-      return NextResponse.json({ error: "cedula requerida" }, { status: 400 });
+    if (!acceso) {
+      return NextResponse.json({ error: "dato de acceso requerido" }, { status: 400 });
     }
 
     // Validar que sea solo dígitos (evitar inyecciones)
-    if (!/^\d{1,15}$/.test(cedula)) {
-      return NextResponse.json({ error: "Cédula inválida" }, { status: 400 });
+    if (!/^\d{4,15}$/.test(acceso)) {
+      return NextResponse.json({ error: "Dato de acceso inválido" }, { status: 400 });
     }
 
     const supabase = getAdminClient();
@@ -33,11 +35,12 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("perfiles")
       .select(
-        "id,nombre_completo,telefono,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento,total_compras,logros,racha_visitas"
+        "id,nombre_completo,telefono,telefono_2,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento,total_compras,logros,racha_visitas"
       )
-      .eq("cedula", cedula)
+      .or(`cedula.eq.${acceso},telefono.eq.${acceso},telefono_2.eq.${acceso},telefono.ilike.*${acceso}*,telefono_2.ilike.*${acceso}*`)
       .eq("rol", "cliente")
       .eq("activo", true)
+      .limit(1)
       .maybeSingle();
 
     if (error) {

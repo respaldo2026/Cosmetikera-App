@@ -19,6 +19,12 @@
       "static/chunks/_app-pages-browser_src_app_historial_HistorialCharts_tsx.js"
     ]
   },
+  "components\\EscanerCodigo.tsx -> html5-qrcode": {
+    "id": "components\\EscanerCodigo.tsx -> html5-qrcode",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_html5-qrcode_esm_index_js.js"
+    ]
+  },
   "utils\\historial-report.ts -> @/components/pdf/HistorialEstadisticoPDF": {
     "id": "utils\\historial-report.ts -> @/components/pdf/HistorialEstadisticoPDF",
     "files": [
@@ -34,5 +40,11 @@
   "utils\\historial-report.ts -> react": {
     "id": "utils\\historial-report.ts -> react",
     "files": []
+  },
+  "utils\\pos-hardware.ts -> qz-tray": {
+    "id": "utils\\pos-hardware.ts -> qz-tray",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_qz-tray_qz-tray_js.js"
+    ]
   }
 }

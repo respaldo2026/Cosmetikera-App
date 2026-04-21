@@ -27,6 +27,7 @@ type Cliente = {
   id: string;
   nombre_completo: string;
   telefono?: string;
+  telefono_2?: string;
   email?: string;
   cedula?: string;
   puntos_fidelidad?: number;
@@ -115,6 +116,7 @@ function DrawerCliente({
       nombre_completo: cliente.nombre_completo,
       cedula: cliente.cedula,
       telefono: cliente.telefono,
+      telefono_2: cliente.telefono_2,
       email: cliente.email,
       fecha_nacimiento: cliente.fecha_nacimiento ? dayjs(cliente.fecha_nacimiento) : null,
       activo: cliente.activo ?? true,
@@ -150,6 +152,7 @@ function DrawerCliente({
           nombre_completo: values.nombre_completo,
           cedula: values.cedula || null,
           telefono: values.telefono || null,
+          telefono_2: values.telefono_2 || null,
           email: values.email || null,
           fecha_nacimiento: values.fecha_nacimiento
             ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD") : null,
@@ -247,11 +250,11 @@ function DrawerCliente({
         </Space>
       }
       extra={
-        cliente.telefono && (
+        (cliente.telefono || cliente.telefono_2) && (
           <Button
             icon={<WhatsAppOutlined />}
             style={{ color: "#25D366", borderColor: "#25D366" }}
-            onClick={() => window.open(`https://wa.me/57${cliente.telefono?.replace(/\D/g, "")}`, "_blank")}
+            onClick={() => window.open(`https://wa.me/57${(cliente.telefono || cliente.telefono_2 || "").replace(/\D/g, "")}`, "_blank")}
           >
             WhatsApp
           </Button>
@@ -283,17 +286,29 @@ function DrawerCliente({
                       </Form.Item>
                     </Col>
                     <Col span={12}>
-                      <Form.Item name="telefono" label="Teléfono">
-                        <Input prefix={<PhoneOutlined />} />
+                      <Form.Item name="telefono" label="Teléfono principal" rules={[{ pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" }]}>
+                        <Input prefix={<PhoneOutlined />} placeholder="3001234567" maxLength={15} />
                       </Form.Item>
                     </Col>
                   </Row>
                   <Row gutter={12}>
                     <Col span={12}>
+                      <Form.Item
+                        name="telefono_2"
+                        label="Teléfono alterno"
+                        extra="Sirve como acceso de respaldo al Club si el cliente cambia o pierde su número principal."
+                        rules={[{ pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" }]}
+                      >
+                        <Input prefix={<PhoneOutlined />} placeholder="3019876543" maxLength={15} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
                       <Form.Item name="email" label="Email">
                         <Input prefix={<MailOutlined />} />
                       </Form.Item>
                     </Col>
+                  </Row>
+                  <Row gutter={12}>
                     <Col span={12}>
                       <Form.Item name="fecha_nacimiento" label="Fecha de nacimiento">
                         <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
@@ -472,6 +487,7 @@ export default function ClientesPage() {
       c.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
       (c.cedula || "").includes(search) ||
       (c.telefono || "").includes(search) ||
+      (c.telefono_2 || "").includes(search) ||
       (c.email || "").toLowerCase().includes(search.toLowerCase())
     ), [clientes, search]);
 
@@ -493,6 +509,7 @@ export default function ClientesPage() {
           nombre_completo: values.nombre_completo,
           cedula: values.cedula || null,
           telefono: values.telefono || null,
+          telefono_2: values.telefono_2 || null,
           email: values.email || null,
           fecha_nacimiento: values.fecha_nacimiento
             ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD") : null,
@@ -538,9 +555,14 @@ export default function ClientesPage() {
     {
       title: "Teléfono",
       dataIndex: "telefono",
-      width: 130,
-      render: (t?: string) => t
-        ? <Space size={4}><PhoneOutlined style={{ color: "#aaa" }} /><Text style={{ fontSize: 12 }}>{t}</Text></Space>
+      width: 180,
+      render: (_: string | undefined, r) => r.telefono || r.telefono_2
+        ? (
+          <div>
+            {r.telefono && <Space size={4}><PhoneOutlined style={{ color: "#aaa" }} /><Text style={{ fontSize: 12 }}>{r.telefono}</Text></Space>}
+            {r.telefono_2 && <div><Text type="secondary" style={{ fontSize: 11 }}>Alt: {r.telefono_2}</Text></div>}
+          </div>
+        )
         : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
     },
     {
@@ -671,16 +693,24 @@ export default function ClientesPage() {
           </Form.Item>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="cedula" label="Cédula" rules={[{ required: true, message: "La cédula es obligatoria — es el acceso al portal Club" }, { pattern: /^\d{4,15}$/, message: "Solo dígitos, entre 4 y 15 caracteres" }]}>
+              <Form.Item name="cedula" label="Cédula" rules={[{ required: true, message: "La cédula es obligatoria — es uno de los accesos al portal Club" }, { pattern: /^\d{4,15}$/, message: "Solo dígitos, entre 4 y 15 caracteres" }]}>
                 <Input prefix={<IdcardOutlined />} placeholder="1234567890" maxLength={15} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="telefono" label="Teléfono">
-                <Input prefix={<PhoneOutlined />} placeholder="3001234567" />
+              <Form.Item name="telefono" label="Teléfono principal" rules={[{ pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" }]}>
+                <Input prefix={<PhoneOutlined />} placeholder="3001234567" maxLength={15} />
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item
+            name="telefono_2"
+            label="Teléfono alterno"
+            extra="También puede usarse para ingresar al Club si el cliente cambia o pierde su número principal."
+            rules={[{ pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" }]}
+          >
+            <Input prefix={<PhoneOutlined />} placeholder="3019876543" maxLength={15} />
+          </Form.Item>
           <Form.Item name="email" label="Email">
             <Input prefix={<MailOutlined />} placeholder="correo@ejemplo.com" />
           </Form.Item>
@@ -691,7 +721,7 @@ export default function ClientesPage() {
             <Text style={{ fontSize: 12 }}>🌟 El cliente recibirá <strong>50 puntos de bienvenida</strong></Text>
           </div>
           <div style={{ background: "#f0f5ff", border: "1px solid #adc6ff", borderRadius: 8, padding: "10px 14px" }}>
-            <Text style={{ fontSize: 12 }}>🔑 La <strong>cédula</strong> será el acceso del cliente al <strong>Portal Club</strong> en <code>/club</code></Text>
+            <Text style={{ fontSize: 12 }}>🔑 El cliente podrá entrar al <strong>Portal Club</strong> con su <strong>cédula</strong>, teléfono principal o teléfono alterno.</Text>
           </div>
         </Form>
       </Modal>
