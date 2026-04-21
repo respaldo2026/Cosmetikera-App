@@ -1,22 +1,58 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Card, Typography, Space, Input, Select, Tag, Spin,
-  Row, Col, Statistic, Table, Empty, Grid, Button, DatePicker,
-  Avatar, Tooltip, Divider,
+  App,
+  Avatar,
+  Button,
+  Card,
+  Col,
+  DatePicker,
+  Descriptions,
+  Empty,
+  Grid,
+  Input,
+  Modal,
+  Row,
+  Segmented,
+  Select,
+  Space,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
 } from "antd";
 import {
-  HistoryOutlined, SearchOutlined, ReloadOutlined, ShoppingCartOutlined,
-  UserOutlined, CreditCardOutlined, DollarOutlined, FilterOutlined,
-  EyeOutlined, ArrowUpOutlined, ArrowDownOutlined,
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+  CreditCardOutlined,
+  DollarOutlined,
+  EyeOutlined,
+  GiftOutlined,
+  HistoryOutlined,
+  InboxOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  ShoppingCartOutlined,
+  SwapOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
-import { supabaseBrowserClient } from "@utils/supabase/client";
-import dayjs from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
+import { parseRewardCanjeDescription } from "@/constants/clubRewards";
 
 const { Title, Text } = Typography;
-const { useBreakpoint } = Grid;
 const { RangePicker } = DatePicker;
+const { useBreakpoint } = Grid;
+
+type VentaItem = {
+  nombre: string;
+  cantidad: number;
+  precio?: number;
+  precio_unitario?: number;
+  subtotal?: number;
+};
 
 type Venta = {
   id: string;
@@ -24,155 +60,519 @@ type Venta = {
   total: number;
   subtotal?: number;
   descuento?: number;
-  metodo_pago?: string;
-  cliente_id?: string;
-  cliente?: { nombre_completo: string };
-  items?: Array<{ nombre: string; cantidad: number; precio: number }>;
+  metodo_pago?: string | null;
+  cliente_id?: string | null;
+  cliente?: { nombre_completo?: string | null; cedula?: string | null } | null;
+  items?: VentaItem[] | null;
+};
+
+type Compra = {
+  id: string;
+  proveedor_id?: string | null;
+  proveedor_nombre?: string | null;
+  fecha: string;
+  total: number;
+  estado: "pendiente" | "recibida" | "parcial" | "cancelada";
+  notas?: string | null;
+  items?: Array<{ nombre: string; cantidad: number; precio_unitario: number }> | null;
+};
+
+type Movimiento = {
+  id: string;
+  fecha: string;
+  tipo: "ingreso" | "egreso";
+  monto: number;
+  concepto: string;
+  categoria?: string | null;
+  metodo_pago?: string | null;
+  referencia?: string | null;
+  descripcion?: string | null;
+  estudiante_id?: string | null;
+  proveedor_id?: string | null;
+  conciliado?: boolean;
+  created_at?: string | null;
+  perfiles?: { nombre_completo?: string | null; telefono?: string | null } | null;
+  proveedores?: { nombre_completo?: string | null } | null;
+};
+
+type Punto = {
+  id: string;
+  perfil_id?: string | null;
+  tipo: string;
+  puntos: number;
+  concepto: string;
+  referencia?: string | null;
+  created_at: string;
+};
+
+type Canje = {
+  id: string;
+  perfil_id?: string | null;
+  puntos: number;
+  valor_cop?: number | null;
+  descripcion?: string | null;
+  estado?: string | null;
+  created_at: string;
+};
+
+type Perfil = {
+  id: string;
+  nombre_completo?: string | null;
+  cedula?: string | null;
+};
+
+type HistorialPayload = {
+  ventas: Venta[];
+  compras: Compra[];
+  movimientos: Movimiento[];
+  puntos: Punto[];
+  canjes: Canje[];
+  perfiles: Perfil[];
+};
+
+type TipoOperacion = "venta" | "compra" | "movimiento" | "puntos" | "voucher";
+type DireccionOperacion = "entrada" | "salida" | "neutral";
+type PeriodoRapido = "hoy" | "semana" | "mes" | "personalizado" | "todo";
+
+type HistorialEntry = {
+  id: string;
+  key: string;
+  tipo: TipoOperacion;
+  fecha: string;
+  titulo: string;
+  detalle: string;
+  tercero: string;
+  terceroId?: string | null;
+  monto?: number | null;
+  puntos?: number | null;
+  direccion: DireccionOperacion;
+  metodoPago?: string | null;
+  estado?: string | null;
+  referencia?: string | null;
+  items?: VentaItem[] | Array<{ nombre: string; cantidad: number; precio_unitario: number }> | null;
+  raw: Venta | Compra | Movimiento | Punto | Canje;
+};
+
+const TIPO_META: Record<TipoOperacion, { label: string; color: string; icon: React.ReactNode }> = {
+  venta: { label: "Venta", color: "magenta", icon: <ShoppingCartOutlined /> },
+  compra: { label: "Compra", color: "blue", icon: <InboxOutlined /> },
+  movimiento: { label: "Caja", color: "geekblue", icon: <SwapOutlined /> },
+  puntos: { label: "Puntos", color: "gold", icon: <GiftOutlined /> },
+  voucher: { label: "Voucher", color: "purple", icon: <GiftOutlined /> },
+};
+
+const ESTADO_COMPRA_COLOR: Record<string, string> = {
+  pendiente: "gold",
+  recibida: "green",
+  parcial: "orange",
+  cancelada: "red",
+};
+
+const ESTADO_VOUCHER_COLOR: Record<string, string> = {
+  emitido: "blue",
+  aplicado: "green",
+  redimido: "green",
+  vencido: "red",
 };
 
 const METODO_TAG: Record<string, string> = {
-  efectivo: "green", tarjeta: "blue", transferencia: "purple", mixto: "orange",
+  efectivo: "green",
+  tarjeta: "blue",
+  transferencia: "purple",
+  mixto: "orange",
 };
 
-const parseMetodoPago = (value?: string | null) => {
+const PUNTO_LABELS: Record<string, string> = {
+  ganados: "Puntos ganados",
+  canjeados: "Puntos canjeados",
+  bonificacion: "Bonificacion",
+  ajuste: "Ajuste",
+  bienvenida: "Bienvenida",
+  cumpleanos: "Cumpleanos",
+  racha: "Racha",
+  referido: "Referido",
+};
+
+function formatMoney(value?: number | null) {
+  return `$${Number(value || 0).toLocaleString()}`;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+  return dayjs(value).format("DD/MM/YYYY HH:mm");
+}
+
+function parseMetodoPago(value?: string | null) {
   const raw = String(value || "");
   if (raw.startsWith("mixto|")) {
-    const detalle = raw
+    const detail = raw
       .split("|")
       .slice(1)
       .map((parte) => {
         const [clave, monto] = parte.split(":");
-        const label = clave === "efectivo" ? "Efectivo" : clave === "tarjeta" ? "Tarjeta" : clave === "transferencia" ? "Transferencia" : clave;
-        return `${label} $${Number(monto || 0).toLocaleString()}`;
+        const label = clave === "efectivo"
+          ? "Efectivo"
+          : clave === "tarjeta"
+            ? "Tarjeta"
+            : clave === "transferencia"
+              ? "Transferencia"
+              : clave;
+        return `${label} ${formatMoney(Number(monto || 0))}`;
       })
       .join(" · ");
 
-    return { base: "mixto", label: "Mixto", detail: detalle || null };
+    return { base: "mixto", label: "Mixto", detail: detail || null };
   }
 
   if (raw === "efectivo" || raw === "tarjeta" || raw === "transferencia" || raw === "mixto") {
     return {
       base: raw,
-      label: raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "—",
+      label: raw.charAt(0).toUpperCase() + raw.slice(1),
       detail: null,
     };
   }
 
-  return { base: raw, label: raw || "—", detail: null };
-};
+  return { base: raw, label: raw || "-", detail: null };
+}
+
+function buildItemSummary(items?: Array<{ nombre: string; cantidad: number }> | null) {
+  if (!items || items.length === 0) return "Sin detalle de items";
+  const preview = items.slice(0, 3).map((item) => `${item.nombre} x${item.cantidad}`).join(", ");
+  const extra = items.length > 3 ? ` +${items.length - 3} mas` : "";
+  return `${preview}${extra}`;
+}
+
+function matchesPeriodo(fecha: string, periodo: PeriodoRapido, rango: [Dayjs, Dayjs] | null) {
+  const current = dayjs(fecha);
+  if (!current.isValid()) return false;
+
+  if (periodo === "todo") return true;
+  if (periodo === "hoy") return current.isSame(dayjs(), "day");
+  if (periodo === "semana") {
+    return current.isAfter(dayjs().startOf("week").subtract(1, "millisecond")) && current.isBefore(dayjs().endOf("week").add(1, "millisecond"));
+  }
+  if (periodo === "mes") {
+    return current.isAfter(dayjs().startOf("month").subtract(1, "millisecond")) && current.isBefore(dayjs().endOf("month").add(1, "millisecond"));
+  }
+  if (!rango) return true;
+
+  return current.isAfter(rango[0].startOf("day").subtract(1, "millisecond")) && current.isBefore(rango[1].endOf("day").add(1, "millisecond"));
+}
 
 export default function HistorialPage() {
+  const { message } = App.useApp();
   const screens = useBreakpoint();
   const isMobile = !screens.md;
 
-  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [data, setData] = useState<HistorialPayload>({
+    ventas: [],
+    compras: [],
+    movimientos: [],
+    puntos: [],
+    canjes: [],
+    perfiles: [],
+  });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filtroMetodo, setFiltroMetodo] = useState<string | null>(null);
-  const [rango, setRango] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
-  const [detalle, setDetalle] = useState<Venta | null>(null);
+  const [tipoFiltro, setTipoFiltro] = useState<TipoOperacion | undefined>(undefined);
+  const [direccionFiltro, setDireccionFiltro] = useState<DireccionOperacion | undefined>(undefined);
+  const [periodo, setPeriodo] = useState<PeriodoRapido>("mes");
+  const [rango, setRango] = useState<[Dayjs, Dayjs] | null>(null);
+  const [detalle, setDetalle] = useState<HistorialEntry | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabaseBrowserClient
-      .from("ventas")
-      .select("*, cliente:perfiles(nombre_completo)")
-      .order("fecha", { ascending: false })
-      .limit(500);
-    setVentas(data || []);
-    setLoading(false);
-  }, []);
+    try {
+      const response = await fetch("/api/historial", { cache: "no-store" });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json?.error || "No se pudo cargar el historial");
+      }
 
-  useEffect(() => { cargar(); }, [cargar]);
+      setData({
+        ventas: json.ventas || [],
+        compras: json.compras || [],
+        movimientos: json.movimientos || [],
+        puntos: json.puntos || [],
+        canjes: json.canjes || [],
+        perfiles: json.perfiles || [],
+      });
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "No se pudo cargar el historial");
+    } finally {
+      setLoading(false);
+    }
+  }, [message]);
 
-  const ventasFiltradas = ventas.filter((v) => {
-    const nombreCliente = (v.cliente as any)?.nombre_completo || "";
-    const matchSearch = !search ||
-      nombreCliente.toLowerCase().includes(search.toLowerCase()) ||
-      v.id.toLowerCase().includes(search.toLowerCase());
-    const metodoBase = parseMetodoPago(v.metodo_pago).base;
-    const matchMetodo = !filtroMetodo || metodoBase === filtroMetodo;
-    const matchRango = !rango ||
-      (dayjs(v.fecha).isAfter(rango[0].startOf("day")) &&
-        dayjs(v.fecha).isBefore(rango[1].endOf("day")));
-    return matchSearch && matchMetodo && matchRango;
-  });
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
-  const totalVentasVal = ventasFiltradas.reduce((s, v) => s + Number(v.total || 0), 0);
-  const ventasHoy = ventas.filter((v) => dayjs(v.fecha).isSame(dayjs(), "day")).length;
-  const ingresoHoy = ventas
-    .filter((v) => dayjs(v.fecha).isSame(dayjs(), "day"))
-    .reduce((s, v) => s + Number(v.total || 0), 0);
+  const operaciones = useMemo(() => {
+    const perfilesMap = new Map(data.perfiles.map((perfil) => [perfil.id, perfil]));
+
+    const ventas = data.ventas.map<HistorialEntry>((venta) => ({
+      id: venta.id,
+      key: `venta-${venta.id}`,
+      tipo: "venta",
+      fecha: venta.fecha,
+      titulo: `Venta POS #${venta.id.slice(-6).toUpperCase()}`,
+      detalle: buildItemSummary(venta.items || []),
+      tercero: venta.cliente?.nombre_completo || "Venta sin cliente",
+      terceroId: venta.cliente_id || null,
+      monto: Number(venta.total || 0),
+      puntos: null,
+      direccion: "entrada",
+      metodoPago: venta.metodo_pago || null,
+      estado: null,
+      referencia: venta.id,
+      items: venta.items || [],
+      raw: venta,
+    }));
+
+    const compras = data.compras.map<HistorialEntry>((compra) => ({
+      id: compra.id,
+      key: `compra-${compra.id}`,
+      tipo: "compra",
+      fecha: compra.fecha,
+      titulo: `Compra #${compra.id.slice(-6).toUpperCase()}`,
+      detalle: compra.notas || buildItemSummary(compra.items || []),
+      tercero: compra.proveedor_nombre || "Proveedor no especificado",
+      terceroId: compra.proveedor_id || null,
+      monto: Number(compra.total || 0),
+      puntos: null,
+      direccion: compra.estado === "cancelada" ? "neutral" : "salida",
+      metodoPago: null,
+      estado: compra.estado,
+      referencia: compra.id,
+      items: compra.items || [],
+      raw: compra,
+    }));
+
+    const movimientos = data.movimientos.map<HistorialEntry>((movimiento) => ({
+      id: movimiento.id,
+      key: `movimiento-${movimiento.id}`,
+      tipo: "movimiento",
+      fecha: movimiento.created_at || movimiento.fecha,
+      titulo: movimiento.concepto || `Movimiento ${movimiento.tipo}`,
+      detalle: [movimiento.categoria, movimiento.descripcion].filter(Boolean).join(" · ") || "Movimiento de caja",
+      tercero: movimiento.perfiles?.nombre_completo || movimiento.proveedores?.nombre_completo || "Caja general",
+      terceroId: movimiento.estudiante_id || movimiento.proveedor_id || null,
+      monto: Number(movimiento.monto || 0),
+      puntos: null,
+      direccion: movimiento.tipo === "ingreso" ? "entrada" : "salida",
+      metodoPago: movimiento.metodo_pago || null,
+      estado: movimiento.conciliado ? "conciliado" : "pendiente",
+      referencia: movimiento.referencia || movimiento.id,
+      items: null,
+      raw: movimiento,
+    }));
+
+    const puntos = data.puntos.map<HistorialEntry>((registro) => {
+      const perfil = registro.perfil_id ? perfilesMap.get(registro.perfil_id) : null;
+      return {
+        id: registro.id,
+        key: `puntos-${registro.id}`,
+        tipo: "puntos",
+        fecha: registro.created_at,
+        titulo: PUNTO_LABELS[registro.tipo] || `Movimiento de puntos: ${registro.tipo}`,
+        detalle: registro.concepto || "Sin concepto",
+        tercero: perfil?.nombre_completo || "Cliente no identificado",
+        terceroId: registro.perfil_id || null,
+        monto: null,
+        puntos: Number(registro.puntos || 0),
+        direccion: Number(registro.puntos || 0) > 0 ? "entrada" : Number(registro.puntos || 0) < 0 ? "salida" : "neutral",
+        metodoPago: null,
+        estado: registro.tipo,
+        referencia: registro.referencia || registro.id,
+        items: null,
+        raw: registro,
+      };
+    });
+
+    const canjes = data.canjes.map<HistorialEntry>((canje) => {
+      const perfil = canje.perfil_id ? perfilesMap.get(canje.perfil_id) : null;
+      const parsed = parseRewardCanjeDescription(canje.descripcion);
+      return {
+        id: canje.id,
+        key: `voucher-${canje.id}`,
+        tipo: "voucher",
+        fecha: canje.created_at,
+        titulo: parsed?.cleanDescription || "Voucher del club",
+        detalle: parsed?.code ? `Codigo ${parsed.code}` : canje.descripcion || "Voucher emitido",
+        tercero: perfil?.nombre_completo || "Cliente no identificado",
+        terceroId: canje.perfil_id || null,
+        monto: Number(canje.valor_cop || 0),
+        puntos: -Math.abs(Number(canje.puntos || 0)),
+        direccion: "salida",
+        metodoPago: null,
+        estado: canje.estado || "emitido",
+        referencia: parsed?.code || canje.id,
+        items: null,
+        raw: canje,
+      };
+    });
+
+    return [...ventas, ...compras, ...movimientos, ...puntos, ...canjes].sort(
+      (a, b) => dayjs(b.fecha).valueOf() - dayjs(a.fecha).valueOf()
+    );
+  }, [data]);
+
+  const operacionesFiltradas = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return operaciones.filter((operacion) => {
+      const matchTipo = !tipoFiltro || operacion.tipo === tipoFiltro;
+      const matchDireccion = !direccionFiltro || operacion.direccion === direccionFiltro;
+      const matchPeriodo = matchesPeriodo(operacion.fecha, periodo, rango);
+      const metodo = parseMetodoPago(operacion.metodoPago).label.toLowerCase();
+      const target = [
+        operacion.titulo,
+        operacion.detalle,
+        operacion.tercero,
+        operacion.referencia,
+        operacion.estado,
+        metodo,
+      ].join(" ").toLowerCase();
+      const matchSearch = !query || target.includes(query);
+
+      return matchTipo && matchDireccion && matchPeriodo && matchSearch;
+    });
+  }, [direccionFiltro, operaciones, periodo, rango, search, tipoFiltro]);
+
+  const stats = useMemo(() => {
+    const entradas = operacionesFiltradas
+      .filter((item) => item.direccion === "entrada" && typeof item.monto === "number")
+      .reduce((acc, item) => acc + Number(item.monto || 0), 0);
+    const salidas = operacionesFiltradas
+      .filter((item) => item.direccion === "salida" && typeof item.monto === "number")
+      .reduce((acc, item) => acc + Number(item.monto || 0), 0);
+    const puntosNetos = operacionesFiltradas.reduce((acc, item) => acc + Number(item.puntos || 0), 0);
+    const clientesConCompra = new Set(
+      operacionesFiltradas
+        .filter((item) => item.tipo === "venta" && item.terceroId)
+        .map((item) => item.terceroId)
+    ).size;
+
+    return {
+      total: operacionesFiltradas.length,
+      entradas,
+      salidas,
+      balance: entradas - salidas,
+      puntosNetos,
+      clientesConCompra,
+      resumen: {
+        ventas: operacionesFiltradas.filter((item) => item.tipo === "venta").length,
+        compras: operacionesFiltradas.filter((item) => item.tipo === "compra").length,
+        movimientos: operacionesFiltradas.filter((item) => item.tipo === "movimiento").length,
+        puntos: operacionesFiltradas.filter((item) => item.tipo === "puntos").length,
+        vouchers: operacionesFiltradas.filter((item) => item.tipo === "voucher").length,
+      },
+    };
+  }, [operacionesFiltradas]);
 
   const columns = [
     {
       title: "Fecha",
       dataIndex: "fecha",
       key: "fecha",
-      width: 140,
-      render: (v: string) => (
+      width: 150,
+      render: (value: string) => (
         <div>
-          <Text strong style={{ fontSize: 13 }}>{dayjs(v).format("DD/MM/YYYY")}</Text>
-          <div><Text type="secondary" style={{ fontSize: 11 }}>{dayjs(v).format("HH:mm")}</Text></div>
+          <Text strong style={{ fontSize: 13 }}>{dayjs(value).format("DD/MM/YYYY")}</Text>
+          <div><Text type="secondary" style={{ fontSize: 11 }}>{dayjs(value).format("HH:mm")}</Text></div>
         </div>
       ),
     },
     {
-      title: "Cliente",
-      key: "cliente",
-      render: (_: any, rec: Venta) => {
-        const nombre = (rec.cliente as any)?.nombre_completo;
-        return nombre ? (
-          <Space>
-            <Avatar size="small" icon={<UserOutlined />} style={{ background: "#d81b87" }} />
-            <Text>{nombre}</Text>
-          </Space>
-        ) : (
-          <Text type="secondary">Venta sin cliente</Text>
-        );
+      title: "Operacion",
+      dataIndex: "tipo",
+      key: "tipo",
+      width: 120,
+      render: (value: TipoOperacion) => {
+        const meta = TIPO_META[value];
+        return <Tag color={meta.color} icon={meta.icon}>{meta.label}</Tag>;
       },
     },
     {
-      title: "Método",
-      dataIndex: "metodo_pago",
-      key: "metodo",
-      width: 120,
-      render: (v: string) => {
-        const metodo = parseMetodoPago(v);
-        return (
-          <Tooltip title={metodo.detail || undefined}>
-            <Tag color={METODO_TAG[metodo.base] || "default"} icon={<CreditCardOutlined />}>
-              {metodo.label}
-            </Tag>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      title: "Ítems",
-      dataIndex: "items",
-      key: "items",
-      width: 80,
-      render: (v: any[]) => <Tag>{(v || []).length}</Tag>,
-    },
-    {
-      title: "Total",
-      dataIndex: "total",
-      key: "total",
-      width: 120,
-      render: (v: number) => (
-        <Text strong style={{ color: "#d81b87", fontSize: 15 }}>
-          ${Number(v).toLocaleString()}
-        </Text>
+      title: "Detalle",
+      key: "detalle",
+      render: (_: unknown, record: HistorialEntry) => (
+        <div>
+          <Text strong>{record.titulo}</Text>
+          <div><Text type="secondary" style={{ fontSize: 12 }}>{record.detalle}</Text></div>
+        </div>
       ),
+    },
+    {
+      title: "Cliente / tercero",
+      key: "tercero",
+      width: 220,
+      render: (_: unknown, record: HistorialEntry) => (
+        <Space>
+          <Avatar size="small" icon={<UserOutlined />} style={{ background: record.tipo === "compra" ? "#1677ff" : "#d81b87" }} />
+          <Text>{record.tercero}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: "Estado",
+      key: "estado",
+      width: 130,
+      render: (_: unknown, record: HistorialEntry) => {
+        if (record.tipo === "compra" && record.estado) {
+          return <Tag color={ESTADO_COMPRA_COLOR[record.estado] || "default"}>{record.estado}</Tag>;
+        }
+        if (record.tipo === "voucher" && record.estado) {
+          return <Tag color={ESTADO_VOUCHER_COLOR[record.estado] || "default"}>{record.estado}</Tag>;
+        }
+        if (record.tipo === "movimiento" && record.estado) {
+          return <Tag color={record.estado === "conciliado" ? "green" : "gold"}>{record.estado}</Tag>;
+        }
+        if (record.metodoPago) {
+          const metodo = parseMetodoPago(record.metodoPago);
+          return (
+            <Tooltip title={metodo.detail || undefined}>
+              <Tag color={METODO_TAG[metodo.base] || "default"} icon={<CreditCardOutlined />}>
+                {metodo.label}
+              </Tag>
+            </Tooltip>
+          );
+        }
+        return <Text type="secondary">-</Text>;
+      },
+    },
+    {
+      title: "Impacto",
+      key: "impacto",
+      width: 150,
+      render: (_: unknown, record: HistorialEntry) => {
+        if (typeof record.monto === "number") {
+          const positive = record.direccion === "entrada";
+          return (
+            <Text strong style={{ color: positive ? "#389e0d" : record.direccion === "salida" ? "#cf1322" : "#595959" }}>
+              {positive ? "+" : record.direccion === "salida" ? "-" : ""}{formatMoney(record.monto)}
+            </Text>
+          );
+        }
+        if (typeof record.puntos === "number") {
+          const positive = record.puntos > 0;
+          return (
+            <Text strong style={{ color: positive ? "#d48806" : record.puntos < 0 ? "#cf1322" : "#595959" }}>
+              {positive ? "+" : ""}{record.puntos} pts
+            </Text>
+          );
+        }
+        return <Text type="secondary">-</Text>;
+      },
     },
     {
       title: "",
       key: "acciones",
-      width: 60,
-      render: (_: any, rec: Venta) => (
+      width: 70,
+      render: (_: unknown, record: HistorialEntry) => (
         <Tooltip title="Ver detalle">
-          <Button size="small" icon={<EyeOutlined />} onClick={() => setDetalle(rec)} />
+          <Button size="small" icon={<EyeOutlined />} onClick={() => setDetalle(record)} />
         </Tooltip>
       ),
     },
@@ -180,183 +580,223 @@ export default function HistorialPage() {
 
   return (
     <>
-      {/* HEADER */}
-      <Card style={{ marginBottom: 16, borderRadius: 12 }} bodyStyle={{ padding: "12px 16px" }}>
+      <Card style={{ marginBottom: 16, borderRadius: 12 }} styles={{ body: { padding: "12px 16px" } }}>
         <Row gutter={[16, 12]} align="middle">
           <Col flex="auto">
             <Space>
               <div style={{
-                width: 44, height: 44, borderRadius: 10,
+                width: 44,
+                height: 44,
+                borderRadius: 10,
                 background: "linear-gradient(135deg,#13c2c2,#096dd9)",
-                display: "flex", alignItems: "center", justifyContent: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}>
                 <HistoryOutlined style={{ color: "#fff", fontSize: 22 }} />
               </div>
               <div>
-                <Title level={4} style={{ margin: 0 }}>Historial de ventas</Title>
-                <Text type="secondary" style={{ fontSize: 12 }}>Registro completo de transacciones</Text>
+                <Title level={4} style={{ margin: 0 }}>Historial operativo</Title>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Ventas, compras, caja, puntos y vouchers en un solo log para auditar operaciones.
+                </Text>
               </div>
             </Space>
           </Col>
           <Col>
-            <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
+            <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading}>
+              Actualizar
+            </Button>
           </Col>
         </Row>
       </Card>
 
-      {/* KPIs */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={6}>
+        <Col xs={12} lg={4}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
-            <Statistic title="Ventas hoy" value={ventasHoy} prefix={<ShoppingCartOutlined />} />
+            <Statistic title="Operaciones" value={stats.total} prefix={<HistoryOutlined />} />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
+        <Col xs={12} lg={4}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
-            <Statistic
-              title="Ingreso hoy"
-              value={ingresoHoy}
-              prefix="$"
-              formatter={(v) => Number(v).toLocaleString()}
-              valueStyle={{ color: "#52c41a" }}
-            />
+            <Statistic title="Entradas" value={stats.entradas} prefix={<ArrowUpOutlined />} formatter={(value) => formatMoney(Number(value || 0))} valueStyle={{ color: "#389e0d" }} />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
+        <Col xs={12} lg={4}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
-            <Statistic title="Total filtrado" value={ventasFiltradas.length} />
+            <Statistic title="Salidas" value={stats.salidas} prefix={<ArrowDownOutlined />} formatter={(value) => formatMoney(Number(value || 0))} valueStyle={{ color: "#cf1322" }} />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
+        <Col xs={12} lg={4}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
-            <Statistic
-              title="Suma filtrada"
-              value={totalVentasVal}
-              prefix="$"
-              formatter={(v) => Number(v).toLocaleString()}
-              valueStyle={{ color: "#d81b87" }}
-            />
+            <Statistic title="Balance" value={stats.balance} prefix={<DollarOutlined />} formatter={(value) => formatMoney(Number(value || 0))} valueStyle={{ color: stats.balance >= 0 ? "#1677ff" : "#cf1322" }} />
+          </Card>
+        </Col>
+        <Col xs={12} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic title="Puntos netos" value={stats.puntosNetos} suffix="pts" valueStyle={{ color: stats.puntosNetos >= 0 ? "#d48806" : "#cf1322" }} />
+          </Card>
+        </Col>
+        <Col xs={12} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
+            <Statistic title="Clientes que compraron" value={stats.clientesConCompra} prefix={<UserOutlined />} />
           </Card>
         </Col>
       </Row>
 
-      {/* FILTROS */}
-      <Card style={{ marginBottom: 12, borderRadius: 10 }} bodyStyle={{ padding: "10px 14px" }}>
-        <Row gutter={[12, 8]}>
-          <Col xs={24} sm={8}>
+      <Card style={{ marginBottom: 12, borderRadius: 10 }} styles={{ body: { padding: "12px 14px" } }}>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} xl={10}>
             <Input
-              placeholder="Buscar por cliente o ID..."
+              placeholder="Buscar por cliente, proveedor, concepto, codigo o referencia"
               prefix={<SearchOutlined />}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               allowClear
             />
           </Col>
-          <Col xs={24} sm={6}>
+          <Col xs={24} sm={8} xl={4}>
             <Select
-              placeholder="Método de pago"
+              placeholder="Tipo de operacion"
               allowClear
               style={{ width: "100%" }}
-              value={filtroMetodo}
-              onChange={setFiltroMetodo}
+              value={tipoFiltro}
+              onChange={(value) => setTipoFiltro(value)}
+              options={Object.entries(TIPO_META).map(([value, meta]) => ({ value, label: meta.label }))}
+            />
+          </Col>
+          <Col xs={24} sm={8} xl={4}>
+            <Select
+              placeholder="Direccion"
+              allowClear
+              style={{ width: "100%" }}
+              value={direccionFiltro}
+              onChange={(value) => setDireccionFiltro(value)}
               options={[
-                { value: "efectivo", label: "Efectivo" },
-                { value: "tarjeta", label: "Tarjeta" },
-                { value: "transferencia", label: "Transferencia" },
-                { value: "mixto", label: "Mixto" },
+                { value: "entrada", label: "Entrada" },
+                { value: "salida", label: "Salida" },
+                { value: "neutral", label: "Neutral" },
               ]}
             />
           </Col>
-          <Col xs={24} sm={10}>
-            <RangePicker
-              style={{ width: "100%" }}
-              format="DD/MM/YYYY"
-              placeholder={["Desde", "Hasta"]}
-              onChange={(dates) => setRango(dates as any)}
+          <Col xs={24} sm={8} xl={6}>
+            <Segmented
+              block
+              value={periodo}
+              onChange={(value) => setPeriodo(value as PeriodoRapido)}
+              options={[
+                { label: "Hoy", value: "hoy" },
+                { label: "Semana", value: "semana" },
+                { label: "Mes", value: "mes" },
+                { label: "Periodo", value: "personalizado" },
+                { label: "Todo", value: "todo" },
+              ]}
             />
           </Col>
+          {periodo === "personalizado" ? (
+            <Col xs={24} xl={10}>
+              <RangePicker
+                style={{ width: "100%" }}
+                format="DD/MM/YYYY"
+                placeholder={["Desde", "Hasta"]}
+                value={rango as [Dayjs, Dayjs] | null}
+                onChange={(dates) => setRango(dates as [Dayjs, Dayjs] | null)}
+              />
+            </Col>
+          ) : null}
         </Row>
+        <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
+          <Tag color="magenta">Ventas: {stats.resumen.ventas}</Tag>
+          <Tag color="blue">Compras: {stats.resumen.compras}</Tag>
+          <Tag color="geekblue">Caja: {stats.resumen.movimientos}</Tag>
+          <Tag color="gold">Puntos: {stats.resumen.puntos}</Tag>
+          <Tag color="purple">Vouchers: {stats.resumen.vouchers}</Tag>
+        </Space>
       </Card>
 
-      {/* TABLA */}
-      <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 0 }}>
+      <Card style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
         {loading ? (
-          <div style={{ textAlign: "center", padding: 60 }}><Spin size="large" /></div>
-        ) : ventasFiltradas.length === 0 ? (
-          <Empty description="Sin ventas en el período seleccionado" style={{ padding: 60 }} />
+          <div style={{ textAlign: "center", padding: 64 }}>
+            <Spin size="large" />
+          </div>
+        ) : operacionesFiltradas.length === 0 ? (
+          <Empty description="No hay operaciones para los filtros seleccionados" style={{ padding: 64 }} />
         ) : (
           <Table
-            dataSource={ventasFiltradas}
+            dataSource={operacionesFiltradas}
             columns={columns}
-            rowKey="id"
+            rowKey="key"
+            size={isMobile ? "small" : "middle"}
             pagination={{ pageSize: 20, showSizeChanger: true }}
-            scroll={{ x: 600 }}
+            scroll={{ x: 980 }}
           />
         )}
       </Card>
 
-      {/* MODAL DETALLE */}
-      {detalle && (
-        <Card
-          style={{
-            position: "fixed", bottom: 20, right: 20, width: 340,
-            borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-            zIndex: 1000,
-          }}
-          title={
-            <Space>
-              <HistoryOutlined style={{ color: "#d81b87" }} />
-              <span>Detalle de venta</span>
-            </Space>
-          }
-          extra={<Button size="small" onClick={() => setDetalle(null)}>✕</Button>}
-          bodyStyle={{ padding: 12 }}
-        >
-          <div style={{ marginBottom: 8 }}>
-            <Text type="secondary">Fecha: </Text>
-            <Text strong>{dayjs(detalle.fecha).format("DD/MM/YYYY HH:mm")}</Text>
-          </div>
-          {(detalle.cliente as any)?.nombre_completo && (
-            <div style={{ marginBottom: 8 }}>
-              <Text type="secondary">Cliente: </Text>
-              <Text strong>{(detalle.cliente as any).nombre_completo}</Text>
-            </div>
-          )}
-          <Divider style={{ margin: "8px 0" }} />
-          {(detalle.items || []).map((item, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-              <Text style={{ fontSize: 12 }}>{item.nombre} × {item.cantidad}</Text>
-              <Text style={{ fontSize: 12, color: "#d81b87" }}>${(item.precio * item.cantidad).toLocaleString()}</Text>
-            </div>
-          ))}
-          <Divider style={{ margin: "8px 0" }} />
-          {detalle.descuento ? (
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <Text type="secondary">Descuento</Text>
-              <Text style={{ color: "#52c41a" }}>-${Number(detalle.descuento).toLocaleString()}</Text>
-            </div>
-          ) : null}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-            <Text strong style={{ fontSize: 14 }}>Total</Text>
-            <Text strong style={{ fontSize: 16, color: "#d81b87" }}>${Number(detalle.total).toLocaleString()}</Text>
-          </div>
-          {(() => {
-            const metodo = parseMetodoPago(detalle.metodo_pago);
-            return (
-              <>
-                <Tag color={METODO_TAG[metodo.base] || "default"} style={{ marginTop: 8 }}>
-                  {metodo.label}
-                </Tag>
-                {metodo.detail ? (
-                  <div style={{ marginTop: 8 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Desglose: {metodo.detail}</Text>
-                  </div>
-                ) : null}
-              </>
-            );
-          })()}
-        </Card>
-      )}
+      <Modal
+        open={!!detalle}
+        title={detalle ? detalle.titulo : "Detalle"}
+        onCancel={() => setDetalle(null)}
+        footer={null}
+        width={isMobile ? "94%" : 760}
+      >
+        {detalle ? (
+          <Space direction="vertical" size={16} style={{ width: "100%" }}>
+            <Descriptions bordered size="small" column={1}>
+              <Descriptions.Item label="Fecha">{formatDateTime(detalle.fecha)}</Descriptions.Item>
+              <Descriptions.Item label="Operacion">
+                <Tag color={TIPO_META[detalle.tipo].color} icon={TIPO_META[detalle.tipo].icon}>{TIPO_META[detalle.tipo].label}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Cliente / tercero">{detalle.tercero}</Descriptions.Item>
+              <Descriptions.Item label="Detalle">{detalle.detalle}</Descriptions.Item>
+              <Descriptions.Item label="Referencia">{detalle.referencia || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Estado">{detalle.estado || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Metodo de pago">
+                {detalle.metodoPago ? parseMetodoPago(detalle.metodoPago).label : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Monto">
+                {typeof detalle.monto === "number" ? formatMoney(detalle.monto) : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Puntos">
+                {typeof detalle.puntos === "number" ? `${detalle.puntos} pts` : "-"}
+              </Descriptions.Item>
+            </Descriptions>
+
+            {detalle.items && detalle.items.length > 0 ? (
+              <Card size="small" title="Items relacionados">
+                <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                  {detalle.items.map((item, index) => {
+                    const precioUnitario = "precio_unitario" in item ? Number(item.precio_unitario || 0) : Number(item.precio || 0);
+                    const subtotal = "subtotal" in item && typeof item.subtotal === "number"
+                      ? Number(item.subtotal || 0)
+                      : Number(item.cantidad || 0) * precioUnitario;
+
+                    return (
+                      <div key={`${detalle.key}-item-${index}`} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <div>
+                          <Text strong>{item.nombre}</Text>
+                          <div><Text type="secondary">Cantidad: {item.cantidad}</Text></div>
+                        </div>
+                        <Text strong>{formatMoney(subtotal)}</Text>
+                      </div>
+                    );
+                  })}
+                </Space>
+              </Card>
+            ) : null}
+
+            {detalle.tipo === "movimiento" ? (
+              <Card size="small" title="Movimiento de caja">
+                <Space direction="vertical" size={8}>
+                  <Text>Direccion: {detalle.direccion === "entrada" ? "Entrada" : detalle.direccion === "salida" ? "Salida" : "Neutral"}</Text>
+                  {detalle.metodoPago ? <Text>Metodo: {parseMetodoPago(detalle.metodoPago).label}</Text> : null}
+                  {typeof detalle.monto === "number" ? <Text>Monto: {formatMoney(detalle.monto)}</Text> : null}
+                </Space>
+              </Card>
+            ) : null}
+          </Space>
+        ) : null}
+      </Modal>
     </>
   );
 }
