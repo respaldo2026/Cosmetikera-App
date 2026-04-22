@@ -55,6 +55,16 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/club/route.js"
+    ],
+    "/api/club/canjes/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/club/canjes/route.js"
+    ],
+    "/api/club/verificar/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/club/verificar/route.js"
     ]
   }
 }

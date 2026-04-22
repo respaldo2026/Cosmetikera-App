@@ -12,12 +12,14 @@ import {
   Empty,
   Form,
   Input,
+  Modal,
   Progress,
   Row,
   Space,
   Spin,
   Statistic,
   Tag,
+  Tabs,
   Timeline,
   Tooltip,
   Typography,
@@ -131,9 +133,10 @@ export default function ClubPage() {
   const [codigoReferidoIngresado, setCodigoReferidoIngresado] = useState("");
   const [aplicandoReferido, setAplicandoReferido] = useState(false);
   const [referidoAplicado, setReferidoAplicado] = useState(false);
-  const [telefonoVerificacion, setTelefonoVerificacion] = useState("");
-  const [telefonoVerificado, setTelefonoVerificado] = useState(false);
-  const [verificandoTelefono, setVerificandoTelefono] = useState(false);
+  const [tabActiva, setTabActiva] = useState("resumen");
+  const [canjeModalOpen, setCanjeModalOpen] = useState(false);
+  const [rewardPendiente, setRewardPendiente] = useState<string | null>(null);
+  const [telefonoCanje, setTelefonoCanje] = useState("");
 
   const cargarCanjes = useCallback(async (perfilId: string) => {
     const response = await fetch(`/api/club/canjes?perfil_id=${encodeURIComponent(perfilId)}`);
@@ -151,8 +154,9 @@ export default function ClubPage() {
     setHistorial([]);
     setCanjes([]);
     setError("");
-    setTelefonoVerificacion("");
-    setTelefonoVerificado(false);
+    setCanjeModalOpen(false);
+    setRewardPendiente(null);
+    setTelefonoCanje("");
 
     try {
       const res = await fetch(`/api/club?acceso=${encodeURIComponent(val)}`);
@@ -178,6 +182,7 @@ export default function ClubPage() {
       ]);
       const histJson = await histRes.json();
       setHistorial(histJson.data || []);
+      setTabActiva("resumen");
     } catch {
       setError("Error al conectar. Intenta nuevamente.");
     } finally {
@@ -185,45 +190,12 @@ export default function ClubPage() {
     }
   }, [acceso, cargarCanjes]);
 
-  const verificarTelefono = useCallback(async () => {
-    if (!cliente) return false;
-
-    const telefono = normalizePhone(telefonoVerificacion);
-    if (!telefono) {
-      message.error("Ingresa tu número de teléfono para continuar");
-      return false;
-    }
-
-    setVerificandoTelefono(true);
-    try {
-      const response = await fetch("/api/club/verificar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ perfilId: cliente.id, telefono }),
-      });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || "No se pudo verificar el teléfono");
-      setTelefonoVerificado(true);
-      message.success("Segunda verificación aprobada");
-      return true;
-    } catch (requestError: unknown) {
-      setTelefonoVerificado(false);
-      const errorMessage = requestError instanceof Error
-        ? requestError.message
-        : "No se pudo verificar el teléfono";
-      message.error(errorMessage);
-      return false;
-    } finally {
-      setVerificandoTelefono(false);
-    }
-  }, [cliente, message, telefonoVerificacion]);
-
-  const canjearRecompensa = useCallback(async (rewardKey: string) => {
+  const canjearRecompensa = useCallback(async (rewardKey: string, telefonoVerificacion: string) => {
     if (!cliente) return;
 
     const telefono = normalizePhone(telefonoVerificacion);
-    if (!telefonoVerificado || !telefono) {
-      message.error("Verifica tu teléfono antes de usar puntos o beneficios");
+    if (!telefono) {
+      message.error("Ingresa tu teléfono para confirmar el canje");
       return;
     }
 
@@ -252,9 +224,11 @@ export default function ClubPage() {
         concepto: `Canje ${reward?.title || "recompensa"} · código ${json.data.code}`,
         created_at: new Date().toISOString(),
       }, ...current]);
+      setCanjeModalOpen(false);
+      setRewardPendiente(null);
+      setTelefonoCanje("");
       message.success(`Voucher emitido: ${json.data.code}`);
     } catch (requestError: unknown) {
-      setTelefonoVerificado(false);
       const errorMessage = requestError instanceof Error
         ? requestError.message
         : "No se pudo emitir la recompensa";
@@ -262,7 +236,18 @@ export default function ClubPage() {
     } finally {
       setCanjeando(null);
     }
-  }, [cliente, message, telefonoVerificacion, telefonoVerificado]);
+  }, [cliente, message]);
+
+  const solicitarCanje = useCallback((rewardKey: string) => {
+    setRewardPendiente(rewardKey);
+    setTelefonoCanje("");
+    setCanjeModalOpen(true);
+  }, []);
+
+  const confirmarCanje = useCallback(async () => {
+    if (!rewardPendiente) return;
+    await canjearRecompensa(rewardPendiente, telefonoCanje);
+  }, [canjearRecompensa, rewardPendiente, telefonoCanje]);
 
   const copiar = useCallback(async (texto: string) => {
     try {
@@ -452,8 +437,9 @@ export default function ClubPage() {
                       setCanjes([]);
                       setReferidoAplicado(false);
                       setCodigoReferidoIngresado("");
-                      setTelefonoVerificacion("");
-                      setTelefonoVerificado(false);
+                      setCanjeModalOpen(false);
+                      setRewardPendiente(null);
+                      setTelefonoCanje("");
                     }}
                     style={{ marginTop: 4, color: "#888", borderColor: "#ddd", fontSize: 11 }}
                   >
@@ -498,284 +484,310 @@ export default function ClubPage() {
               <Alert style={{ marginTop: 12, borderRadius: 8 }} type="success" message="Estás en el nivel más alto del club." showIcon />
             )}
 
-            <Card size="small" style={{ marginTop: 16, borderRadius: 12, background: telefonoVerificado ? "#f6ffed" : "#fffbe6", border: `1px solid ${telefonoVerificado ? "#b7eb8f" : "#ffe58f"}` }}>
-              <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                <div>
-                  <Text strong>Segunda verificación para usar puntos</Text>
-                  <Text type="secondary" style={{ fontSize: 12, display: "block" }}>
-                    Ingresa tu teléfono registrado para habilitar canjes y ver los códigos completos de tus vouchers.
-                  </Text>
-                </div>
-                <Space.Compact style={{ width: "100%" }}>
-                  <Input
-                    prefix={<PhoneOutlined style={{ color: "#d81b87" }} />}
-                    placeholder="Ej: 3001234567"
-                    value={telefonoVerificacion}
-                    onChange={(event) => {
-                      setTelefonoVerificacion(event.target.value.replace(/\D/g, ""));
-                      if (telefonoVerificado) setTelefonoVerificado(false);
-                    }}
-                    maxLength={15}
-                  />
-                  <Button type="primary" onClick={verificarTelefono} loading={verificandoTelefono} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
-                    {telefonoVerificado ? "Verificado" : "Verificar"}
-                  </Button>
-                </Space.Compact>
-                <Alert
-                  type={telefonoVerificado ? "success" : "info"}
-                  showIcon
-                  message={telefonoVerificado ? "Identidad confirmada. Ya puedes usar puntos y copiar vouchers." : "Tu cédula abre el portal, pero el teléfono protege el uso de puntos y beneficios."}
-                  style={{ borderRadius: 10 }}
-                />
-              </Space>
-            </Card>
+            <Alert
+              style={{ marginTop: 16, borderRadius: 10 }}
+              type="info"
+              showIcon
+              message="Por seguridad, cada canje pide confirmar el teléfono registrado."
+            />
           </Card>
 
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={14}>
-              <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined style={{ color: "#d81b87" }} /><Text strong>Catálogo de recompensas</Text></Space>} extra={<Tag color="magenta">{recompensasDisponibles.length} disponibles</Tag>}>
-<Row gutter={[12, 12]}>
-                  {loadingConfig ? <Col span={24}><Spin /></Col> : catalogoDinamico.map((reward) => {
-                    const unlocked = isRewardEligibleDynamic(reward, cliente, reglas, esCumple);
-                    const faltantes = Math.max(0, reward.points_cost - (cliente.puntos_fidelidad || 0));
-                    return (
-                      <Col xs={24} md={12} key={reward.key}>
-                        <Card size="small" style={{ borderRadius: 14, border: unlocked ? "1px solid #f0d6ff" : "1px solid #f0f0f0", minHeight: 220, background: unlocked ? "linear-gradient(180deg,#fff,#fff7fb)" : "#fafafa" }}>
-                          <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                            <Space wrap>
-                              <span style={{ fontSize: 24 }}>{reward.icon}</span>
-                              <Text strong>{reward.title}</Text>
-                              {reward.badge && <Tag color={reward.featured ? "gold" : "default"}>{reward.badge}</Tag>}
-                            </Space>
-                            <Text type="secondary" style={{ fontSize: 12 }}>{reward.description}</Text>
-                            <Space wrap>
-                              <Tag color="purple">{reward.points_cost.toLocaleString()} pts</Tag>
-                              <Tag color="green">${reward.value_cop.toLocaleString()}</Tag>
-                              {reward.level_min && <Tag>{reward.level_min}</Tag>}
-                              {reward.birthday_only && <Tag color="pink">solo cumpleaños</Tag>}
-                            </Space>
-                            {!unlocked && (
-                              <Alert
-                                type="info"
-                                showIcon
-                                message={reward.birthday_only && !esCumple ? "Disponible solo en tu mes de cumpleaños" : faltantes > 0 ? `Te faltan ${faltantes.toLocaleString()} pts` : "Tu nivel aún no la desbloquea"}
-                                style={{ borderRadius: 10 }}
-                              />
-                            )}
-                            <Button
-                              type={unlocked ? "primary" : "default"}
-                              disabled={!unlocked || !telefonoVerificado}
-                              loading={canjeando === reward.key}
-                              onClick={() => canjearRecompensa(reward.key)}
-                              style={unlocked ? { background: "#d81b87", borderColor: "#d81b87" } : undefined}
-                            >
-                              {unlocked ? (telefonoVerificado ? "Canjear ahora" : "Verifica tu teléfono") : "Bloqueada"}
-                            </Button>
-                          </Space>
-                        </Card>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              </Card>
-
-              <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined /><Text strong>Mis vouchers y canjes</Text></Space>}>
-                {canjes.length === 0 ? <Empty description="Todavía no has emitido vouchers" /> : (
-                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                    {canjes.map((canje) => (
-                      <div key={canje.id} style={{ padding: 14, borderRadius: 12, background: canje.estado === "redimido" ? "#fafafa" : "#fff7fb", border: `1px solid ${canje.estado === "redimido" ? "#f0f0f0" : "#ffd6e7"}` }}>
-                        <Row gutter={[12, 12]} align="middle">
-                          <Col flex="auto">
-                            <Space direction="vertical" size={4}>
-                              <Space wrap>
-                                <Text strong>{canje.rewardIcon} {canje.rewardTitle}</Text>
-                                <Tag color={canje.estado === "redimido" ? "default" : "success"}>{canje.estado}</Tag>
+          <Tabs
+            activeKey={tabActiva}
+            onChange={setTabActiva}
+            style={{ marginTop: 8 }}
+            items={[
+              {
+                key: "resumen",
+                label: "Resumen",
+                children: (
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={12}>
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><TrophyOutlined style={{ color: nivel.color }} /><Text strong>Beneficios activos</Text></Space>}>
+                        <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                          {beneficiosActivos.map((benefit) => (
+                            <div key={benefit.key} style={{ padding: 12, borderRadius: 12, background: benefit.active ? "#f6ffed" : "#fafafa", border: `1px solid ${benefit.active ? "#b7eb8f" : "#f0f0f0"}` }}>
+                              <Space direction="vertical" size={2}>
+                                <Space wrap>
+                                  <span>{benefit.icon}</span>
+                                  <Text strong>{benefit.title}</Text>
+                                  <Tag color={benefit.active ? "success" : "default"}>{benefit.active ? "activo" : "por desbloquear"}</Tag>
+                                </Space>
+                                <Text type="secondary" style={{ fontSize: 12 }}>{benefit.description}</Text>
                               </Space>
-                              <Text type="secondary" style={{ fontSize: 12 }}>{canje.description}</Text>
-                              <Space wrap>
-                                <Tag color="purple">-{canje.puntos} pts</Tag>
-                                <Tag color="green">${canje.valorCop.toLocaleString()}</Tag>
-                                <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(canje.createdAt).format("DD/MM/YYYY HH:mm")}</Text>
-                              </Space>
-                            </Space>
-                          </Col>
-                          <Col>
-                            {canje.code ? (
-                              <Space direction="vertical" size={6} style={{ textAlign: "center" }}>
-                                <Tag style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8, wordBreak: "break-all" }}>
-                                  {telefonoVerificado ? canje.code : "Verifica tu teléfono para ver el código"}
-                                </Tag>
-                                <Button icon={<CopyOutlined />} onClick={() => canje.code && copiar(canje.code)} disabled={canje.estado === "redimido" || !telefonoVerificado}>Copiar</Button>
-                              </Space>
-                            ) : null}
-                          </Col>
-                        </Row>
-                      </div>
-                    ))}
-                  </Space>
-                )}
-              </Card>
-            </Col>
-
-            <Col xs={24} lg={10}>
-              <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><TrophyOutlined style={{ color: nivel.color }} /><Text strong>Beneficios activos</Text></Space>}>
-                <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                  {beneficiosActivos.map((benefit) => (
-                    <div key={benefit.key} style={{ padding: 12, borderRadius: 12, background: benefit.active ? "#f6ffed" : "#fafafa", border: `1px solid ${benefit.active ? "#b7eb8f" : "#f0f0f0"}` }}>
-                      <Space direction="vertical" size={2}>
-                        <Space wrap>
-                          <span>{benefit.icon}</span>
-                          <Text strong>{benefit.title}</Text>
-                          <Tag color={benefit.active ? "success" : "default"}>{benefit.active ? "activo" : "por desbloquear"}</Tag>
-                        </Space>
-                        <Text type="secondary" style={{ fontSize: 12 }}>{benefit.description}</Text>
-                      </Space>
-                    </div>
-                  ))}
-                </Space>
-              </Card>
-
-              <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><StarOutlined style={{ color: "#faad14" }} /><Text strong>Siguiente recompensa recomendada</Text></Space>}>
-                {siguienteRecompensa ? (
-                  <Space direction="vertical" size={8} style={{ width: "100%" }}>
-                    <Text strong style={{ fontSize: 16 }}>{siguienteRecompensa.icon} {siguienteRecompensa.title}</Text>
-                    <Text type="secondary">{siguienteRecompensa.description}</Text>
-                    <Space wrap>
-                      <Tag color="purple">{siguienteRecompensa.points_cost.toLocaleString()} pts</Tag>
-                      <Tag color="green">${siguienteRecompensa.value_cop.toLocaleString()}</Tag>
-                    </Space>
-                    <Alert type="info" showIcon message={`Te faltan ${Math.max(0, siguienteRecompensa.points_cost - (cliente.puntos_fidelidad || 0)).toLocaleString()} pts para desbloquearla.`} style={{ borderRadius: 10 }} />
-                  </Space>
-                ) : (
-                  <Alert type="success" showIcon message="Ya tienes desbloqueadas todas las recompensas compatibles con tu nivel actual." style={{ borderRadius: 10 }} />
-                )}
-              </Card>
-
-              <Card style={{ borderRadius: 16, marginBottom: 16 }} title="Campañas del club">
-                <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                  <div style={{ padding: 12, borderRadius: 12, background: esCumple ? "#fff0f6" : "#fffbe6", border: `1px solid ${esCumple ? "#ffadd2" : "#ffe58f"}` }}>
-                    <Space direction="vertical" size={4}>
-                      <Text strong>🎂 Campaña de cumpleaños</Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {esCumple ? "Este mes tienes multiplicador de puntos activo y acceso a recompensas especiales." : "Cuando llegue tu mes de cumpleaños se activarán puntos extra y premios temáticos."}
-                      </Text>
-                    </Space>
-                  </div>
-                  <div style={{ padding: 12, borderRadius: 12, background: "#f9f0ff", border: "1px solid #d3adf7" }}>
-                    <Space direction="vertical" size={6} style={{ width: "100%" }}>
-                      <Text strong>🤝 Campaña de referidos</Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Tu código personal suma 300 pts cuando tu referida haga su primera compra.</Text>
-                      <Space wrap style={{ width: "100%" }}>
-                        <Tag color="purple" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8 }}>{referralCode}</Tag>
-                        <Button icon={<CopyOutlined />} onClick={() => copiar(referralCode)}>Copiar código</Button>
-                        <Button icon={<ShareAltOutlined />} onClick={compartirReferido}>Compartir</Button>
-                      </Space>
-                      <Divider style={{ margin: "8px 0" }} />
-                      <Text type="secondary" style={{ fontSize: 12 }}>¿Alguien te refirió? Ingresa su código y le acreditamos 300 puntos:</Text>
-                      {referidoAplicado ? (
-                        <Tag color="success" style={{ fontSize: 12 }}>✅ Código de referido ya aplicado</Tag>
-                      ) : (
-                        <Space.Compact style={{ width: "100%" }}>
-                          <Input
-                            placeholder="COSM-XXXXXXXX"
-                            value={codigoReferidoIngresado}
-                            onChange={e => setCodigoReferidoIngresado(e.target.value.toUpperCase())}
-                            style={{ textTransform: "uppercase", letterSpacing: 1 }}
-                            maxLength={13}
-                            onPressEnter={aplicarCodigoReferido}
-                          />
-                          <Button
-                            type="primary"
-                            loading={aplicandoReferido}
-                            onClick={aplicarCodigoReferido}
-                            disabled={!codigoReferidoIngresado.trim()}
-                          >
-                            Aplicar
-                          </Button>
-                        </Space.Compact>
-                      )}
-                    </Space>
-                  </div>
-                </Space>
-              </Card>
-
-              <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><StarOutlined style={{ color: "#faad14" }} /><Text strong>Tus logros</Text><Tag>{logros.length}/{LOGROS_CATALOGO.length}</Tag></Space>}>
-                <Progress percent={Math.round((logros.length / LOGROS_CATALOGO.length) * 100)} strokeColor={{ "0%": "#d81b87", "100%": "#faad14" }} style={{ marginBottom: 16 }} />
-                <Row gutter={[12, 16]}>
-                  {LOGROS_CATALOGO.map((achievement) => {
-                    const unlocked = logros.includes(achievement.key);
-                    return (
-                      <Col key={achievement.key} xs={8} sm={6} style={{ textAlign: "center" }}>
-                        <Tooltip title={`${achievement.titulo}: ${achievement.desc}`}>
-                          <div>
-                            <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 4px", background: unlocked ? "linear-gradient(135deg,#fff7e6,#ffe7ba)" : "#f5f5f5", border: `2px solid ${unlocked ? "#faad14" : "#e0e0e0"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, opacity: unlocked ? 1 : 0.35, filter: unlocked ? "none" : "grayscale(100%)", boxShadow: unlocked ? "0 2px 8px rgba(250,173,20,0.35)" : "none" }}>
-                              {unlocked ? achievement.emoji : <LockOutlined style={{ color: "#bbb", fontSize: 18 }} />}
                             </div>
-                            <Text style={{ fontSize: 10, color: unlocked ? "#333" : "#bbb", display: "block" }}>{achievement.titulo}</Text>
-                          </div>
-                        </Tooltip>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              </Card>
-            </Col>
-          </Row>
-
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={14}>
-              <Card style={{ borderRadius: 16, marginBottom: 24 }} title={<Space><GiftOutlined />Historial de puntos</Space>}>
-                {historial.length === 0 ? <Empty description="Sin movimientos registrados" /> : (
-                  <Timeline
-                    items={historial.map((item) => ({
-                      color: item.puntos > 0 ? "green" : "red",
-                      children: (
-                        <div>
-                          <Space wrap>
-                            <Tag color={item.puntos > 0 ? "success" : "error"}>{item.puntos > 0 ? "+" : ""}{item.puntos} pts</Tag>
-                            <Text style={{ fontSize: 13 }}>{item.concepto}</Text>
+                          ))}
+                        </Space>
+                      </Card>
+                    </Col>
+                    <Col xs={24} lg={12}>
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><StarOutlined style={{ color: "#faad14" }} /><Text strong>Siguiente recompensa</Text></Space>}>
+                        {siguienteRecompensa ? (
+                          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                            <Text strong style={{ fontSize: 16 }}>{siguienteRecompensa.icon} {siguienteRecompensa.title}</Text>
+                            <Text type="secondary">{siguienteRecompensa.description}</Text>
+                            <Space wrap>
+                              <Tag color="purple">{siguienteRecompensa.points_cost.toLocaleString()} pts</Tag>
+                              <Tag color="green">${siguienteRecompensa.value_cop.toLocaleString()}</Tag>
+                            </Space>
+                            <Alert type="info" showIcon message={`Te faltan ${Math.max(0, siguienteRecompensa.points_cost - (cliente.puntos_fidelidad || 0)).toLocaleString()} pts para desbloquearla.`} style={{ borderRadius: 10 }} />
                           </Space>
-                          <Text type="secondary" style={{ fontSize: 11, display: "block" }}>{dayjs(item.created_at).format("DD/MM/YYYY HH:mm")}</Text>
-                        </div>
-                      ),
-                    }))}
-                  />
-                )}
-              </Card>
-            </Col>
-            <Col xs={24} lg={10}>
-              <Card style={{ borderRadius: 16, marginBottom: 24 }} title="Cómo ganar más puntos">
-                <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                  {[
-                    { icon: "💵", text: "Gana 1 punto por cada $1.000 de compra." },
-                    { icon: "🎂", text: "El mes de tu cumpleaños se activan puntos extra según tu nivel." },
-                    { icon: "🤝", text: "Recibe 300 pts cuando una referida compre por primera vez." },
-                    { icon: "🔥", text: "Mantén tu racha mensual para desbloquear logros." },
-                    { icon: "🎟️", text: "Convierte tus puntos en vouchers que ya funcionan en caja." },
-                  ].map((item) => (
-                    <div key={item.text} style={{ padding: 12, borderRadius: 12, background: "#fff", border: "1px solid #f0f0f0" }}>
-                      <Space>
-                        <span style={{ fontSize: 18 }}>{item.icon}</span>
-                        <Text style={{ fontSize: 12 }}>{item.text}</Text>
-                      </Space>
-                    </div>
-                  ))}
-                </Space>
-              </Card>
-            </Col>
-          </Row>
+                        ) : (
+                          <Alert type="success" showIcon message="Ya tienes desbloqueadas todas las recompensas compatibles con tu nivel actual." style={{ borderRadius: 10 }} />
+                        )}
+                      </Card>
 
-          <Card style={{ borderRadius: 16, textAlign: "center", background: "linear-gradient(135deg,#fff0f8,#ffe4f2)" }}>
-            <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 8 }}>¿Quieres ayuda para usar tu código o revisar tu club?</Text>
-            <Button
-              type="primary"
-              icon={<PhoneOutlined />}
-              style={{ background: "#25D366", borderColor: "#25D366" }}
-              onClick={() => window.open("https://wa.me/57XXXXXXXXXX?text=Hola! Quiero consultar mis puntos del Club La Cosmetikera", "_blank")}
-            >
-              Contáctanos por WhatsApp
-            </Button>
-          </Card>
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><StarOutlined style={{ color: "#faad14" }} /><Text strong>Tus logros</Text><Tag>{logros.length}/{LOGROS_CATALOGO.length}</Tag></Space>}>
+                        <Progress percent={Math.round((logros.length / LOGROS_CATALOGO.length) * 100)} strokeColor={{ "0%": "#d81b87", "100%": "#faad14" }} style={{ marginBottom: 16 }} />
+                        <Row gutter={[12, 16]}>
+                          {LOGROS_CATALOGO.map((achievement) => {
+                            const unlocked = logros.includes(achievement.key);
+                            return (
+                              <Col key={achievement.key} xs={8} sm={6} style={{ textAlign: "center" }}>
+                                <Tooltip title={`${achievement.titulo}: ${achievement.desc}`}>
+                                  <div>
+                                    <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 4px", background: unlocked ? "linear-gradient(135deg,#fff7e6,#ffe7ba)" : "#f5f5f5", border: `2px solid ${unlocked ? "#faad14" : "#e0e0e0"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, opacity: unlocked ? 1 : 0.35, filter: unlocked ? "none" : "grayscale(100%)", boxShadow: unlocked ? "0 2px 8px rgba(250,173,20,0.35)" : "none" }}>
+                                      {unlocked ? achievement.emoji : <LockOutlined style={{ color: "#bbb", fontSize: 18 }} />}
+                                    </div>
+                                    <Text style={{ fontSize: 10, color: unlocked ? "#333" : "#bbb", display: "block" }}>{achievement.titulo}</Text>
+                                  </div>
+                                </Tooltip>
+                              </Col>
+                            );
+                          })}
+                        </Row>
+                      </Card>
+                    </Col>
+                  </Row>
+                ),
+              },
+              {
+                key: "recompensas",
+                label: "Recompensas",
+                children: (
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24}>
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined style={{ color: "#d81b87" }} /><Text strong>Catálogo de recompensas</Text></Space>} extra={<Tag color="magenta">{recompensasDisponibles.length} disponibles</Tag>}>
+                        <Row gutter={[12, 12]}>
+                          {loadingConfig ? <Col span={24}><Spin /></Col> : catalogoDinamico.map((reward) => {
+                            const unlocked = isRewardEligibleDynamic(reward, cliente, reglas, esCumple);
+                            const faltantes = Math.max(0, reward.points_cost - (cliente.puntos_fidelidad || 0));
+                            return (
+                              <Col xs={24} md={12} key={reward.key}>
+                                <Card size="small" style={{ borderRadius: 14, border: unlocked ? "1px solid #f0d6ff" : "1px solid #f0f0f0", minHeight: 220, background: unlocked ? "linear-gradient(180deg,#fff,#fff7fb)" : "#fafafa" }}>
+                                  <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                                    <Space wrap>
+                                      <span style={{ fontSize: 24 }}>{reward.icon}</span>
+                                      <Text strong>{reward.title}</Text>
+                                      {reward.badge && <Tag color={reward.featured ? "gold" : "default"}>{reward.badge}</Tag>}
+                                    </Space>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>{reward.description}</Text>
+                                    <Space wrap>
+                                      <Tag color="purple">{reward.points_cost.toLocaleString()} pts</Tag>
+                                      <Tag color="green">${reward.value_cop.toLocaleString()}</Tag>
+                                      {reward.level_min && <Tag>{reward.level_min}</Tag>}
+                                      {reward.birthday_only && <Tag color="pink">solo cumpleaños</Tag>}
+                                    </Space>
+                                    {!unlocked && (
+                                      <Alert
+                                        type="info"
+                                        showIcon
+                                        message={reward.birthday_only && !esCumple ? "Disponible solo en tu mes de cumpleaños" : faltantes > 0 ? `Te faltan ${faltantes.toLocaleString()} pts` : "Tu nivel aún no la desbloquea"}
+                                        style={{ borderRadius: 10 }}
+                                      />
+                                    )}
+                                    <Button
+                                      type={unlocked ? "primary" : "default"}
+                                      disabled={!unlocked}
+                                      loading={canjeando === reward.key}
+                                      onClick={() => solicitarCanje(reward.key)}
+                                      style={unlocked ? { background: "#d81b87", borderColor: "#d81b87" } : undefined}
+                                    >
+                                      {unlocked ? "Canjear ahora" : "Bloqueada"}
+                                    </Button>
+                                  </Space>
+                                </Card>
+                              </Col>
+                            );
+                          })}
+                        </Row>
+                      </Card>
+
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined /><Text strong>Mis vouchers y canjes</Text></Space>}>
+                        {canjes.length === 0 ? <Empty description="Todavía no has emitido vouchers" /> : (
+                          <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                            {canjes.map((canje) => (
+                              <div key={canje.id} style={{ padding: 14, borderRadius: 12, background: canje.estado === "redimido" ? "#fafafa" : "#fff7fb", border: `1px solid ${canje.estado === "redimido" ? "#f0f0f0" : "#ffd6e7"}` }}>
+                                <Row gutter={[12, 12]} align="middle">
+                                  <Col flex="auto">
+                                    <Space direction="vertical" size={4}>
+                                      <Space wrap>
+                                        <Text strong>{canje.rewardIcon} {canje.rewardTitle}</Text>
+                                        <Tag color={canje.estado === "redimido" ? "default" : "success"}>{canje.estado}</Tag>
+                                      </Space>
+                                      <Text type="secondary" style={{ fontSize: 12 }}>{canje.description}</Text>
+                                      <Space wrap>
+                                        <Tag color="purple">-{canje.puntos} pts</Tag>
+                                        <Tag color="green">${canje.valorCop.toLocaleString()}</Tag>
+                                        <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(canje.createdAt).format("DD/MM/YYYY HH:mm")}</Text>
+                                      </Space>
+                                    </Space>
+                                  </Col>
+                                  <Col>
+                                    {canje.code ? (
+                                      <Space direction="vertical" size={6} style={{ textAlign: "center" }}>
+                                        <Tag style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8, wordBreak: "break-all" }}>{canje.code}</Tag>
+                                        <Button icon={<CopyOutlined />} onClick={() => canje.code && copiar(canje.code)} disabled={canje.estado === "redimido"}>Copiar</Button>
+                                      </Space>
+                                    ) : null}
+                                  </Col>
+                                </Row>
+                              </div>
+                            ))}
+                          </Space>
+                        )}
+                      </Card>
+                    </Col>
+                  </Row>
+                ),
+              },
+              {
+                key: "actividad",
+                label: "Actividad",
+                children: (
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={14}>
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined />Historial de puntos</Space>}>
+                        {historial.length === 0 ? <Empty description="Sin movimientos registrados" /> : (
+                          <Timeline
+                            items={historial.map((item) => ({
+                              color: item.puntos > 0 ? "green" : "red",
+                              children: (
+                                <div>
+                                  <Space wrap>
+                                    <Tag color={item.puntos > 0 ? "success" : "error"}>{item.puntos > 0 ? "+" : ""}{item.puntos} pts</Tag>
+                                    <Text style={{ fontSize: 13 }}>{item.concepto}</Text>
+                                  </Space>
+                                  <Text type="secondary" style={{ fontSize: 11, display: "block" }}>{dayjs(item.created_at).format("DD/MM/YYYY HH:mm")}</Text>
+                                </div>
+                              ),
+                            }))}
+                          />
+                        )}
+                      </Card>
+
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title="Campañas del club">
+                        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                          <div style={{ padding: 12, borderRadius: 12, background: esCumple ? "#fff0f6" : "#fffbe6", border: `1px solid ${esCumple ? "#ffadd2" : "#ffe58f"}` }}>
+                            <Space direction="vertical" size={4}>
+                              <Text strong>🎂 Campaña de cumpleaños</Text>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {esCumple ? "Este mes tienes multiplicador de puntos activo y acceso a recompensas especiales." : "Cuando llegue tu mes de cumpleaños se activarán puntos extra y premios temáticos."}
+                              </Text>
+                            </Space>
+                          </div>
+                          <div style={{ padding: 12, borderRadius: 12, background: "#f9f0ff", border: "1px solid #d3adf7" }}>
+                            <Space direction="vertical" size={6} style={{ width: "100%" }}>
+                              <Text strong>🤝 Campaña de referidos</Text>
+                              <Text type="secondary" style={{ fontSize: 12 }}>Tu código personal suma 300 pts cuando tu referida haga su primera compra.</Text>
+                              <Space wrap style={{ width: "100%" }}>
+                                <Tag color="purple" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8 }}>{referralCode}</Tag>
+                                <Button icon={<CopyOutlined />} onClick={() => copiar(referralCode)}>Copiar código</Button>
+                                <Button icon={<ShareAltOutlined />} onClick={compartirReferido}>Compartir</Button>
+                              </Space>
+                              <Divider style={{ margin: "8px 0" }} />
+                              <Text type="secondary" style={{ fontSize: 12 }}>¿Alguien te refirió? Ingresa su código y le acreditamos 300 puntos:</Text>
+                              {referidoAplicado ? (
+                                <Tag color="success" style={{ fontSize: 12 }}>✅ Código de referido ya aplicado</Tag>
+                              ) : (
+                                <Space.Compact style={{ width: "100%" }}>
+                                  <Input
+                                    placeholder="COSM-XXXXXXXX"
+                                    value={codigoReferidoIngresado}
+                                    onChange={e => setCodigoReferidoIngresado(e.target.value.toUpperCase())}
+                                    style={{ textTransform: "uppercase", letterSpacing: 1 }}
+                                    maxLength={13}
+                                    onPressEnter={aplicarCodigoReferido}
+                                  />
+                                  <Button
+                                    type="primary"
+                                    loading={aplicandoReferido}
+                                    onClick={aplicarCodigoReferido}
+                                    disabled={!codigoReferidoIngresado.trim()}
+                                  >
+                                    Aplicar
+                                  </Button>
+                                </Space.Compact>
+                              )}
+                            </Space>
+                          </div>
+                        </Space>
+                      </Card>
+                    </Col>
+
+                    <Col xs={24} lg={10}>
+                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title="Cómo ganar más puntos">
+                        <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                          {[
+                            { icon: "💵", text: "Gana 1 punto por cada $1.000 de compra." },
+                            { icon: "🎂", text: "El mes de tu cumpleaños se activan puntos extra según tu nivel." },
+                            { icon: "🤝", text: "Recibe 300 pts cuando una referida compre por primera vez." },
+                            { icon: "🔥", text: "Mantén tu racha mensual para desbloquear logros." },
+                            { icon: "🎟️", text: "Convierte tus puntos en vouchers que ya funcionan en caja." },
+                          ].map((item) => (
+                            <div key={item.text} style={{ padding: 12, borderRadius: 12, background: "#fff", border: "1px solid #f0f0f0" }}>
+                              <Space>
+                                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                                <Text style={{ fontSize: 12 }}>{item.text}</Text>
+                              </Space>
+                            </div>
+                          ))}
+                        </Space>
+                      </Card>
+
+                      <Card style={{ borderRadius: 16, textAlign: "center", background: "linear-gradient(135deg,#fff0f8,#ffe4f2)" }}>
+                        <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 8 }}>¿Quieres ayuda para usar tu código o revisar tu club?</Text>
+                        <Button
+                          type="primary"
+                          icon={<PhoneOutlined />}
+                          style={{ background: "#25D366", borderColor: "#25D366" }}
+                          onClick={() => window.open("https://wa.me/57XXXXXXXXXX?text=Hola! Quiero consultar mis puntos del Club La Cosmetikera", "_blank")}
+                        >
+                          Contáctanos por WhatsApp
+                        </Button>
+                      </Card>
+                    </Col>
+                  </Row>
+                ),
+              },
+            ]}
+          />
+
+          <Modal
+            title="Confirmar canje con teléfono"
+            open={canjeModalOpen}
+            onCancel={() => {
+              setCanjeModalOpen(false);
+              setRewardPendiente(null);
+              setTelefonoCanje("");
+            }}
+            onOk={confirmarCanje}
+            okText="Confirmar canje"
+            cancelText="Cancelar"
+            confirmLoading={!!rewardPendiente && canjeando === rewardPendiente}
+          >
+            <Space direction="vertical" size={10} style={{ width: "100%" }}>
+              <Text type="secondary">Para seguridad, ingresa el teléfono registrado de la clienta para este canje.</Text>
+              <Input
+                prefix={<PhoneOutlined style={{ color: "#d81b87" }} />}
+                placeholder="Ej: 3001234567"
+                value={telefonoCanje}
+                onChange={(event) => setTelefonoCanje(event.target.value.replace(/\D/g, ""))}
+                maxLength={15}
+                onPressEnter={confirmarCanje}
+              />
+            </Space>
+          </Modal>
         </div>
       )}
 

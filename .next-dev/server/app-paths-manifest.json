@@ -1,5 +1,4 @@
 {
-  "/api/club/route": "app/api/club/route.js",
   "/clientes/page": "app/clientes/page.js",
   "/historial/page": "app/historial/page.js",
   "/ventas/page": "app/ventas/page.js",
