@@ -9,9 +9,19 @@ function getAdminClient() {
   );
 }
 
+function maskPhone(value: unknown) {
+  if (typeof value !== "string") return "";
+  const digits = value.replace(/\D/g, "").trim();
+  if (digits.length < 4) return "";
+  const visibleStart = digits.slice(0, Math.min(3, digits.length - 2));
+  const visibleEnd = digits.slice(-2);
+  const hidden = "•".repeat(Math.max(0, digits.length - visibleStart.length - visibleEnd.length));
+  return `${visibleStart}${hidden}${visibleEnd}`;
+}
+
 /**
  * GET /api/club?acceso=1234567890
- * Busca el perfil de un cliente por cédula, teléfono principal o alterno.
+ * Busca el perfil de un cliente por cédula.
  * Usa service role para evitar problemas de RLS.
  */
 export async function GET(request: Request) {
@@ -35,11 +45,11 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("perfiles")
       .select(
-        "id,nombre_completo,telefono,telefono_2,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento,total_compras,logros,racha_visitas"
+        "id,nombre_completo,telefono,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento"
       )
-      .or(`cedula.eq.${acceso},telefono.eq.${acceso},telefono_2.eq.${acceso},telefono.ilike.*${acceso}*,telefono_2.ilike.*${acceso}*`)
+      .eq("cedula", acceso)
       .eq("rol", "cliente")
-      .eq("activo", true)
+      .or("activo.is.null,activo.eq.true")
       .limit(1)
       .maybeSingle();
 
@@ -52,7 +62,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    return NextResponse.json({ data });
+    return NextResponse.json({
+      data: {
+        ...data,
+        telefono: maskPhone(data.telefono),
+      },
+    });
   } catch (err) {
     console.error("[GET /api/club] unexpected", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

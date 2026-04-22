@@ -16,6 +16,11 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+function normalizePhone(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\D/g, "").trim();
+}
+
 function normalizeCanje(canje: any) {
   const meta = parseRewardCanjeDescription(canje.descripcion);
   const reward = getRewardByKey(meta?.rewardKey);
@@ -56,16 +61,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { perfilId, rewardKey } = await request.json();
-    if (!perfilId || !rewardKey) {
-      return NextResponse.json({ error: "perfilId y rewardKey son requeridos" }, { status: 400 });
+    const { perfilId, rewardKey, telefonoVerificacion } = await request.json();
+    if (!perfilId || !rewardKey || !telefonoVerificacion) {
+      return NextResponse.json({ error: "perfilId, rewardKey y telefonoVerificacion son requeridos" }, { status: 400 });
     }
 
     // Cargar config dinámica (recompensas + reglas) desde la BD
     const [clientRes, configRes] = await Promise.all([
       supabaseAdmin
         .from("perfiles")
-        .select("id,nombre_completo,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento")
+        .select("id,nombre_completo,telefono,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento")
         .eq("id", perfilId)
         .single(),
       supabaseAdmin
@@ -82,6 +87,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: clientRes.error?.message || "Cliente no encontrado" }, { status: 404 });
     }
     const client = clientRes.data;
+
+    const telefonoIngresado = normalizePhone(telefonoVerificacion);
+    const telefonoPrincipal = normalizePhone(client.telefono);
+
+    if (!telefonoPrincipal) {
+      return NextResponse.json({ error: "Este cliente no tiene teléfono registrado. Actualízalo antes de usar puntos." }, { status: 409 });
+    }
+
+    if (!telefonoIngresado || telefonoIngresado !== telefonoPrincipal) {
+      return NextResponse.json({ error: "La segunda verificación por teléfono no coincide" }, { status: 403 });
+    }
 
     // Construir reglas dinámicas (con fallback a defaults)
     const reglasRaw = reglasDbRes.data ?? [];

@@ -317,6 +317,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../src/app/api/club/verificar/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/club/verificar">> = Specific
+  const handler = {} as typeof import("../../src/app/api/club/verificar/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/api/club/voucher/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/club/voucher">> = Specific

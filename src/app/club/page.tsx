@@ -50,7 +50,6 @@ type Cliente = {
   id: string;
   nombre_completo: string;
   telefono?: string;
-  telefono_2?: string;
   cedula?: string;
   puntos_fidelidad?: number;
   puntos_canjeados?: number;
@@ -116,6 +115,10 @@ function calcularLogros(c: Cliente): string[] {
   return [...new Set(logros)];
 }
 
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "").trim();
+}
+
 export default function ClubPage() {
   const { message } = App.useApp();
   const [acceso, setAcceso] = useState("");
@@ -128,6 +131,9 @@ export default function ClubPage() {
   const [codigoReferidoIngresado, setCodigoReferidoIngresado] = useState("");
   const [aplicandoReferido, setAplicandoReferido] = useState(false);
   const [referidoAplicado, setReferidoAplicado] = useState(false);
+  const [telefonoVerificacion, setTelefonoVerificacion] = useState("");
+  const [telefonoVerificado, setTelefonoVerificado] = useState(false);
+  const [verificandoTelefono, setVerificandoTelefono] = useState(false);
 
   const cargarCanjes = useCallback(async (perfilId: string) => {
     const response = await fetch(`/api/club/canjes?perfil_id=${encodeURIComponent(perfilId)}`);
@@ -145,13 +151,15 @@ export default function ClubPage() {
     setHistorial([]);
     setCanjes([]);
     setError("");
+    setTelefonoVerificacion("");
+    setTelefonoVerificado(false);
 
     try {
       const res = await fetch(`/api/club?acceso=${encodeURIComponent(val)}`);
       const json = await res.json();
 
       if (res.status === 404 || !json.data) {
-        setError("No encontramos una cuenta con ese dato. Intenta con cédula, teléfono principal o teléfono alterno.");
+        setError("No encontramos una cuenta con esa cédula.");
         return;
       }
       if (!res.ok) throw new Error(json.error || "Error");
@@ -177,14 +185,54 @@ export default function ClubPage() {
     }
   }, [acceso, cargarCanjes]);
 
+  const verificarTelefono = useCallback(async () => {
+    if (!cliente) return false;
+
+    const telefono = normalizePhone(telefonoVerificacion);
+    if (!telefono) {
+      message.error("Ingresa tu número de teléfono para continuar");
+      return false;
+    }
+
+    setVerificandoTelefono(true);
+    try {
+      const response = await fetch("/api/club/verificar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ perfilId: cliente.id, telefono }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "No se pudo verificar el teléfono");
+      setTelefonoVerificado(true);
+      message.success("Segunda verificación aprobada");
+      return true;
+    } catch (requestError: unknown) {
+      setTelefonoVerificado(false);
+      const errorMessage = requestError instanceof Error
+        ? requestError.message
+        : "No se pudo verificar el teléfono";
+      message.error(errorMessage);
+      return false;
+    } finally {
+      setVerificandoTelefono(false);
+    }
+  }, [cliente, message, telefonoVerificacion]);
+
   const canjearRecompensa = useCallback(async (rewardKey: string) => {
     if (!cliente) return;
+
+    const telefono = normalizePhone(telefonoVerificacion);
+    if (!telefonoVerificado || !telefono) {
+      message.error("Verifica tu teléfono antes de usar puntos o beneficios");
+      return;
+    }
+
     setCanjeando(rewardKey);
     try {
       const response = await fetch("/api/club/canjes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ perfilId: cliente.id, rewardKey }),
+        body: JSON.stringify({ perfilId: cliente.id, rewardKey, telefonoVerificacion: telefono }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || "No se pudo generar el voucher");
@@ -206,6 +254,7 @@ export default function ClubPage() {
       }, ...current]);
       message.success(`Voucher emitido: ${json.data.code}`);
     } catch (requestError: unknown) {
+      setTelefonoVerificado(false);
       const errorMessage = requestError instanceof Error
         ? requestError.message
         : "No se pudo emitir la recompensa";
@@ -213,7 +262,7 @@ export default function ClubPage() {
     } finally {
       setCanjeando(null);
     }
-  }, [cliente, message]);
+  }, [cliente, message, telefonoVerificacion, telefonoVerificado]);
 
   const copiar = useCallback(async (texto: string) => {
     try {
@@ -354,12 +403,12 @@ export default function ClubPage() {
       {!cliente && (
         <Card style={{ width: "100%", maxWidth: 560, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 24 }}>
           <Title level={5} style={{ marginTop: 0 }}>Consulta y canjea tus beneficios</Title>
-          <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>Ingresa tu cédula, teléfono principal o teléfono alterno para abrir tu wallet del club</Text>
+          <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>Ingresa tu cédula para abrir tu wallet del club. El teléfono se pedirá solo cuando uses puntos o beneficios.</Text>
           <Form onFinish={buscar}>
             <Space.Compact style={{ width: "100%" }}>
               <Input
                 prefix={<SearchOutlined style={{ color: "#d81b87" }} />}
-                placeholder="Ej: 1234567890 o 3001234567"
+                placeholder="Ej: 1234567890"
                 value={acceso}
                 onChange={(event) => setAcceso(event.target.value.replace(/\D/g, ""))}
                 size="large"
@@ -395,12 +444,21 @@ export default function ClubPage() {
                     <Tag style={{ background: nivel.color, color: "#fff", border: "none", fontSize: 13, padding: "2px 12px" }}>{nivel.icon} {nivel.label}</Tag>
                   </Space>
                   {cliente.cedula && <Text type="secondary" style={{ fontSize: 12 }}>CC: {cliente.cedula}</Text>}
-                  {cliente.telefono && <Text type="secondary" style={{ fontSize: 12 }}><PhoneOutlined /> {cliente.telefono}</Text>}
-                  {cliente.telefono_2 && cliente.telefono_2 !== cliente.telefono && <Text type="secondary" style={{ fontSize: 12 }}><PhoneOutlined /> Alterno: {cliente.telefono_2}</Text>}
-                  <Text type="secondary" style={{ fontSize: 12 }}>Tu portal ya puede emitir vouchers para usar en caja.</Text>
+                  {cliente.telefono && <Text type="secondary" style={{ fontSize: 12 }}><PhoneOutlined /> Verificación disponible con el teléfono terminado en {cliente.telefono.slice(-2)}</Text>}
+                  <Text type="secondary" style={{ fontSize: 12 }}>Tu portal muestra puntos y campañas con cédula, pero exige teléfono para usar puntos o revelar vouchers.</Text>
                   <Button
                     size="small"
-                    onClick={() => { setCliente(null); setAcceso(""); setError(""); setHistorial([]); setCanjes([]); setReferidoAplicado(false); setCodigoReferidoIngresado(""); }}
+                    onClick={() => {
+                      setCliente(null);
+                      setAcceso("");
+                      setError("");
+                      setHistorial([]);
+                      setCanjes([]);
+                      setReferidoAplicado(false);
+                      setCodigoReferidoIngresado("");
+                      setTelefonoVerificacion("");
+                      setTelefonoVerificado(false);
+                    }}
                     style={{ marginTop: 4, color: "#888", borderColor: "#ddd", fontSize: 11 }}
                   >
                     ← Cambiar dato de acceso
@@ -443,6 +501,38 @@ export default function ClubPage() {
             ) : (
               <Alert style={{ marginTop: 12, borderRadius: 8 }} type="success" message="Estás en el nivel más alto del club." showIcon />
             )}
+
+            <Card size="small" style={{ marginTop: 16, borderRadius: 12, background: telefonoVerificado ? "#f6ffed" : "#fffbe6", border: `1px solid ${telefonoVerificado ? "#b7eb8f" : "#ffe58f"}` }}>
+              <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                <div>
+                  <Text strong>Segunda verificación para usar puntos</Text>
+                  <Text type="secondary" style={{ fontSize: 12, display: "block" }}>
+                    Ingresa tu teléfono registrado para habilitar canjes y ver los códigos completos de tus vouchers.
+                  </Text>
+                </div>
+                <Space.Compact style={{ width: "100%" }}>
+                  <Input
+                    prefix={<PhoneOutlined style={{ color: "#d81b87" }} />}
+                    placeholder="Ej: 3001234567"
+                    value={telefonoVerificacion}
+                    onChange={(event) => {
+                      setTelefonoVerificacion(event.target.value.replace(/\D/g, ""));
+                      if (telefonoVerificado) setTelefonoVerificado(false);
+                    }}
+                    maxLength={15}
+                  />
+                  <Button type="primary" onClick={verificarTelefono} loading={verificandoTelefono} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
+                    {telefonoVerificado ? "Verificado" : "Verificar"}
+                  </Button>
+                </Space.Compact>
+                <Alert
+                  type={telefonoVerificado ? "success" : "info"}
+                  showIcon
+                  message={telefonoVerificado ? "Identidad confirmada. Ya puedes usar puntos y copiar vouchers." : "Tu cédula abre el portal, pero el teléfono protege el uso de puntos y beneficios."}
+                  style={{ borderRadius: 10 }}
+                />
+              </Space>
+            </Card>
           </Card>
 
           <Row gutter={[16, 16]}>
@@ -478,12 +568,12 @@ export default function ClubPage() {
                             )}
                             <Button
                               type={unlocked ? "primary" : "default"}
-                              disabled={!unlocked}
+                              disabled={!unlocked || !telefonoVerificado}
                               loading={canjeando === reward.key}
                               onClick={() => canjearRecompensa(reward.key)}
                               style={unlocked ? { background: "#d81b87", borderColor: "#d81b87" } : undefined}
                             >
-                              {unlocked ? "Canjear ahora" : "Bloqueada"}
+                              {unlocked ? (telefonoVerificado ? "Canjear ahora" : "Verifica tu teléfono") : "Bloqueada"}
                             </Button>
                           </Space>
                         </Card>
@@ -516,8 +606,10 @@ export default function ClubPage() {
                           <Col>
                             {canje.code ? (
                               <Space direction="vertical" size={6} style={{ textAlign: "center" }}>
-                                <Tag style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8, wordBreak: "break-all" }}>{canje.code}</Tag>
-                                <Button icon={<CopyOutlined />} onClick={() => canje.code && copiar(canje.code)} disabled={canje.estado === "redimido"}>Copiar</Button>
+                                <Tag style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8, wordBreak: "break-all" }}>
+                                  {telefonoVerificado ? canje.code : "Verifica tu teléfono para ver el código"}
+                                </Tag>
+                                <Button icon={<CopyOutlined />} onClick={() => canje.code && copiar(canje.code)} disabled={canje.estado === "redimido" || !telefonoVerificado}>Copiar</Button>
                               </Space>
                             ) : null}
                           </Col>

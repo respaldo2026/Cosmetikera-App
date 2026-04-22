@@ -24,11 +24,7 @@ function normalizarPayload(body: Record<string, unknown>) {
 
   if ("cedula" in payload) payload.cedula = limpiarNumero(payload.cedula);
   if ("telefono" in payload) payload.telefono = limpiarNumero(payload.telefono);
-  if ("telefono_2" in payload) payload.telefono_2 = limpiarNumero(payload.telefono_2);
-
-  if (payload.telefono && payload.telefono === payload.telefono_2) {
-    payload.telefono_2 = null;
-  }
+  if ("telefono_2" in payload) delete payload.telefono_2;
 
   return payload;
 }
@@ -41,7 +37,7 @@ export async function GET(request: Request) {
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from("perfiles")
-      .select("id,nombre_completo,telefono,telefono_2,email,cedula,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,total_compras,activo,created_at")
+      .select("id,nombre_completo,telefono,email,cedula,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,activo,created_at")
       .eq("rol", rol)
       .order("nombre_completo");
 
@@ -87,7 +83,6 @@ export async function POST(request: Request) {
     const {
       nombre_completo,
       telefono,
-      telefono_2,
       email,
       cedula,
       fecha_nacimiento,
@@ -100,7 +95,6 @@ export async function POST(request: Request) {
 
     const cedulaNormalizada = limpiarNumero(cedula);
     const telefonoNormalizado = limpiarNumero(telefono);
-    const telefonoAlternoNormalizado = limpiarNumero(telefono_2);
 
     if (!nombre_completo?.trim()) {
       return NextResponse.json(
@@ -130,13 +124,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (telefonoAlternoNormalizado && !/^\d{7,15}$/.test(telefonoAlternoNormalizado)) {
-      return NextResponse.json(
-        { error: "El teléfono alterno debe contener solo dígitos (7-15 caracteres)" },
-        { status: 400 }
-      );
-    }
-
     const supabase = getAdminClient();
 
     const { data, error } = await supabase
@@ -144,9 +131,6 @@ export async function POST(request: Request) {
       .insert({
         nombre_completo: nombre_completo.trim(),
         telefono: telefonoNormalizado,
-        telefono_2: telefonoAlternoNormalizado && telefonoAlternoNormalizado !== telefonoNormalizado
-          ? telefonoAlternoNormalizado
-          : null,
         email: email || null,
         cedula: cedulaNormalizada,
         fecha_nacimiento: fecha_nacimiento || null,
