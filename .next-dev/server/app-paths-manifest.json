@@ -1,3 +1,6 @@
 {
-  "/marketing-center/page": "app/marketing-center/page.js"
+  "/articulos/page": "app/articulos/page.js",
+  "/clientes/page": "app/clientes/page.js",
+  "/historial/page": "app/historial/page.js",
+  "/ventas/page": "app/ventas/page.js"
 }
