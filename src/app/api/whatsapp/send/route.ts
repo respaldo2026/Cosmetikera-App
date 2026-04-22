@@ -10,13 +10,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { WhatsAppService } from "@/services/whatsapp-service";
 import type { WhatsAppSendRequest, WhatsAppSendResponse } from "@/types/whatsapp";
 
 /**
  * Valida que la solicitud venga de Make o del frontend autenticado
  */
-function validateRequest(request: NextRequest): boolean {
+async function validateRequest(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get("x-api-key");
   const expectedKey = process.env.WHATSAPP_API_KEY;
 
@@ -25,12 +26,27 @@ function validateRequest(request: NextRequest): boolean {
     return apiKey === expectedKey;
   }
 
-  // Si no hay API key, permitir (asumiendo que viene del frontend autenticado)
-  // NOTA: Aquí puedes agregar validación de sesión si lo necesitas
-  // const session = await getServerSession();
-  // if (!session) return false;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return false;
+  }
 
-  return true; // Permitir llamadas desde el frontend
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll() {
+        // En este endpoint no necesitamos mutar cookies.
+      },
+    },
+  });
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return false;
+
+  return Boolean(data.user?.id);
 }
 
 /**
@@ -39,7 +55,7 @@ function validateRequest(request: NextRequest): boolean {
 export async function POST(request: NextRequest) {
   try {
     // 1. Validar autenticación
-    if (!validateRequest(request)) {
+    if (!(await validateRequest(request))) {
       return NextResponse.json(
         { success: false, error: "No autorizado" } as WhatsAppSendResponse,
         { status: 401 }

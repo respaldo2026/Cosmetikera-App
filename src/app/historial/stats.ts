@@ -117,7 +117,7 @@ export function buildComparisonMetric(current: number, previous: number): Compar
 }
 
 export function getCurrentAndPreviousRanges(
-  periodo: "hoy" | "semana" | "mes" | "personalizado" | "todo",
+  periodo: "hoy" | "semana" | "mes" | "anio" | "personalizado" | "todo",
   rango: [dayjs.Dayjs, dayjs.Dayjs] | null,
   now = dayjs()
 ): { current: RangeBounds | null; previous: RangeBounds | null } {
@@ -160,6 +160,19 @@ export function getCurrentAndPreviousRanges(
         start: start.subtract(1, "month"),
         end: end.subtract(1, "month"),
         label: "Mes anterior",
+      },
+    };
+  }
+
+  if (periodo === "anio") {
+    const start = now.startOf("year");
+    const end = now.endOf("year");
+    return {
+      current: { start, end, label: "Este año" },
+      previous: {
+        start: start.subtract(1, "year"),
+        end: end.subtract(1, "year"),
+        label: "Año anterior",
       },
     };
   }

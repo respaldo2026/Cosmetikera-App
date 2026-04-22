@@ -62,6 +62,13 @@ import { RolesPermissionsProvider, useRolesPermissions } from "@/contexts/roles-
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
+const isDebugLogging = process.env.NODE_ENV !== "production";
+const debugLog = (...args: unknown[]) => {
+  if (isDebugLogging) {
+    console.log(...args);
+  }
+};
+
 const allResources = [
   // ── VISTA GENERAL ────────────────────────────────────────────────
   {
@@ -629,9 +636,9 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
     if (["admin", "director", "administrativo"].includes(normalized)) normalized = "administrador";
     if (["secretaria", "asesor"].includes(normalized)) normalized = "vendedor";
     if (["estudiante", "egresado"].includes(normalized)) normalized = "cliente";
-    console.log("[AppShell] User object:", user);
-    console.log("[AppShell] Raw role:", rawRole);
-    console.log("[AppShell] Normalized role:", normalized);
+    debugLog("[AppShell] User object:", user);
+    debugLog("[AppShell] Raw role:", rawRole);
+    debugLog("[AppShell] Normalized role:", normalized);
     return normalized;
   }, [user]);
 
@@ -684,14 +691,14 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
 
   const resources = useMemo(() => {
     if (userLoading || !user) {
-      console.log("[AppShell] Resources - No user or loading, returning []");
+      debugLog("[AppShell] Resources - No user or loading, returning []");
       return [];
     }
 
-    console.log("[AppShell] Resources - Building for role:", normalizedRole);
+    debugLog("[AppShell] Resources - Building for role:", normalizedRole);
 
     if (normalizedRole === "administrador") {
-      console.log("[AppShell] Returning administrador resources");
+      debugLog("[AppShell] Returning administrador resources");
       return allResources;
     }
 
@@ -736,11 +743,11 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
   }, [user, userLoading, normalizedRole, permisosLoading, permisos]);
 
   if (userLoading || (roleNeedsPermissions && permisosLoading)) {
-    console.log('[AppShell] Mostrando loader:', { userLoading, permisosLoading, roleNeedsPermissions });
+    debugLog('[AppShell] Mostrando loader:', { userLoading, permisosLoading, roleNeedsPermissions });
     return <FullScreenLoader />;
   }
   
-  console.log('[AppShell] Renderizando app con usuario:', user?.id, 'rol:', normalizedRole);
+  debugLog('[AppShell] Renderizando app con usuario:', user?.id, 'rol:', normalizedRole);
 
   return (
     <RefineKbarProvider>
