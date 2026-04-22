@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { sendClubWelcomeWhatsApp } from "@/utils/club-whatsapp";
 
 function getAdminClient() {
   return createClient(
@@ -146,6 +147,18 @@ export async function POST(request: Request) {
     if (error) {
       console.error("[POST /api/perfiles]", error);
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (rol === "cliente") {
+      try {
+        await sendClubWelcomeWhatsApp({
+          nombre: nombre_completo.trim(),
+          telefono: telefonoNormalizado,
+          usuarioClub: cedulaNormalizada,
+        });
+      } catch (whatsappError) {
+        console.warn("[POST /api/perfiles] No se pudo enviar WhatsApp de bienvenida", whatsappError);
+      }
     }
 
     return NextResponse.json({ data }, { status: 201 });

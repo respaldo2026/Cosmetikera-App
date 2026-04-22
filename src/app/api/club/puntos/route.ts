@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendClubPointsWhatsApp } from "@/utils/club-whatsapp";
 
 function getAdminClient() {
   return createClient(
@@ -53,6 +54,28 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("[POST /api/club/puntos]", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    try {
+      const { data: perfil } = await supabase
+        .from("perfiles")
+        .select("nombre_completo,telefono,puntos_fidelidad")
+        .eq("id", perfil_id)
+        .maybeSingle();
+
+      if (perfil?.telefono) {
+        const puntosMovimiento = tipo === "canjeados" ? -Math.abs(puntos) : puntos;
+        await sendClubPointsWhatsApp({
+          nombre: perfil.nombre_completo || "Cliente",
+          telefono: perfil.telefono,
+          tipo,
+          puntosMovimiento,
+          puntosActuales: Number(perfil.puntos_fidelidad || 0),
+          concepto: typeof concepto === "string" ? concepto : null,
+        });
+      }
+    } catch (whatsappError) {
+      console.warn("[POST /api/club/puntos] No se pudo enviar WhatsApp de puntos", whatsappError);
     }
 
     return NextResponse.json({ ok: true });
