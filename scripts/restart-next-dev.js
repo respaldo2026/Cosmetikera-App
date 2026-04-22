@@ -64,9 +64,15 @@ function killPid(pid) {
 
 async function removeNextDir() {
   const projectRoot = path.resolve(__dirname, "..");
-  const nextDir = path.join(projectRoot, ".next-dev");
-  await fs.rm(nextDir, { recursive: true, force: true });
-  console.log(`Eliminado: ${nextDir}`);
+  const dirsToRemove = [
+    path.join(projectRoot, ".next-dev"),
+    path.join(projectRoot, ".next-dev-3001"),
+  ];
+
+  for (const dirPath of dirsToRemove) {
+    await fs.rm(dirPath, { recursive: true, force: true });
+    console.log(`Eliminado: ${dirPath}`);
+  }
 }
 
 async function main() {
