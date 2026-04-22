@@ -1,8 +1,7 @@
 {
-  "/api/articulos/route": "app/api/articulos/route.js",
   "/clientes/page": "app/clientes/page.js",
-  "/articulos/page": "app/articulos/page.js",
-  "/ventas/page": "app/ventas/page.js",
   "/historial/page": "app/historial/page.js",
+  "/ventas/page": "app/ventas/page.js",
+  "/articulos/page": "app/articulos/page.js",
   "/club/page": "app/club/page.js"
 }

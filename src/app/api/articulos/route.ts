@@ -1,6 +1,114 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+type ArticuloIdentityRow = {
+  id: string;
+  nombre?: string | null;
+  referencia?: string | null;
+  codigo_secundario?: string | null;
+};
+
+type ArticuloInputRow = Record<string, unknown>;
+
+const normalizeText = (value: unknown) =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
+
+const fieldLabels: Record<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia" | "codigo_secundario">, string> = {
+  nombre: "nombre",
+  referencia: "código principal",
+  codigo_secundario: "código secundario",
+};
+
+async function getArticuloIdentityRows(supabase: ReturnType<typeof getAdminClient>) {
+  return supabase.from("articulos").select("id,nombre,referencia,codigo_secundario");
+}
+
+function buildDuplicateError(field: keyof typeof fieldLabels, value: string, scope: "db" | "payload") {
+  const label = fieldLabels[field];
+  if (scope === "payload") {
+    return `Hay artículos repetidos en la misma carga por ${label}: "${value}"`;
+  }
+  return `Ya existe un artículo con ${label} "${value}"`;
+}
+
+function findPayloadDuplicate(rows: ArticuloInputRow[]) {
+  const seen = {
+    nombre: new Set<string>(),
+    referencia: new Set<string>(),
+    codigo_secundario: new Set<string>(),
+  };
+
+  for (const row of rows) {
+    const nombre = normalizeText(row.nombre);
+    if (nombre) {
+      if (seen.nombre.has(nombre)) {
+        return { field: "nombre" as const, value: String(row.nombre).trim() };
+      }
+      seen.nombre.add(nombre);
+    }
+
+    const referencia = normalizeText(row.referencia);
+    if (referencia) {
+      if (seen.referencia.has(referencia)) {
+        return { field: "referencia" as const, value: String(row.referencia).trim() };
+      }
+      seen.referencia.add(referencia);
+    }
+
+    const codigoSecundario = normalizeText(row.codigo_secundario);
+    if (codigoSecundario) {
+      if (seen.codigo_secundario.has(codigoSecundario)) {
+        return { field: "codigo_secundario" as const, value: String(row.codigo_secundario).trim() };
+      }
+      seen.codigo_secundario.add(codigoSecundario);
+    }
+  }
+
+  return null;
+}
+
+function findDatabaseDuplicate(
+  rows: ArticuloInputRow[],
+  existingRows: ArticuloIdentityRow[],
+  changedFields?: Array<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia" | "codigo_secundario">>
+) {
+  const fieldsToCheck = changedFields ?? ["nombre", "referencia", "codigo_secundario"];
+
+  const indexes = {
+    nombre: new Map<string, ArticuloIdentityRow>(),
+    referencia: new Map<string, ArticuloIdentityRow>(),
+    codigo_secundario: new Map<string, ArticuloIdentityRow>(),
+  };
+
+  for (const row of existingRows) {
+    const nombre = normalizeText(row.nombre);
+    const referencia = normalizeText(row.referencia);
+    const codigoSecundario = normalizeText(row.codigo_secundario);
+
+    if (nombre) indexes.nombre.set(nombre, row);
+    if (referencia) indexes.referencia.set(referencia, row);
+    if (codigoSecundario) indexes.codigo_secundario.set(codigoSecundario, row);
+  }
+
+  for (const row of rows) {
+    for (const field of fieldsToCheck) {
+      const normalized = normalizeText(row[field]);
+      if (!normalized) continue;
+
+      const match = indexes[field].get(normalized);
+      if (match) {
+        return {
+          field,
+          value: String(row[field]).trim(),
+          id: match.id,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,6 +154,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Cada artículo debe tener nombre" }, { status: 400 });
     }
 
+    const duplicateInPayload = findPayloadDuplicate(rows);
+    if (duplicateInPayload) {
+      return NextResponse.json(
+        { error: buildDuplicateError(duplicateInPayload.field, duplicateInPayload.value, "payload") },
+        { status: 409 }
+      );
+    }
+
+    const { data: existingRows, error: existingError } = await getArticuloIdentityRows(supabase);
+    if (existingError) {
+      return NextResponse.json({ error: existingError.message }, { status: 400 });
+    }
+
+    const duplicateInDb = findDatabaseDuplicate(rows, (existingRows as ArticuloIdentityRow[]) || []);
+    if (duplicateInDb) {
+      return NextResponse.json(
+        { error: buildDuplicateError(duplicateInDb.field, duplicateInDb.value, "db") },
+        { status: 409 }
+      );
+    }
+
     const { data, error } = await supabase.from("articulos").insert(rows).select("id,nombre");
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
@@ -67,6 +196,53 @@ export async function PATCH(request: Request) {
 
     // Edición individual
     if (id) {
+      const { data: currentRow, error: currentError } = await supabase
+        .from("articulos")
+        .select("id,nombre,referencia,codigo_secundario")
+        .eq("id", id)
+        .single();
+
+      if (currentError || !currentRow) {
+        return NextResponse.json({ error: currentError?.message || "Artículo no encontrado" }, { status: 404 });
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, "nombre")) {
+        if (typeof body.nombre !== "string" || !body.nombre.trim()) {
+          return NextResponse.json({ error: "El nombre del artículo es obligatorio" }, { status: 400 });
+        }
+      }
+
+      const mergedRow: ArticuloInputRow = {
+        ...currentRow,
+        ...body,
+      };
+
+      const fieldsToCheck = (["nombre", "referencia", "codigo_secundario"] as const).filter(
+        (field) =>
+          Object.prototype.hasOwnProperty.call(body, field) &&
+          normalizeText(mergedRow[field]) !== normalizeText(currentRow[field])
+      );
+
+      if (fieldsToCheck.length > 0) {
+        const { data: existingRows, error: existingError } = await getArticuloIdentityRows(supabase);
+        if (existingError) {
+          return NextResponse.json({ error: existingError.message }, { status: 400 });
+        }
+
+        const duplicateInDb = findDatabaseDuplicate(
+          [mergedRow],
+          ((existingRows as ArticuloIdentityRow[]) || []).filter((row) => row.id !== id),
+          [...fieldsToCheck]
+        );
+
+        if (duplicateInDb) {
+          return NextResponse.json(
+            { error: buildDuplicateError(duplicateInDb.field, duplicateInDb.value, "db") },
+            { status: 409 }
+          );
+        }
+      }
+
       const { data, error } = await supabase
         .from("articulos")
         .update(body)
