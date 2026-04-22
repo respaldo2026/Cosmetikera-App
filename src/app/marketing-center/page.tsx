@@ -22,10 +22,12 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
 import {
+  BellOutlined,
   BulbOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -123,6 +125,12 @@ function extractKeywords(value: MarketingAsset["keywords"]) {
 function isImageUrl(url?: string | null) {
   if (!url) return false;
   return /\.(png|jpe?g|webp|gif|svg)$/i.test(url);
+}
+
+function appendPushTimestamp(value?: string | null) {
+  const base = (value || "").trim();
+  const marker = `[PUSH_TS:${Date.now()}]`;
+  return base ? `${base}\n${marker}` : marker;
 }
 
 export default function MarketingCenterPage() {
@@ -363,6 +371,53 @@ export default function MarketingCenterPage() {
     )));
   };
 
+  const handlePublishPush = async (asset: MarketingAsset) => {
+    const payload = {
+      estado: "activo",
+      visible_para_ia: true,
+      descripcion_ia: appendPushTimestamp(asset.descripcion_ia),
+    };
+
+    const { error } = await supabaseBrowserClient
+      .from("marketing_assets")
+      .update(payload)
+      .eq("id", asset.id);
+
+    if (error) {
+      message.error(`No se pudo publicar la notificación: ${error.message}`);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/marketing-center/push-campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: asset.titulo || "Promoción La Cosmetikera",
+          message: asset.descripcion || asset.descripcion_ia || "Tenemos una promoción activa para ti.",
+          url: "/club",
+        }),
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "No se pudo enviar la campaña push");
+      }
+
+      const sent = Number(json.sent || 0);
+      if (sent > 0) {
+        message.success(`Promoción publicada y enviada a ${sent} dispositivo(s).`);
+      } else {
+        message.success("Promoción publicada. No había dispositivos suscritos para envío inmediato.");
+      }
+    } catch (pushError: unknown) {
+      const errorMessage = pushError instanceof Error ? pushError.message : "Error enviando campaña push";
+      message.warning(`Promoción publicada, pero el envío push falló: ${errorMessage}`);
+    }
+
+    await cargarAssets();
+  };
+
   const assetColumns = [
     {
       title: "Material",
@@ -435,11 +490,14 @@ export default function MarketingCenterPage() {
     {
       title: "Acciones",
       key: "acciones",
-      width: 180,
+      width: 230,
       render: (_: unknown, asset: MarketingAsset) => (
         <Space>
           <Button icon={<EyeOutlined />} onClick={() => setPreviewAsset(asset)} />
           <Button icon={<EditOutlined />} onClick={() => openEditModal(asset)} />
+          <Tooltip title="Publicar para notificación en app móvil">
+            <Button icon={<BellOutlined />} onClick={() => void handlePublishPush(asset)} />
+          </Tooltip>
           <Popconfirm
             title="Eliminar material"
             description="Esta acción no se puede deshacer."

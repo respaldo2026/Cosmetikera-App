@@ -1,9 +1,8 @@
 {
-  "/api/club/canjes/route": "app/api/club/canjes/route.js",
-  "/api/club/route": "app/api/club/route.js",
   "/club/page": "app/club/page.js",
-  "/page": "app/page.js",
-  "/articulos/page": "app/articulos/page.js",
+  "/clientes/page": "app/clientes/page.js",
+  "/marketing-center/page": "app/marketing-center/page.js",
+  "/historial/page": "app/historial/page.js",
   "/fidelizacion/page": "app/fidelizacion/page.js",
-  "/clientes/page": "app/clientes/page.js"
+  "/ventas/page": "app/ventas/page.js"
 }

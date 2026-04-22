@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   App,
@@ -26,6 +26,7 @@ import {
 } from "antd";
 import {
   CopyOutlined,
+  BellOutlined,
   GiftOutlined,
   LockOutlined,
   PhoneOutlined,
@@ -94,6 +95,18 @@ type ClubCanje = {
   createdAt: string;
 };
 
+type RecomendacionProducto = {
+  id: string;
+  nombre: string;
+  categoria?: string | null;
+  marca?: string | null;
+  precio_venta?: number | null;
+  descuento_porcentaje?: number | null;
+  promocion_texto?: string | null;
+  imagen_url?: string | null;
+  razon: string;
+};
+
 const LOGROS_CATALOGO = [
   { key: "primera_compra", emoji: "🌟", titulo: "Primera compra", desc: "Realizó su primera compra" },
   { key: "compradora_5", emoji: "🛍️", titulo: "Compradora frecuente", desc: "5 compras realizadas" },
@@ -133,6 +146,13 @@ function normalizePhone(value: string) {
   return value.replace(/\D/g, "").trim();
 }
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from(rawData, (char) => char.charCodeAt(0));
+}
+
 export default function ClubPage() {
   const { message } = App.useApp();
   const screens = useBreakpoint();
@@ -151,12 +171,30 @@ export default function ClubPage() {
   const [canjeModalOpen, setCanjeModalOpen] = useState(false);
   const [rewardPendiente, setRewardPendiente] = useState<string | null>(null);
   const [telefonoCanje, setTelefonoCanje] = useState("");
+  const [recomendaciones, setRecomendaciones] = useState<RecomendacionProducto[]>([]);
+  const [loadingRecomendaciones, setLoadingRecomendaciones] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [pushEnabled, setPushEnabled] = useState(false);
 
   const cargarCanjes = useCallback(async (perfilId: string) => {
     const response = await fetch(`/api/club/canjes?perfil_id=${encodeURIComponent(perfilId)}`);
     const json = await response.json();
     if (response.ok) {
       setCanjes(json.data || []);
+    }
+  }, []);
+
+  const cargarRecomendaciones = useCallback(async (perfilId: string) => {
+    setLoadingRecomendaciones(true);
+    try {
+      const response = await fetch(`/api/club/recomendaciones?perfil_id=${encodeURIComponent(perfilId)}`);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "No se pudieron cargar recomendaciones");
+      setRecomendaciones(Array.isArray(json.data) ? json.data : []);
+    } catch {
+      setRecomendaciones([]);
+    } finally {
+      setLoadingRecomendaciones(false);
     }
   }, []);
 
@@ -167,6 +205,7 @@ export default function ClubPage() {
     setCliente(null);
     setHistorial([]);
     setCanjes([]);
+    setRecomendaciones([]);
     setError("");
     setCanjeModalOpen(false);
     setRewardPendiente(null);
@@ -193,6 +232,7 @@ export default function ClubPage() {
           body: JSON.stringify({ perfil_id: json.data.id }),
         }),
         cargarCanjes(json.data.id),
+        cargarRecomendaciones(json.data.id),
       ]);
       const histJson = await histRes.json();
       setHistorial(histJson.data || []);
@@ -202,7 +242,7 @@ export default function ClubPage() {
     } finally {
       setBuscando(false);
     }
-  }, [acceso, cargarCanjes]);
+  }, [acceso, cargarCanjes, cargarRecomendaciones]);
 
   const canjearRecompensa = useCallback(async (rewardKey: string, telefonoVerificacion: string) => {
     if (!cliente) return;
@@ -389,6 +429,125 @@ export default function ClubPage() {
 
   const referralCode = useMemo(() => getReferralCode(cliente), [cliente]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) {
+      setPushPermission("unsupported");
+      return;
+    }
+    setPushPermission(window.Notification.permission);
+
+    const syncStatus = async () => {
+      if (!("serviceWorker" in navigator)) {
+        setPushEnabled(false);
+        return;
+      }
+
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (!registration) {
+          setPushEnabled(false);
+          return;
+        }
+        const existing = await registration.pushManager.getSubscription();
+        setPushEnabled(Boolean(existing));
+      } catch {
+        setPushEnabled(false);
+      }
+    };
+
+    void syncStatus();
+  }, []);
+
+  const activarNotificacionesPush = useCallback(async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      message.warning("Este dispositivo no soporta notificaciones push web");
+      return;
+    }
+
+    if (pushPermission === "denied") {
+      message.warning("Las notificaciones están bloqueadas en el navegador. Debes habilitarlas manualmente en ajustes.");
+      return;
+    }
+
+    try {
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        message.warning("Falta configurar NEXT_PUBLIC_VAPID_PUBLIC_KEY para activar push real.");
+        return;
+      }
+
+      if (!("serviceWorker" in navigator)) {
+        message.warning("Este navegador no soporta Service Worker para push.");
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register("/sw.js");
+
+      const permission = await window.Notification.requestPermission();
+      setPushPermission(permission);
+      if (permission !== "granted") {
+        setPushEnabled(false);
+        return;
+      }
+
+      const existingSubscription = await registration.pushManager.getSubscription();
+      const subscription = existingSubscription || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+
+      const response = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          perfilId: cliente?.id || null,
+          subscription: subscription.toJSON(),
+        }),
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "No se pudo registrar la suscripción push");
+      }
+
+      setPushEnabled(true);
+      message.success("Notificaciones activadas. Recibirás promociones incluso con la app cerrada.");
+    } catch (pushError: unknown) {
+      const errorMessage = pushError instanceof Error
+        ? pushError.message
+        : "No se pudieron activar las notificaciones push";
+      message.error(errorMessage);
+    }
+  }, [cliente?.id, message, pushPermission]);
+
+  useEffect(() => {
+    if (!pushEnabled || !cliente?.id || typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    const vincularPerfil = async () => {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (!registration) return;
+        const subscription = await registration.pushManager.getSubscription();
+        if (!subscription) return;
+
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            perfilId: cliente.id,
+            subscription: subscription.toJSON(),
+          }),
+        });
+      } catch {
+        // No bloquear UI si falla la vinculación de perfil con suscripción.
+      }
+    };
+
+    void vincularPerfil();
+  }, [cliente?.id, pushEnabled]);
+
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fff0f8 0%, #f9f0ff 55%, #ffe8f5 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "clamp(16px, 5vw, 40px) 16px" }}>
       <div style={{ textAlign: "center", marginBottom: isMobile ? 16 : 32 }}>
@@ -450,6 +609,7 @@ export default function ClubPage() {
                       setError("");
                       setHistorial([]);
                       setCanjes([]);
+                      setRecomendaciones([]);
                       setReferidoAplicado(false);
                       setCodigoReferidoIngresado("");
                       setCanjeModalOpen(false);
@@ -563,6 +723,38 @@ export default function ClubPage() {
                           </Space>
                         ) : (
                           <Alert type="success" showIcon message="Ya tienes desbloqueadas todas las recompensas compatibles con tu nivel actual." style={{ borderRadius: 10 }} />
+                        )}
+                      </Card>
+
+                      <Card style={sectionCardStyle} title={<Space><GiftOutlined style={{ color: BRAND_FUCHSIA }} /><Text strong>Recomendadas para ti</Text></Space>}>
+                        {loadingRecomendaciones ? (
+                          <Spin />
+                        ) : recomendaciones.length === 0 ? (
+                          <Alert
+                            type="info"
+                            showIcon
+                            style={{ borderRadius: 10 }}
+                            message="Aún no tenemos suficientes compras para personalizar recomendaciones."
+                            description="Cuando registres más compras, te sugeriremos productos alineados con tu estilo."
+                          />
+                        ) : (
+                          <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                            {recomendaciones.map((producto) => (
+                              <div key={producto.id} style={{ padding: 12, borderRadius: 12, border: "1px solid #ffd6e7", background: "#fff" }}>
+                                <Space direction="vertical" size={4} style={{ width: "100%" }}>
+                                  <Space wrap>
+                                    <Text strong>{producto.nombre}</Text>
+                                    {producto.descuento_porcentaje ? <Tag color="red">{producto.descuento_porcentaje}% OFF</Tag> : null}
+                                    {producto.categoria ? <Tag>{producto.categoria}</Tag> : null}
+                                  </Space>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>{producto.razon}</Text>
+                                  <Text style={{ color: BRAND_FUCHSIA, fontWeight: 700 }}>
+                                    ${(producto.precio_venta || 0).toLocaleString()}
+                                  </Text>
+                                </Space>
+                              </div>
+                            ))}
+                          </Space>
                         )}
                       </Card>
 
@@ -755,6 +947,42 @@ export default function ClubPage() {
                     </Col>
 
                     <Col xs={24} lg={10}>
+                      <Card style={sectionCardStyle} title={<Space><BellOutlined style={{ color: BRAND_FUCHSIA }} /><Text strong>Notificaciones de promociones</Text></Space>}>
+                        <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Activa notificaciones para recibir en tu teléfono las promociones publicadas desde Marketing Center.
+                          </Text>
+                          <Space wrap>
+                            <Tag color={pushEnabled ? "success" : "default"}>
+                              {pushPermission === "unsupported"
+                                ? "No soportado"
+                                : pushEnabled
+                                  ? "Activo"
+                                  : pushPermission === "denied"
+                                    ? "Bloqueado"
+                                    : "Pendiente"}
+                            </Tag>
+                            <Button
+                              type="primary"
+                              onClick={activarNotificacionesPush}
+                              disabled={pushPermission === "unsupported" || pushPermission === "denied"}
+                              style={{ background: BRAND_FUCHSIA, borderColor: BRAND_FUCHSIA }}
+                            >
+                              Activar notificaciones
+                            </Button>
+                          </Space>
+                          {pushPermission === "denied" && (
+                            <Alert
+                              type="warning"
+                              showIcon
+                              style={{ borderRadius: 10 }}
+                              message="Notificaciones bloqueadas"
+                              description="Habilítalas en la configuración del navegador para recibir promociones en este dispositivo."
+                            />
+                          )}
+                        </Space>
+                      </Card>
+
                       <Card style={sectionCardStyle} title="Cómo ganar más puntos">
                         <Space direction="vertical" size={10} style={{ width: "100%" }}>
                           {[
