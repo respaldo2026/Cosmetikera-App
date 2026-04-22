@@ -59,7 +59,6 @@ import { authProvider } from "@/providers/auth-provider/auth-provider.client";
 import { QueryProvider } from "@/providers/query-provider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { RolesPermissionsProvider, useRolesPermissions } from "@/contexts/roles-permissions-context";
-import { ColorModeContextProvider, useColorMode } from "@/contexts/color-mode";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
@@ -511,34 +510,31 @@ const FullScreenLoader = () => (
 const AppInner = ({ children }: { children: React.ReactNode }) => {
   const { user, loading: userLoading } = useCurrentUser();
   const { permisos, loading: permisosLoading } = useRolesPermissions();
-  const { mode } = useColorMode();
   const pathname = usePathname();
   const [brandingName, setBrandingName] = useState("La Cosmetikera");
   const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
 
-  const isDarkMode = mode === "dark";
-
   const themeConfig = useMemo(
     () => ({
-      algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+      algorithm: theme.defaultAlgorithm,
       token: {
         colorPrimary: "#d81b87",
         colorSuccess: "#059669",
         colorWarning: "#D97706",
         colorError: "#DC2626",
         colorInfo: "#0284C7",
-        colorTextBase: isDarkMode ? "#F8FAFC" : "#1F2937",
-        colorText: isDarkMode ? "#E2E8F0" : "#1F2937",
-        colorTextSecondary: isDarkMode ? "#CBD5E1" : "#374151",
-        colorTextTertiary: isDarkMode ? "#94A3B8" : "#4B5563",
-        colorBgBase: isDarkMode ? "#0A1020" : "#F6F8FB",
-        colorBgContainer: isDarkMode ? "#0C1426" : "#F0F3F8",
-        colorBgElevated: isDarkMode ? "#111827" : "#FFFFFF",
-        colorBgLayout: isDarkMode ? "#090f1d" : "#e1e6ee",
-        colorBorder: isDarkMode ? "#3b4a63" : "#c9d1de",
-        colorBorderSecondary: isDarkMode ? "#263347" : "#d4dbe6",
-        colorFillSecondary: isDarkMode ? "#1d293b" : "#e3e8f1",
-        colorPrimaryBg: isDarkMode ? "#4d1132" : "#f8dbe9",
+        colorTextBase: "#1F2937",
+        colorText: "#1F2937",
+        colorTextSecondary: "#374151",
+        colorTextTertiary: "#4B5563",
+        colorBgBase: "#F6F8FB",
+        colorBgContainer: "#F0F3F8",
+        colorBgElevated: "#FFFFFF",
+        colorBgLayout: "#e1e6ee",
+        colorBorder: "#c9d1de",
+        colorBorderSecondary: "#d4dbe6",
+        colorFillSecondary: "#e3e8f1",
+        colorPrimaryBg: "#f8dbe9",
         controlOutline: "#d81b87",
         borderRadius: 8,
         fontSize: 14,
@@ -560,64 +556,45 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
           paddingSM: 12,
           paddingLG: 16,
           bodyPadding: 14,
-          colorBgContainer: isDarkMode ? "#121a2d" : undefined,
-          headerBg: isDarkMode ? "#0f182a" : undefined,
-          boxShadow: isDarkMode ? "0 12px 32px rgba(0,0,0,0.35)" : undefined,
         },
         Tag: {
           borderRadiusSM: 6,
         },
         Table: {
-          headerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
-          headerColor: isDarkMode ? "#E5E7EB" : "#374151",
-          rowHoverBg: isDarkMode ? "#0B1220" : "#E9EEF6",
-          borderColor: isDarkMode ? "#233044" : "#E5E7EB",
+          headerBg: "#F9FAFB",
+          headerColor: "#374151",
+          rowHoverBg: "#E9EEF6",
+          borderColor: "#E5E7EB",
           headerPadding: 10,
           cellPaddingBlock: 8,
           cellPaddingInline: 10,
         },
         Layout: {
-          bodyBg: isDarkMode ? "#090f1d" : "#e1e6ee",
-          headerBg: isDarkMode ? "#0F172A" : "#FFFFFF",
-          siderBg: isDarkMode ? "#0F172A" : undefined,
+          bodyBg: "#e1e6ee",
+          headerBg: "#FFFFFF",
           headerPadding: "0 16px",
         },
         Menu: {
-          itemColor: isDarkMode ? "#E5E7EB" : undefined,
-          itemSelectedColor: isDarkMode ? "#F3F4F6" : undefined,
-          itemSelectedBg: isDarkMode ? "#1F2937" : undefined,
-          itemHoverBg: isDarkMode ? "#111827" : undefined,
           itemHeight: 38,
           itemPaddingInline: 12,
           itemMarginInline: 4,
         },
-        Input: {
-          colorBgContainer: isDarkMode ? "#111a2d" : undefined,
-          colorTextPlaceholder: isDarkMode ? "#cbd5e1" : undefined,
-          activeBorderColor: isDarkMode ? "#A855F7" : undefined,
-          hoverBorderColor: isDarkMode ? "#c084fc" : undefined,
-          colorBorder: isDarkMode ? "#334155" : undefined,
-        },
-        Select: {
-          colorBgContainer: isDarkMode ? "#111a2d" : undefined,
-          colorTextPlaceholder: isDarkMode ? "#cbd5e1" : undefined,
-          optionSelectedBg: isDarkMode ? "#1F2937" : undefined,
-          colorBorder: isDarkMode ? "#334155" : undefined,
-        },
+        Input: {},
+        Select: {},
         Modal: {
-          contentBg: isDarkMode ? "#111827" : "#FFFFFF",
-          headerBg: isDarkMode ? "#111827" : "#FFFFFF",
+          contentBg: "#FFFFFF",
+          headerBg: "#FFFFFF",
           colorBgMask: "rgba(15, 23, 42, 0.55)",
           borderRadiusLG: 14,
           paddingMD: 18,
         },
         Drawer: {
-          colorBgElevated: isDarkMode ? "#0F172A" : "#FFFFFF",
+          colorBgElevated: "#FFFFFF",
           colorBgMask: "rgba(15, 23, 42, 0.55)",
         },
       },
     }),
-    [isDarkMode],
+    [],
   );
 
   const i18nProvider = useMemo(() => {
@@ -827,9 +804,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
 export const AppShell = ({ children }: { children: React.ReactNode }) => (
   <QueryProvider>
     <RolesPermissionsProvider>
-      <ColorModeContextProvider defaultMode="light">
-        <AppInner>{children}</AppInner>
-      </ColorModeContextProvider>
+      <AppInner>{children}</AppInner>
     </RolesPermissionsProvider>
   </QueryProvider>
 );

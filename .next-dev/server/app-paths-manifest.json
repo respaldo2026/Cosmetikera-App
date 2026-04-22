@@ -1,6 +1,6 @@
 {
-  "/api/perfiles/route": "app/api/perfiles/route.js",
   "/api/configuracion/club/route": "app/api/configuracion/club/route.js",
+  "/api/perfiles/route": "app/api/perfiles/route.js",
   "/clientes/page": "app/clientes/page.js",
   "/historial/page": "app/historial/page.js",
   "/ventas/page": "app/ventas/page.js",
