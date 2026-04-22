@@ -423,10 +423,6 @@ export default function ClubPage() {
         </Card>
       )}
 
-      {error && cliente === null && !buscando && acceso && (
-        <Alert type="warning" message={error} showIcon style={{ width: "100%", maxWidth: 560, marginBottom: 16, borderRadius: 8 }} />
-      )}
-
       {buscando && <Spin size="large" style={{ margin: "32px 0" }} />}
 
       {cliente && nivel && (
