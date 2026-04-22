@@ -1,5 +1,3 @@
 {
-  "/historial/page": "app/historial/page.js",
-  "/club/page": "app/club/page.js",
-  "/ventas/page": "app/ventas/page.js"
+  "/marketing-center/page": "app/marketing-center/page.js"
 }
