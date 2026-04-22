@@ -11,13 +11,13 @@ import {
   Divider,
   Empty,
   Form,
+  Grid,
   Input,
   Modal,
   Progress,
   Row,
   Space,
   Spin,
-  Statistic,
   Tag,
   Tabs,
   Timeline,
@@ -47,6 +47,7 @@ import {
 } from "@/hooks/useClubConfig";
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 type Cliente = {
   id: string;
@@ -123,6 +124,8 @@ function normalizePhone(value: string) {
 
 export default function ClubPage() {
   const { message } = App.useApp();
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
   const [acceso, setAcceso] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [canjeando, setCanjeando] = useState<string | null>(null);
@@ -377,12 +380,12 @@ export default function ClubPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fff0f8 0%, #f9f0ff 50%, #fffbe6 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "clamp(16px, 5vw, 40px) 16px" }}>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ width: 72, height: 72, borderRadius: 20, background: "linear-gradient(135deg,#faad14,#d81b87)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", boxShadow: "0 4px 20px rgba(216,27,135,0.3)" }}>
-          <GiftOutlined style={{ color: "#fff", fontSize: 34 }} />
+      <div style={{ textAlign: "center", marginBottom: isMobile ? 16 : 32 }}>
+        <div style={{ width: isMobile ? 56 : 72, height: isMobile ? 56 : 72, borderRadius: isMobile ? 16 : 20, background: "linear-gradient(135deg,#faad14,#d81b87)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", boxShadow: "0 4px 20px rgba(216,27,135,0.3)" }}>
+          <GiftOutlined style={{ color: "#fff", fontSize: isMobile ? 26 : 34 }} />
         </div>
-        <Title level={2} style={{ margin: 0, color: "#d81b87" }}>Club La Cosmetikera</Title>
-        <Text type="secondary">Puntos, recompensas, vouchers y campañas activas del club</Text>
+        <Title level={isMobile ? 3 : 2} style={{ margin: 0, color: "#d81b87", lineHeight: 1.15 }}>Club La Cosmetikera</Title>
+        <Text type="secondary" style={{ fontSize: isMobile ? 12 : 14 }}>Puntos, recompensas, vouchers y campañas activas del club</Text>
       </div>
 
       {!cliente && (
@@ -412,21 +415,22 @@ export default function ClubPage() {
 
       {cliente && nivel && (
         <div style={{ width: "100%", maxWidth: 980, boxSizing: "border-box" }}>
-          <Card style={{ borderRadius: 16, marginBottom: 16, background: `linear-gradient(135deg, ${nivel.color}18, ${nivel.color}30)`, border: `2px solid ${nivel.color}` }}>
-            <Row align="middle" gutter={[16, 16]}>
+          <Card
+            style={{ borderRadius: 16, marginBottom: 12, background: `linear-gradient(135deg, ${nivel.color}18, ${nivel.color}30)`, border: `2px solid ${nivel.color}` }}
+            bodyStyle={{ padding: isMobile ? 14 : 20 }}
+          >
+            <Row align="middle" gutter={[12, 12]}>
               <Col>
-                <Avatar size={64} style={{ background: nivel.color, fontSize: 26 }}>{cliente.nombre_completo[0]?.toUpperCase()}</Avatar>
+                <Avatar size={isMobile ? 50 : 64} style={{ background: nivel.color, fontSize: isMobile ? 21 : 26 }}>{cliente.nombre_completo[0]?.toUpperCase()}</Avatar>
               </Col>
               <Col flex="auto">
-                <Space direction="vertical" size={2}>
+                <Space direction="vertical" size={isMobile ? 1 : 2}>
                   <Space wrap>
-                    <Title level={4} style={{ margin: 0 }}>{cliente.nombre_completo}</Title>
-                    {esCumple && <Tag color="pink">Mes de cumpleaños activo</Tag>}
-                    <Tag style={{ background: nivel.color, color: "#fff", border: "none", fontSize: 13, padding: "2px 12px" }}>{nivel.icon} {nivel.label}</Tag>
+                    <Title level={isMobile ? 5 : 4} style={{ margin: 0, lineHeight: 1.1 }}>{cliente.nombre_completo}</Title>
+                    {esCumple && <Tag color="pink" style={{ marginInlineEnd: 0 }}>Mes de cumpleaños activo</Tag>}
+                    <Tag style={{ background: nivel.color, color: "#fff", border: "none", fontSize: isMobile ? 11 : 13, padding: isMobile ? "0 8px" : "2px 12px", marginInlineEnd: 0 }}>{nivel.icon} {nivel.label}</Tag>
                   </Space>
                   {cliente.cedula && <Text type="secondary" style={{ fontSize: 12 }}>CC: {cliente.cedula}</Text>}
-                  {cliente.telefono && <Text type="secondary" style={{ fontSize: 12 }}><PhoneOutlined /> Verificación disponible con el teléfono terminado en {cliente.telefono.slice(-2)}</Text>}
-                  <Text type="secondary" style={{ fontSize: 12 }}>Tu portal muestra puntos y campañas con cédula, pero exige teléfono para usar puntos o revelar vouchers.</Text>
                   <Button
                     size="small"
                     onClick={() => {
@@ -449,25 +453,45 @@ export default function ClubPage() {
               </Col>
             </Row>
 
-            <Divider style={{ margin: "16px 0" }} />
+            <Divider style={{ margin: isMobile ? "12px 0" : "16px 0" }} />
 
-            <Row gutter={[16, 16]}>
+            <Row gutter={[10, 10]}>
               <Col xs={12} md={6}>
-                <Statistic title={<Text style={{ fontSize: 12 }}>Puntos disponibles</Text>} value={cliente.puntos_fidelidad || 0} valueStyle={{ color: nivel.color, fontWeight: 800 }} formatter={(value) => Number(value).toLocaleString()} />
+                <div style={{ background: "rgba(255,255,255,0.72)", borderRadius: 12, padding: "8px 10px" }}>
+                  <Text style={{ fontSize: 11, color: "#666", display: "block", lineHeight: 1.15 }}>Puntos disponibles</Text>
+                  <Text style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: nivel.color, lineHeight: 1.2 }}>
+                    {(cliente.puntos_fidelidad || 0).toLocaleString()}
+                  </Text>
+                </div>
               </Col>
               <Col xs={12} md={6}>
-                <Statistic title={<Text style={{ fontSize: 12 }}>Puntos canjeados</Text>} value={cliente.puntos_canjeados || 0} valueStyle={{ color: "#52c41a" }} formatter={(value) => Number(value).toLocaleString()} />
+                <div style={{ background: "rgba(255,255,255,0.72)", borderRadius: 12, padding: "8px 10px" }}>
+                  <Text style={{ fontSize: 11, color: "#666", display: "block", lineHeight: 1.15 }}>Puntos canjeados</Text>
+                  <Text style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700, color: "#52c41a", lineHeight: 1.2 }}>
+                    {(cliente.puntos_canjeados || 0).toLocaleString()}
+                  </Text>
+                </div>
               </Col>
               <Col xs={12} md={6}>
-                <Statistic title={<Text style={{ fontSize: 12 }}>Rewards desbloqueadas</Text>} value={recompensasDisponibles.length} valueStyle={{ color: "#d81b87" }} />
+                <div style={{ background: "rgba(255,255,255,0.72)", borderRadius: 12, padding: "8px 10px" }}>
+                  <Text style={{ fontSize: 11, color: "#666", display: "block", lineHeight: 1.15 }}>Rewards desbloqueadas</Text>
+                  <Text style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700, color: "#d81b87", lineHeight: 1.2 }}>
+                    {recompensasDisponibles.length}
+                  </Text>
+                </div>
               </Col>
               <Col xs={12} md={6}>
-                <Statistic title={<Text style={{ fontSize: 12 }}>Valor canjeable hoy</Text>} value={recompensasDisponibles.reduce((sum, reward) => sum + reward.value_cop, 0)} prefix="$" valueStyle={{ color: "#722ed1" }} formatter={(value) => Number(value).toLocaleString()} />
+                <div style={{ background: "rgba(255,255,255,0.72)", borderRadius: 12, padding: "8px 10px" }}>
+                  <Text style={{ fontSize: 11, color: "#666", display: "block", lineHeight: 1.15 }}>Valor canjeable hoy</Text>
+                  <Text style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700, color: "#722ed1", lineHeight: 1.2 }}>
+                    ${recompensasDisponibles.reduce((sum, reward) => sum + reward.value_cop, 0).toLocaleString()}
+                  </Text>
+                </div>
               </Col>
             </Row>
 
             {progreso ? (
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginTop: 12 }}>
                 <Row justify="space-between" style={{ marginBottom: 4 }}>
                   <Text style={{ fontSize: 12, color: "#666" }}>Progreso hacia {progreso.siguiente.icon} {progreso.siguiente.label}</Text>
                   <Text style={{ fontSize: 12, color: "#666" }}>Faltan {progreso.faltantes.toLocaleString()} pts</Text>
@@ -484,18 +508,12 @@ export default function ClubPage() {
               <Alert style={{ marginTop: 12, borderRadius: 8 }} type="success" message="Estás en el nivel más alto del club." showIcon />
             )}
 
-            <Alert
-              style={{ marginTop: 16, borderRadius: 10 }}
-              type="info"
-              showIcon
-              message="Por seguridad, cada canje pide confirmar el teléfono registrado."
-            />
           </Card>
 
           <Tabs
             activeKey={tabActiva}
             onChange={setTabActiva}
-            style={{ marginTop: 8 }}
+            style={{ marginTop: 4 }}
             items={[
               {
                 key: "resumen",
