@@ -41,8 +41,6 @@ import {
   BarsOutlined,
   LeftOutlined,
   RightOutlined,
-  MoonOutlined,
-  SunOutlined,
   NotificationOutlined,
   ShoppingCartOutlined,
   ShopOutlined,
@@ -510,34 +508,6 @@ const FullScreenLoader = () => (
   </div>
 );
 
-const ThemeToggleButton = () => {
-  const { mode, toggle } = useColorMode();
-  const isDarkMode = mode === "dark";
-
-  return (
-    <Button
-      type="text"
-      shape="circle"
-      size="small"
-      onClick={toggle}
-      icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-      style={{
-        position: "fixed",
-        bottom: 16,
-        left: 14,
-        zIndex: 950,
-        background: "transparent",
-        boxShadow: "none",
-        border: `1px solid ${isDarkMode ? "#1f2937" : "#e5e7eb"}`,
-        color: isDarkMode ? "#e5e7eb" : "#111827",
-      }}
-      aria-label={isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-    >
-      {null}
-    </Button>
-  );
-};
-
 const AppInner = ({ children }: { children: React.ReactNode }) => {
   const { user, loading: userLoading } = useCurrentUser();
   const { permisos, loading: permisosLoading } = useRolesPermissions();
@@ -843,7 +813,6 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
                   />
                 )}
               >
-                <ThemeToggleButton />
                 {children}
               </ThemedLayout>
             )}
@@ -858,7 +827,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
 export const AppShell = ({ children }: { children: React.ReactNode }) => (
   <QueryProvider>
     <RolesPermissionsProvider>
-      <ColorModeContextProvider defaultMode="dark">
+      <ColorModeContextProvider defaultMode="light">
         <AppInner>{children}</AppInner>
       </ColorModeContextProvider>
     </RolesPermissionsProvider>

@@ -49,6 +49,17 @@ import {
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+const BRAND_FUCHSIA = "#d81b87";
+const BRAND_FUCHSIA_SOFT = "#ff4fa3";
+
+const sectionCardStyle: React.CSSProperties = {
+  borderRadius: 16,
+  marginBottom: 16,
+  background: "linear-gradient(180deg, #ffffff 0%, #fff3f9 100%)",
+  border: "1px solid #ffd6e7",
+  boxShadow: "0 6px 16px rgba(216,27,135,0.08)",
+};
+
 type Cliente = {
   id: string;
   nombre_completo: string;
@@ -299,9 +310,9 @@ export default function ClubPage() {
     const pts = cliente.puntos_fidelidad || 0;
     const key = getNivelDinamico(pts, reglas);
     const NIVEL_META: Record<string, { label: string; color: string; icon: string }> = {
-      bronce:   { label: "Bronce",   color: "#cd7f32", icon: "🥉" },
+      bronce:   { label: "Bronce",   color: BRAND_FUCHSIA, icon: "🥉" },
       plata:    { label: "Plata",    color: "#8c8c8c", icon: "🥈" },
-      oro:      { label: "Oro",      color: "#faad14", icon: "🥇" },
+      oro:      { label: "Oro",      color: BRAND_FUCHSIA_SOFT, icon: "🥇" },
       diamante: { label: "Diamante", color: "#13c2c2", icon: "💎" },
     };
     return { key, ...NIVEL_META[key] };
@@ -315,9 +326,9 @@ export default function ClubPage() {
     };
     const NIVEL_ORDER = ["bronce", "plata", "oro", "diamante"] as const;
     const NIVEL_META: Record<string, { label: string; color: string; icon: string; min: number }> = {
-      bronce:   { label: "Bronce",   color: "#cd7f32", icon: "🥉", min: 0 },
+      bronce:   { label: "Bronce",   color: BRAND_FUCHSIA, icon: "🥉", min: 0 },
       plata:    { label: "Plata",    color: "#8c8c8c", icon: "🥈", min: reglas.puntos_min_plata },
-      oro:      { label: "Oro",      color: "#faad14", icon: "🥇", min: reglas.puntos_min_oro },
+      oro:      { label: "Oro",      color: BRAND_FUCHSIA_SOFT, icon: "🥇", min: reglas.puntos_min_oro },
       diamante: { label: "Diamante", color: "#13c2c2", icon: "💎", min: reglas.puntos_min_diamante },
     };
     const idx = NIVEL_ORDER.indexOf(nivel.key as typeof NIVEL_ORDER[number]);
@@ -379,12 +390,12 @@ export default function ClubPage() {
   const referralCode = useMemo(() => getReferralCode(cliente), [cliente]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fff0f8 0%, #f9f0ff 50%, #fffbe6 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "clamp(16px, 5vw, 40px) 16px" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fff0f8 0%, #f9f0ff 55%, #ffe8f5 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "clamp(16px, 5vw, 40px) 16px" }}>
       <div style={{ textAlign: "center", marginBottom: isMobile ? 16 : 32 }}>
-        <div style={{ width: isMobile ? 56 : 72, height: isMobile ? 56 : 72, borderRadius: isMobile ? 16 : 20, background: "linear-gradient(135deg,#faad14,#d81b87)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", boxShadow: "0 4px 20px rgba(216,27,135,0.3)" }}>
+        <div style={{ width: isMobile ? 56 : 72, height: isMobile ? 56 : 72, borderRadius: isMobile ? 16 : 20, background: "linear-gradient(135deg,#ff4fa3,#d81b87)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", boxShadow: "0 4px 20px rgba(216,27,135,0.3)" }}>
           <GiftOutlined style={{ color: "#fff", fontSize: isMobile ? 26 : 34 }} />
         </div>
-        <Title level={isMobile ? 3 : 2} style={{ margin: 0, color: "#d81b87", lineHeight: 1.15 }}>Club La Cosmetikera</Title>
+        <Title level={isMobile ? 3 : 2} style={{ margin: 0, color: BRAND_FUCHSIA, lineHeight: 1.15 }}>Club La Cosmetikera</Title>
         <Text type="secondary" style={{ fontSize: isMobile ? 12 : 14 }}>Puntos, recompensas, vouchers y campañas activas del club</Text>
       </div>
 
@@ -402,7 +413,7 @@ export default function ClubPage() {
                 size="large"
                 maxLength={15}
               />
-              <Button type="primary" size="large" loading={buscando} onClick={buscar} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
+              <Button type="primary" size="large" loading={buscando} onClick={buscar} style={{ background: BRAND_FUCHSIA, borderColor: BRAND_FUCHSIA }}>
                 Buscar
               </Button>
             </Space.Compact>
@@ -417,7 +428,7 @@ export default function ClubPage() {
         <div style={{ width: "100%", maxWidth: 980, boxSizing: "border-box" }}>
           <Card
             style={{ borderRadius: 16, marginBottom: 12, background: `linear-gradient(135deg, ${nivel.color}18, ${nivel.color}30)`, border: `2px solid ${nivel.color}` }}
-            bodyStyle={{ padding: isMobile ? 14 : 20 }}
+            styles={{ body: { padding: isMobile ? 14 : 20 } }}
           >
             <Row align="middle" gutter={[12, 12]}>
               <Col>
@@ -499,8 +510,8 @@ export default function ClubPage() {
                 <Progress
                   percent={progreso.pct}
                   strokeColor={{
-                    "0%": nivel?.color ?? "#cd7f32",
-                    "100%": progreso.siguiente.color ?? "#13c2c2",
+                    "0%": nivel?.color ?? BRAND_FUCHSIA,
+                    "100%": progreso.siguiente.color ?? BRAND_FUCHSIA_SOFT,
                   }}
                 />
               </div>
@@ -521,7 +532,7 @@ export default function ClubPage() {
                 children: (
                   <Row gutter={[16, 16]}>
                     <Col xs={24} lg={12}>
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><TrophyOutlined style={{ color: nivel.color }} /><Text strong>Beneficios activos</Text></Space>}>
+                      <Card style={sectionCardStyle} title={<Space><TrophyOutlined style={{ color: BRAND_FUCHSIA }} /><Text strong>Beneficios activos</Text></Space>}>
                         <Space direction="vertical" size={10} style={{ width: "100%" }}>
                           {beneficiosActivos.map((benefit) => (
                             <div key={benefit.key} style={{ padding: 12, borderRadius: 12, background: benefit.active ? "#f6ffed" : "#fafafa", border: `1px solid ${benefit.active ? "#b7eb8f" : "#f0f0f0"}` }}>
@@ -539,7 +550,7 @@ export default function ClubPage() {
                       </Card>
                     </Col>
                     <Col xs={24} lg={12}>
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><StarOutlined style={{ color: "#faad14" }} /><Text strong>Siguiente recompensa</Text></Space>}>
+                      <Card style={sectionCardStyle} title={<Space><StarOutlined style={{ color: BRAND_FUCHSIA }} /><Text strong>Siguiente recompensa</Text></Space>}>
                         {siguienteRecompensa ? (
                           <Space direction="vertical" size={8} style={{ width: "100%" }}>
                             <Text strong style={{ fontSize: 16 }}>{siguienteRecompensa.icon} {siguienteRecompensa.title}</Text>
@@ -555,8 +566,8 @@ export default function ClubPage() {
                         )}
                       </Card>
 
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><StarOutlined style={{ color: "#faad14" }} /><Text strong>Tus logros</Text><Tag>{logros.length}/{LOGROS_CATALOGO.length}</Tag></Space>}>
-                        <Progress percent={Math.round((logros.length / LOGROS_CATALOGO.length) * 100)} strokeColor={{ "0%": "#d81b87", "100%": "#faad14" }} style={{ marginBottom: 16 }} />
+                      <Card style={sectionCardStyle} title={<Space><StarOutlined style={{ color: BRAND_FUCHSIA }} /><Text strong>Tus logros</Text><Tag>{logros.length}/{LOGROS_CATALOGO.length}</Tag></Space>}>
+                        <Progress percent={Math.round((logros.length / LOGROS_CATALOGO.length) * 100)} strokeColor={{ "0%": BRAND_FUCHSIA, "100%": BRAND_FUCHSIA_SOFT }} style={{ marginBottom: 16 }} />
                         <Row gutter={[12, 16]}>
                           {LOGROS_CATALOGO.map((achievement) => {
                             const unlocked = logros.includes(achievement.key);
@@ -564,7 +575,7 @@ export default function ClubPage() {
                               <Col key={achievement.key} xs={8} sm={6} style={{ textAlign: "center" }}>
                                 <Tooltip title={`${achievement.titulo}: ${achievement.desc}`}>
                                   <div>
-                                    <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 4px", background: unlocked ? "linear-gradient(135deg,#fff7e6,#ffe7ba)" : "#f5f5f5", border: `2px solid ${unlocked ? "#faad14" : "#e0e0e0"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, opacity: unlocked ? 1 : 0.35, filter: unlocked ? "none" : "grayscale(100%)", boxShadow: unlocked ? "0 2px 8px rgba(250,173,20,0.35)" : "none" }}>
+                                    <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 4px", background: unlocked ? "linear-gradient(135deg,#fff2f8,#ffd6e7)" : "#f5f5f5", border: `2px solid ${unlocked ? BRAND_FUCHSIA_SOFT : "#e0e0e0"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, opacity: unlocked ? 1 : 0.35, filter: unlocked ? "none" : "grayscale(100%)", boxShadow: unlocked ? "0 2px 8px rgba(216,27,135,0.28)" : "none" }}>
                                       {unlocked ? achievement.emoji : <LockOutlined style={{ color: "#bbb", fontSize: 18 }} />}
                                     </div>
                                     <Text style={{ fontSize: 10, color: unlocked ? "#333" : "#bbb", display: "block" }}>{achievement.titulo}</Text>
@@ -585,7 +596,7 @@ export default function ClubPage() {
                 children: (
                   <Row gutter={[16, 16]}>
                     <Col xs={24}>
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined style={{ color: "#d81b87" }} /><Text strong>Catálogo de recompensas</Text></Space>} extra={<Tag color="magenta">{recompensasDisponibles.length} disponibles</Tag>}>
+                      <Card style={sectionCardStyle} title={<Space><GiftOutlined style={{ color: BRAND_FUCHSIA }} /><Text strong>Catálogo de recompensas</Text></Space>} extra={<Tag color="magenta">{recompensasDisponibles.length} disponibles</Tag>}>
                         <Row gutter={[12, 12]}>
                           {loadingConfig ? <Col span={24}><Spin /></Col> : catalogoDinamico.map((reward) => {
                             const unlocked = isRewardEligibleDynamic(reward, cliente, reglas, esCumple);
@@ -619,7 +630,7 @@ export default function ClubPage() {
                                       disabled={!unlocked}
                                       loading={canjeando === reward.key}
                                       onClick={() => solicitarCanje(reward.key)}
-                                      style={unlocked ? { background: "#d81b87", borderColor: "#d81b87" } : undefined}
+                                      style={unlocked ? { background: BRAND_FUCHSIA, borderColor: BRAND_FUCHSIA } : undefined}
                                     >
                                       {unlocked ? "Canjear ahora" : "Bloqueada"}
                                     </Button>
@@ -631,7 +642,7 @@ export default function ClubPage() {
                         </Row>
                       </Card>
 
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined /><Text strong>Mis vouchers y canjes</Text></Space>}>
+                      <Card style={sectionCardStyle} title={<Space><GiftOutlined style={{ color: BRAND_FUCHSIA }} /><Text strong>Mis vouchers y canjes</Text></Space>}>
                         {canjes.length === 0 ? <Empty description="Todavía no has emitido vouchers" /> : (
                           <Space direction="vertical" size={12} style={{ width: "100%" }}>
                             {canjes.map((canje) => (
@@ -675,7 +686,7 @@ export default function ClubPage() {
                 children: (
                   <Row gutter={[16, 16]}>
                     <Col xs={24} lg={14}>
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title={<Space><GiftOutlined />Historial de puntos</Space>}>
+                      <Card style={sectionCardStyle} title={<Space><GiftOutlined style={{ color: BRAND_FUCHSIA }} />Historial de puntos</Space>}>
                         {historial.length === 0 ? <Empty description="Sin movimientos registrados" /> : (
                           <Timeline
                             items={historial.map((item) => ({
@@ -694,9 +705,9 @@ export default function ClubPage() {
                         )}
                       </Card>
 
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title="Campañas del club">
+                      <Card style={sectionCardStyle} title="Campañas del club">
                         <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                          <div style={{ padding: 12, borderRadius: 12, background: esCumple ? "#fff0f6" : "#fffbe6", border: `1px solid ${esCumple ? "#ffadd2" : "#ffe58f"}` }}>
+                          <div style={{ padding: 12, borderRadius: 12, background: esCumple ? "#fff0f6" : "#fff2f8", border: `1px solid ${esCumple ? "#ffadd2" : "#ffc1dd"}` }}>
                             <Space direction="vertical" size={4}>
                               <Text strong>🎂 Campaña de cumpleaños</Text>
                               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -704,7 +715,7 @@ export default function ClubPage() {
                               </Text>
                             </Space>
                           </div>
-                          <div style={{ padding: 12, borderRadius: 12, background: "#f9f0ff", border: "1px solid #d3adf7" }}>
+                          <div style={{ padding: 12, borderRadius: 12, background: "#fff2f8", border: "1px solid #ffc1dd" }}>
                             <Space direction="vertical" size={6} style={{ width: "100%" }}>
                               <Text strong>🤝 Campaña de referidos</Text>
                               <Text type="secondary" style={{ fontSize: 12 }}>Tu código personal suma 300 pts cuando tu referida haga su primera compra.</Text>
@@ -744,7 +755,7 @@ export default function ClubPage() {
                     </Col>
 
                     <Col xs={24} lg={10}>
-                      <Card style={{ borderRadius: 16, marginBottom: 16 }} title="Cómo ganar más puntos">
+                      <Card style={sectionCardStyle} title="Cómo ganar más puntos">
                         <Space direction="vertical" size={10} style={{ width: "100%" }}>
                           {[
                             { icon: "💵", text: "Gana 1 punto por cada $1.000 de compra." },
@@ -753,7 +764,7 @@ export default function ClubPage() {
                             { icon: "🔥", text: "Mantén tu racha mensual para desbloquear logros." },
                             { icon: "🎟️", text: "Convierte tus puntos en vouchers que ya funcionan en caja." },
                           ].map((item) => (
-                            <div key={item.text} style={{ padding: 12, borderRadius: 12, background: "#fff", border: "1px solid #f0f0f0" }}>
+                            <div key={item.text} style={{ padding: 12, borderRadius: 12, background: "#fff", border: "1px solid #ffd6e7" }}>
                               <Space>
                                 <span style={{ fontSize: 18 }}>{item.icon}</span>
                                 <Text style={{ fontSize: 12 }}>{item.text}</Text>
@@ -763,7 +774,7 @@ export default function ClubPage() {
                         </Space>
                       </Card>
 
-                      <Card style={{ borderRadius: 16, textAlign: "center", background: "linear-gradient(135deg,#fff0f8,#ffe4f2)" }}>
+                      <Card style={{ ...sectionCardStyle, textAlign: "center", background: "linear-gradient(135deg,#fff0f8,#ffd6e7)" }}>
                         <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 8 }}>¿Quieres ayuda para usar tu código o revisar tu club?</Text>
                         <Button
                           type="primary"

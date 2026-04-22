@@ -1,13 +1,11 @@
 "use client";
 
-import { ColorModeContext } from "@contexts/color-mode";
 import type { RefineThemedLayoutHeaderProps } from "@refinedev/antd";
 import { useGetIdentity, useLogout } from "@refinedev/core";
 import {
   Layout as AntdLayout,
   Avatar,
   Space,
-  Switch,
   theme,
   Typography,
   Button,
@@ -15,7 +13,7 @@ import {
 import { BookOutlined, LogoutOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@hooks/useCurrentUser";
-import React, { useContext } from "react";
+import React from "react";
 
 const { Text } = Typography;
 const { useToken } = theme;
@@ -32,9 +30,6 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
   const { token } = useToken();
   const { data: user } = useGetIdentity<IUser>();
   const { mutate: logout } = useLogout();
-  const colorMode = useContext(ColorModeContext);
-  const mode = colorMode?.mode ?? "light";
-  const setMode = colorMode?.setMode ?? (() => {});
   const router = useRouter();
   const { user: currentUser } = useCurrentUser();
 
@@ -82,12 +77,6 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
             {portalLabel}
           </Button>
         )}
-        <Switch
-          checkedChildren="🌛"
-          unCheckedChildren="🔆"
-          onChange={() => setMode(mode === "light" ? "dark" : "light")}
-          defaultChecked={mode === "dark"}
-        />
         {(user?.name || user?.avatar) && (
           <Space style={{ marginLeft: "8px" }} size="middle">
             {user?.name && <Text strong>{user.name}</Text>}
