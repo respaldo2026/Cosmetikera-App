@@ -1,9 +1,9 @@
 {
-  "/api/configuracion/club/route": "app/api/configuracion/club/route.js",
-  "/api/perfiles/route": "app/api/perfiles/route.js",
-  "/clientes/page": "app/clientes/page.js",
-  "/historial/page": "app/historial/page.js",
-  "/ventas/page": "app/ventas/page.js",
+  "/api/club/canjes/route": "app/api/club/canjes/route.js",
+  "/api/club/route": "app/api/club/route.js",
+  "/club/page": "app/club/page.js",
+  "/page": "app/page.js",
   "/articulos/page": "app/articulos/page.js",
-  "/club/page": "app/club/page.js"
+  "/fidelizacion/page": "app/fidelizacion/page.js",
+  "/clientes/page": "app/clientes/page.js"
 }
