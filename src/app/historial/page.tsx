@@ -159,7 +159,7 @@ type HistorialPayload = {
 
 type TipoOperacion = "venta" | "compra" | "movimiento" | "puntos" | "voucher";
 type DireccionOperacion = "entrada" | "salida" | "neutral";
-type PeriodoRapido = "hoy" | "semana" | "mes" | "personalizado" | "todo";
+type PeriodoRapido = "hoy" | "semana" | "mes" | "anio" | "personalizado" | "todo";
 
 type HistorialEntry = {
   id: string;
@@ -281,6 +281,9 @@ function matchesPeriodo(fecha: string, periodo: PeriodoRapido, rango: [Dayjs, Da
   if (periodo === "mes") {
     return current.isAfter(dayjs().startOf("month").subtract(1, "millisecond")) && current.isBefore(dayjs().endOf("month").add(1, "millisecond"));
   }
+  if (periodo === "anio") {
+    return current.isAfter(dayjs().startOf("year").subtract(1, "millisecond")) && current.isBefore(dayjs().endOf("year").add(1, "millisecond"));
+  }
   if (!rango) return true;
 
   return current.isAfter(rango[0].startOf("day").subtract(1, "millisecond")) && current.isBefore(rango[1].endOf("day").add(1, "millisecond"));
@@ -304,6 +307,71 @@ function formatPercent(value: number | null) {
   return `${prefix}${value.toLocaleString()}%`;
 }
 
+function buildExactRange(
+  diaFiltro: Dayjs | null,
+  mesFiltro: Dayjs | null,
+  anioFiltro: number | null,
+) {
+  if (diaFiltro) {
+    return {
+      start: diaFiltro.startOf("day"),
+      end: diaFiltro.endOf("day"),
+      label: `Dia ${diaFiltro.format("DD/MM/YYYY")}`,
+      mode: "dia" as const,
+    };
+  }
+
+  if (mesFiltro) {
+    return {
+      start: mesFiltro.startOf("month"),
+      end: mesFiltro.endOf("month"),
+      label: `Mes ${mesFiltro.format("MMMM YYYY")}`,
+      mode: "mes" as const,
+    };
+  }
+
+  if (anioFiltro) {
+    const base = dayjs(`${anioFiltro}-01-01`);
+    return {
+      start: base.startOf("year"),
+      end: base.endOf("year"),
+      label: `Año ${anioFiltro}`,
+      mode: "anio" as const,
+    };
+  }
+
+  return null;
+}
+
+function buildPreviousFromExactRange(exactRange: ReturnType<typeof buildExactRange>) {
+  if (!exactRange) return null;
+
+  if (exactRange.mode === "dia") {
+    const prevStart = exactRange.start.subtract(1, "day").startOf("day");
+    return {
+      start: prevStart,
+      end: prevStart.endOf("day"),
+      label: `Dia anterior (${prevStart.format("DD/MM/YYYY")})`,
+    };
+  }
+
+  if (exactRange.mode === "mes") {
+    const prevStart = exactRange.start.subtract(1, "month").startOf("month");
+    return {
+      start: prevStart,
+      end: prevStart.endOf("month"),
+      label: `Mes anterior (${prevStart.format("MMMM YYYY")})`,
+    };
+  }
+
+  const prevStart = exactRange.start.subtract(1, "year").startOf("year");
+  return {
+    start: prevStart,
+    end: prevStart.endOf("year"),
+    label: `Año anterior (${prevStart.format("YYYY")})`,
+  };
+}
+
 export default function HistorialPage() {
   const { message } = App.useApp();
   const screens = useBreakpoint();
@@ -324,6 +392,9 @@ export default function HistorialPage() {
   const [direccionFiltro, setDireccionFiltro] = useState<DireccionOperacion | undefined>(undefined);
   const [periodo, setPeriodo] = useState<PeriodoRapido>("mes");
   const [rango, setRango] = useState<[Dayjs, Dayjs] | null>(null);
+  const [diaFiltro, setDiaFiltro] = useState<Dayjs | null>(null);
+  const [mesFiltro, setMesFiltro] = useState<Dayjs | null>(null);
+  const [anioFiltro, setAnioFiltro] = useState<number | null>(null);
   const [detalle, setDetalle] = useState<HistorialEntry | null>(null);
   const [mostrarGraficas, setMostrarGraficas] = useState(false);
 
@@ -492,9 +563,22 @@ export default function HistorialPage() {
     [periodo, rango]
   );
 
+  const exactRange = useMemo(
+    () => buildExactRange(diaFiltro, mesFiltro, anioFiltro),
+    [anioFiltro, diaFiltro, mesFiltro]
+  );
+
+  const previousExactRange = useMemo(
+    () => buildPreviousFromExactRange(exactRange),
+    [exactRange]
+  );
+
   const operacionesFiltradas = useMemo(
-    () => operacionesBaseFiltradas.filter((operacion) => matchesPeriodo(operacion.fecha, periodo, rango)),
-    [operacionesBaseFiltradas, periodo, rango]
+    () => operacionesBaseFiltradas.filter((operacion) => {
+      if (exactRange) return matchesExplicitRange(operacion.fecha, { start: exactRange.start, end: exactRange.end });
+      return matchesPeriodo(operacion.fecha, periodo, rango);
+    }),
+    [exactRange, operacionesBaseFiltradas, periodo, rango]
   );
 
   const ventasBaseFiltradas = useMemo(
@@ -503,16 +587,43 @@ export default function HistorialPage() {
   );
 
   const ventasFiltradas = useMemo(
-    () => ventasBaseFiltradas.filter((item) => matchesPeriodo(item.fecha, periodo, rango)),
-    [periodo, rango, ventasBaseFiltradas]
+    () => ventasBaseFiltradas.filter((item) => {
+      if (exactRange) return matchesExplicitRange(item.fecha, { start: exactRange.start, end: exactRange.end });
+      return matchesPeriodo(item.fecha, periodo, rango);
+    }),
+    [exactRange, periodo, rango, ventasBaseFiltradas]
   );
 
   const ventasPeriodoAnterior = useMemo(
-    () => periodRanges.previous
-      ? ventasBaseFiltradas.filter((item) => matchesExplicitRange(item.fecha, periodRanges.previous))
-      : [],
-    [periodRanges.previous, ventasBaseFiltradas]
+    () => {
+      if (previousExactRange) {
+        return ventasBaseFiltradas.filter((item) => matchesExplicitRange(item.fecha, previousExactRange));
+      }
+
+      return periodRanges.previous
+        ? ventasBaseFiltradas.filter((item) => matchesExplicitRange(item.fecha, periodRanges.previous))
+        : [];
+    },
+    [periodRanges.previous, previousExactRange, ventasBaseFiltradas]
   );
+
+  const periodComparison = useMemo(() => {
+    if (exactRange && previousExactRange) {
+      return {
+        currentLabel: exactRange.label,
+        previousLabel: previousExactRange.label,
+      };
+    }
+
+    if (periodRanges.previous) {
+      return {
+        currentLabel: periodRanges.current?.label || "Periodo actual",
+        previousLabel: periodRanges.previous.label,
+      };
+    }
+
+    return null;
+  }, [exactRange, periodRanges.current, periodRanges.previous, previousExactRange]);
 
   const stats = useMemo(() => {
     const entradas = operacionesFiltradas
@@ -568,18 +679,40 @@ export default function HistorialPage() {
       tipoFiltro ? `Tipo: ${TIPO_META[tipoFiltro].label}` : null,
       direccionFiltro ? `Direccion: ${direccionFiltro}` : null,
       search ? `Busqueda: ${search}` : null,
+      diaFiltro ? `Dia: ${diaFiltro.format("DD/MM/YYYY")}` : null,
+      mesFiltro ? `Mes: ${mesFiltro.format("MM/YYYY")}` : null,
+      anioFiltro ? `Año: ${anioFiltro}` : null,
       periodo === "personalizado" && rango
         ? `Rango: ${rango[0].format("DD/MM/YYYY")} - ${rango[1].format("DD/MM/YYYY")}`
         : null,
     ].filter(Boolean);
 
     return partes.join(" | ") || "Sin filtros";
-  }, [direccionFiltro, periodo, rango, search, tipoFiltro]);
+  }, [anioFiltro, diaFiltro, direccionFiltro, mesFiltro, periodo, rango, search, tipoFiltro]);
 
   const hayFiltrosActivos = useMemo(
-    () => Boolean(search.trim()) || Boolean(tipoFiltro) || Boolean(direccionFiltro) || periodo !== "mes" || Boolean(rango),
-    [direccionFiltro, periodo, rango, search, tipoFiltro]
+    () => Boolean(search.trim())
+      || Boolean(tipoFiltro)
+      || Boolean(direccionFiltro)
+      || periodo !== "mes"
+      || Boolean(rango)
+      || Boolean(diaFiltro)
+      || Boolean(mesFiltro)
+      || Boolean(anioFiltro),
+    [anioFiltro, diaFiltro, direccionFiltro, mesFiltro, periodo, rango, search, tipoFiltro]
   );
+
+  const yearOptions = useMemo(() => {
+    const years = new Set<number>();
+    operaciones.forEach((operacion) => {
+      const d = dayjs(operacion.fecha);
+      if (d.isValid()) years.add(d.year());
+    });
+
+    return Array.from(years)
+      .sort((a, b) => b - a)
+      .map((year) => ({ value: year, label: String(year) }));
+  }, [operaciones]);
 
   const mostrarSeccionGraficas = mostrarGraficas || hayFiltrosActivos;
 
@@ -779,13 +912,13 @@ export default function HistorialPage() {
         </Col>
       </Row>
 
-      {periodRanges.previous ? (
+      {periodComparison ? (
         <Card style={{ marginBottom: 16, borderRadius: 12 }} styles={{ body: { padding: "14px 16px" } }}>
           <Space direction="vertical" size={14} style={{ width: "100%" }}>
             <div>
               <Title level={5} style={{ marginBottom: 4 }}>Comparacion de periodos</Title>
               <Text type="secondary">
-                {periodRanges.current?.label || "Periodo actual"} frente a {periodRanges.previous.label} con los mismos filtros activos.
+                {periodComparison.currentLabel} frente a {periodComparison.previousLabel} con los mismos filtros activos.
               </Text>
             </div>
 
@@ -920,9 +1053,41 @@ export default function HistorialPage() {
                 { label: "Hoy", value: "hoy" },
                 { label: "Semana", value: "semana" },
                 { label: "Mes", value: "mes" },
+                { label: "Año", value: "anio" },
                 { label: "Periodo", value: "personalizado" },
                 { label: "Todo", value: "todo" },
               ]}
+            />
+          </Col>
+          <Col xs={24} sm={8} xl={4}>
+            <DatePicker
+              style={{ width: "100%" }}
+              format="DD/MM/YYYY"
+              placeholder="Dia exacto"
+              value={diaFiltro}
+              onChange={(value) => setDiaFiltro(value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} sm={8} xl={4}>
+            <DatePicker
+              style={{ width: "100%" }}
+              picker="month"
+              format="MM/YYYY"
+              placeholder="Mes exacto"
+              value={mesFiltro}
+              onChange={(value) => setMesFiltro(value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} sm={8} xl={3}>
+            <Select
+              placeholder="Año"
+              allowClear
+              style={{ width: "100%" }}
+              value={anioFiltro}
+              onChange={(value) => setAnioFiltro(value)}
+              options={yearOptions}
             />
           </Col>
           {periodo === "personalizado" ? (
@@ -940,6 +1105,20 @@ export default function HistorialPage() {
         <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
           <Button onClick={() => setMostrarGraficas((current) => !current)}>
             {mostrarSeccionGraficas ? "Ocultar gráficas" : "Mostrar gráficas"}
+          </Button>
+          <Button
+            onClick={() => {
+              setPeriodo("mes");
+              setRango(null);
+              setDiaFiltro(null);
+              setMesFiltro(null);
+              setAnioFiltro(null);
+              setTipoFiltro(undefined);
+              setDireccionFiltro(undefined);
+              setSearch("");
+            }}
+          >
+            Limpiar filtros
           </Button>
           {!hayFiltrosActivos ? (
             <Text type="secondary">Las gráficas se muestran cuando las abres manualmente o cuando aplicas filtros.</Text>

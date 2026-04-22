@@ -18,28 +18,28 @@ export async function GET() {
         .from("ventas")
         .select("id,fecha,total,subtotal,descuento,metodo_pago,cliente_id,items,cliente:perfiles(nombre_completo,cedula)")
         .order("fecha", { ascending: false })
-        .limit(500),
+        .limit(3000),
       supabase
         .from("compras")
         .select("id,proveedor_id,proveedor_nombre,fecha,total,estado,notas,items")
         .order("fecha", { ascending: false })
-        .limit(300),
+        .limit(3000),
       supabase
         .from("movimientos_financieros")
         .select("id,fecha,tipo,monto,concepto,categoria,metodo_pago,referencia,descripcion,estudiante_id,proveedor_id,conciliado,created_at, perfiles:perfiles!movimientos_financieros_estudiante_id_fkey(nombre_completo, telefono), proveedores:perfiles!movimientos_financieros_proveedor_id_fkey(nombre_completo)")
         .order("fecha", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(3000),
       supabase
         .from("puntos_historial")
         .select("id,perfil_id,tipo,puntos,concepto,referencia,created_at")
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(3000),
       supabase
         .from("canjes")
         .select("id,perfil_id,puntos,valor_cop,descripcion,estado,created_at")
         .order("created_at", { ascending: false })
-        .limit(300),
+        .limit(3000),
       supabase
         .from("perfiles")
         .select("id,nombre_completo,cedula")
