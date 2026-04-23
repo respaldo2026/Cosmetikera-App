@@ -216,14 +216,33 @@ export default function VentasPage() {
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    const [{ data: arts }, clientesRes] = await Promise.all([
-      supabaseBrowserClient.from("articulos").select("*").eq("activo", true).order("nombre"),
-      fetch("/api/perfiles?rol=cliente").then((r) => r.json()),
-    ]);
-    setArticulos((arts || []).filter((a: Articulo) => a.stock > 0));
-    setClientes((clientesRes.data || []).filter((c: Cliente) => c.activo !== false));
-    setLoading(false);
-  }, []);
+    try {
+      const [{ data: arts, error: artsError }, clientesRes] = await Promise.all([
+        supabaseBrowserClient.from("articulos").select("*").eq("activo", true).order("nombre"),
+        fetch("/api/perfiles?rol=cliente").then(async (r) => {
+          if (!r.ok) {
+            const body = await r.text();
+            throw new Error(body || `Error HTTP ${r.status} cargando clientes`);
+          }
+          return r.json();
+        }),
+      ]);
+
+      if (artsError) {
+        throw artsError;
+      }
+
+      setArticulos(((arts as Articulo[]) || []).filter((a: Articulo) => Number(a.stock || 0) > 0));
+      setClientes(((clientesRes.data as Cliente[]) || []).filter((c: Cliente) => c.activo !== false));
+    } catch (error) {
+      console.error("[Ventas] Error cargando datos iniciales:", error);
+      setArticulos([]);
+      setClientes([]);
+      message.error("No se pudieron cargar productos o clientes. Recarga la página.");
+    } finally {
+      setLoading(false);
+    }
+  }, [message]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
