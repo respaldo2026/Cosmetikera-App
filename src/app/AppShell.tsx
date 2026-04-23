@@ -185,6 +185,16 @@ const allResources = [
     },
   },
   {
+    key: "configuracion-general",
+    name: "configuracion-general",
+    list: "/configuracion",
+    meta: {
+      label: "General",
+      icon: <SettingOutlined />,
+      parent: "configuracion",
+    },
+  },
+  {
     key: "configuracion-club",
     name: "configuracion-club",
     list: "/configuracion/club",
