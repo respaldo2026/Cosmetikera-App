@@ -6,7 +6,7 @@ async function getPerfilByIdOrEmail(userId?: string, userEmail?: string | null) 
   if (userId) {
     const { data: perfilById } = await supabaseBrowserClient
       .from("perfiles")
-      .select("id, rol, email, nombre_completo, foto_url")
+      .select("id, rol, email, nombre_completo")
       .eq("id", userId)
       .maybeSingle();
 
@@ -18,7 +18,7 @@ async function getPerfilByIdOrEmail(userId?: string, userEmail?: string | null) 
 
   const { data: perfilesByEmail } = await supabaseBrowserClient
     .from("perfiles")
-    .select("id, rol, email, nombre_completo, foto_url")
+    .select("id, rol, email, nombre_completo")
     .ilike("email", normalizedEmail)
     .limit(2);
 
@@ -273,7 +273,6 @@ export const authProvider: AuthProvider = {
             id: user.id,
             name: perfil.nombre_completo,
             email: perfil.email || user.email,
-            avatar: perfil.foto_url,
             rol: perfil.rol,
           };
           console.log("[AUTH] getIdentity - Returning:", identity);
