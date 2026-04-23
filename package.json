@@ -17,7 +17,8 @@
     "validar:config": "node scripts/validar-config-whatsapp.js",
     "templates:crear": "node scripts/crear-templates-meta.js",
     "templates:listar": "node scripts/listar-templates.js",
-    "templates:probar": "node scripts/probar-template-simple.js"
+    "templates:probar": "node scripts/probar-template-simple.js",
+    "admin:default": "node scripts/sync-admin-users.js && node scripts/set-default-admin-password.js"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
