@@ -33,9 +33,31 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { supabaseBrowserClient } from "@utils/supabase/client";
-import { generarTicketPagoBlob, abrirTicketPagoDesdeBlob, imprimirTicketPagoDesdeBlob } from "@utils/pago-ticket";
-import { subirTicketPago } from "@utils/ticket-storage";
-import { registrarIngresoDesdePago } from "@modules/finanzas/movimientos.service";
+
+let ticketUtilsPromise: Promise<typeof import("@utils/pago-ticket")> | null = null;
+let ticketStoragePromise: Promise<typeof import("@utils/ticket-storage")> | null = null;
+let movimientosServicePromise: Promise<typeof import("@modules/finanzas/movimientos.service")> | null = null;
+
+const loadTicketUtils = () => {
+  if (!ticketUtilsPromise) {
+    ticketUtilsPromise = import("@utils/pago-ticket");
+  }
+  return ticketUtilsPromise;
+};
+
+const loadTicketStorage = () => {
+  if (!ticketStoragePromise) {
+    ticketStoragePromise = import("@utils/ticket-storage");
+  }
+  return ticketStoragePromise;
+};
+
+const loadMovimientosService = () => {
+  if (!movimientosServicePromise) {
+    movimientosServicePromise = import("@modules/finanzas/movimientos.service");
+  }
+  return movimientosServicePromise;
+};
 
 const { Title, Text } = Typography;
 
@@ -503,6 +525,7 @@ export default function CajaPage() {
       const pagosActualizados = [];
       const metodoPago = values.metodo_pago as MetodoPago;
       const referenciaPago = values.referencia || `FAC-${generarNumeroFactura()}`;
+      const { registrarIngresoDesdePago } = await loadMovimientosService();
 
       // Actualizar cada cuota seleccionada
       for (const cuota of cuotasAPagar) {
@@ -600,6 +623,7 @@ export default function CajaPage() {
       };
 
       // Generar y abrir ticket
+      const { generarTicketPagoBlob, abrirTicketPagoDesdeBlob, imprimirTicketPagoDesdeBlob } = await loadTicketUtils();
       const blob = await generarTicketPagoBlob(ticketData);
       const placeholder = window.open("", "_blank");
       
@@ -612,6 +636,7 @@ export default function CajaPage() {
       // Subir ticket a storage y asociarlo a todos los pagos del lote
       if (pagosActualizados.length > 0) {
         try {
+          const { subirTicketPago } = await loadTicketStorage();
           const { publicUrl } = await subirTicketPago({
             blob,
             pagoId: pagosActualizados[0].id,
@@ -1040,6 +1065,7 @@ export default function CajaPage() {
                       },
                     };
 
+                    const { generarTicketPagoBlob, abrirTicketPagoDesdeBlob } = await loadTicketUtils();
                     const blob = await generarTicketPagoBlob(ticketData);
                     const placeholder = window.open("", "_blank");
                     if (placeholder) {
