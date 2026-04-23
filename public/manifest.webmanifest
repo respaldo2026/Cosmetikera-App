@@ -1,19 +1,19 @@
 {
-  "name": "Academia de Belleza Crystal Diamante",
-  "short_name": "Crystal Diamante",
+  "name": "Club La Cosmetikera",
+  "short_name": "Cosmetikera",
   "start_url": "/login",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ff2aa1",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/icon.svg?v=2",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon.svg",
+      "src": "/icon.svg?v=2",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"

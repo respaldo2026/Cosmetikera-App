@@ -12,10 +12,10 @@ export const metadata: Metadata = {
   description: "Administracion, punto de venta y fidelizacion de clientes",
   icons: {
     icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.svg?v=2", type: "image/svg+xml" },
+      { url: "/icon.svg?v=2", type: "image/svg+xml" },
     ],
-    apple: "/icon.svg",
+    apple: "/icon.svg?v=2",
   },
   manifest: "/manifest.webmanifest",
   openGraph: {
@@ -68,8 +68,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es">
       <head>
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon.svg?v=2" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body>
