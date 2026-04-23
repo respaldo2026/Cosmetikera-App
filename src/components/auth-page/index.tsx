@@ -8,7 +8,11 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export const AuthPage = (props: AuthPageProps) => {
+type ExtendedAuthPageProps = AuthPageProps & {
+  audience?: "admin" | "club";
+};
+
+export const AuthPage = (props: ExtendedAuthPageProps) => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -16,6 +20,7 @@ export const AuthPage = (props: AuthPageProps) => {
   const { mutate: login, isPending } = useLogin();
   const searchParams = useSearchParams();
   const authError = searchParams.get("error");
+  const isClubAudience = props.audience === "club";
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -72,8 +77,13 @@ export const AuthPage = (props: AuthPageProps) => {
       >
         <div style={{ marginBottom: isMobile ? 12 : 16 }}>
           <h2 style={{ margin: "0 0 4px", fontSize: isMobile ? 20 : 22, lineHeight: 1.2, color: "#111827" }}>
-            Inicia sesión
+            {isClubAudience ? "Accede a tu portal" : "Inicia sesión"}
           </h2>
+          {isClubAudience ? (
+            <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
+              Consulta tus puntos, recompensas, descuentos y estado de beneficios.
+            </p>
+          ) : null}
         </div>
 
         <Form
@@ -229,7 +239,9 @@ export const AuthPage = (props: AuthPageProps) => {
 
       {props.type === "login" && (
         <div style={{ marginTop: 10, textAlign: "center", fontSize: 11, color: "#6b7280" }}>
-          Acceso exclusivo para usuarios autorizados.
+          {isClubAudience
+            ? "Acceso para clientes del Club La Cosmetikera."
+            : "Acceso exclusivo para usuarios autorizados."}
         </div>
       )}
     </div>

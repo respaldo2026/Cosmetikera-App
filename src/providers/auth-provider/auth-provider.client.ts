@@ -161,7 +161,7 @@ export const authProvider: AuthProvider = {
         if (isClubPage) {
           return {
             authenticated: false,
-            redirectTo: "/login",
+            redirectTo: "/login?from=club",
             logout: true,
           };
         }
@@ -181,7 +181,7 @@ export const authProvider: AuthProvider = {
       if (isClubPage) {
         return {
           authenticated: false,
-          redirectTo: "/login",
+          redirectTo: "/login?from=club",
           logout: true,
         };
       }
@@ -198,7 +198,7 @@ export const authProvider: AuthProvider = {
       if (currentPath.startsWith('/club')) {
         return {
           authenticated: false,
-          redirectTo: "/login",
+          redirectTo: "/login?from=club",
           logout: true,
           error: {
             name: "CheckError",

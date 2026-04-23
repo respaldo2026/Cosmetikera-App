@@ -12,12 +12,16 @@ interface PwaInstallPromptProps {
   inline?: boolean;
   dismissKey?: string;
   autoHideDays?: number;
+  title?: string;
+  subtitle?: string;
 }
 
 export const PwaInstallPrompt = ({
   inline = false,
   dismissKey,
   autoHideDays = 7,
+  title = "Instalar App",
+  subtitle = "Android o iPhone/iPad",
 }: PwaInstallPromptProps) => {
   const [deferredPrompt, setDeferredPrompt] = useState<DeferredPrompt | null>(null);
   const [visible, setVisible] = useState(true);
@@ -151,10 +155,10 @@ export const PwaInstallPrompt = ({
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#ffffff" }}>
-              📱 Instalar App
+              📱 {title}
             </div>
             <div style={{ fontSize: 10, fontWeight: 500, color: "rgba(255, 255, 255, 0.9)" }}>
-              Android o iPhone/iPad
+              {subtitle}
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -243,10 +247,10 @@ export const PwaInstallPrompt = ({
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>
-          📱 Instalar App
+          📱 {title}
         </div>
         <div style={{ fontSize: 11, fontWeight: 500, color: "rgba(255, 255, 255, 0.9)" }}>
-          Android o iPhone/iPad
+          {subtitle}
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>

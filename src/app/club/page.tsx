@@ -603,7 +603,13 @@ export default function ClubPage() {
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Instala el portal como app para entrar mas rapido, recibir notificaciones y usar tus beneficios sin buscar en el navegador.
               </Text>
-              <PwaInstallPrompt inline dismissKey="club-portal-install" autoHideDays={14} />
+              <PwaInstallPrompt
+                inline
+                dismissKey="club-portal-install"
+                autoHideDays={14}
+                title="Instala tu app del club"
+                subtitle="Recibe promociones, puntos y acceso rapido"
+              />
             </Space>
           </Card>
 

@@ -7,7 +7,12 @@ import { PwaInstallPrompt } from "../PwaInstallPrompt";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
-export function LoginLanding({ children }: { children?: ReactNode }) {
+type LoginLandingProps = {
+  children?: ReactNode;
+  audience?: "admin" | "club";
+};
+
+export function LoginLanding({ children, audience = "admin" }: LoginLandingProps) {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
   const [mounted, setMounted] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -47,7 +52,10 @@ export function LoginLanding({ children }: { children?: ReactNode }) {
   if (!mounted) return null;
 
   const isMobile = windowWidth < 768;
-  const isTablet = windowWidth < 1024;
+  const subtitle =
+    audience === "club"
+      ? "Ingresa a tu portal para ver beneficios, puntos y descuentos"
+      : "Tu sistema POS y fidelizacion de clientes";
 
   return (
     <div
@@ -143,7 +151,7 @@ export function LoginLanding({ children }: { children?: ReactNode }) {
               textAlign: "center",
             }}
           >
-            Tu sistema POS y fidelizacion de clientes
+            {subtitle}
           </p>
         </div>
 
@@ -156,7 +164,17 @@ export function LoginLanding({ children }: { children?: ReactNode }) {
             justifyContent: "center",
           }}
         >
-          <PwaInstallPrompt inline={true} />
+          {audience === "club" ? (
+            <PwaInstallPrompt
+              inline
+              dismissKey="club-login-install"
+              autoHideDays={7}
+              title="Instala tu portal"
+              subtitle="Acceso rapido, beneficios y notificaciones push"
+            />
+          ) : (
+            <PwaInstallPrompt inline={true} />
+          )}
           {children}
         </div>
       </div>
