@@ -255,6 +255,9 @@ export default function ArticulosPage() {
     { key: "codigo_secundario", label: "codigo_secundario" },
     { key: "categoria",         label: "categoria" },
     { key: "marca",             label: "marca" },
+    { key: "proveedor",         label: "proveedor" },
+    { key: "tamano",            label: "tamano" },
+    { key: "empaque",           label: "empaque" },
     { key: "precio_venta",      label: "precio_venta" },
     { key: "precio_costo",      label: "precio_costo" },
     { key: "stock",             label: "stock" },
@@ -272,6 +275,9 @@ export default function ArticulosPage() {
         codigo_secundario: String(row["codigo_secundario"] || row["Codigo_secundario"] || "").trim() || undefined,
         categoria:         String(row["categoria"] || row["Categoria"] || row["Categoría"] || "").trim() || undefined,
         marca:             String(row["marca"] || row["Marca"] || "").trim() || undefined,
+        proveedor:         String(row["proveedor"] || row["Proveedor"] || "").trim() || undefined,
+        tamano:            String(row["tamano"] || row["tamaño"] || row["Tamano"] || row["Tamaño"] || "").trim() || undefined,
+        empaque:           String(row["empaque"] || row["Empaque"] || "").trim() || undefined,
         precio_venta:      Number(row["precio_venta"] || row["Precio_venta"] || row["Precio venta"] || row["PrecioVenta"] || 0),
         precio_costo:      Number(row["precio_costo"] || row["Precio_costo"] || row["Precio costo"] || row["PrecioCosto"] || 0) || undefined,
         stock:             Number(row["stock"] || row["Stock"] || 0),
@@ -308,8 +314,8 @@ export default function ArticulosPage() {
   const descargarPlantilla = async () => {
     const XLSX = await loadXlsx();
     const ws = XLSX.utils.aoa_to_sheet([
-      ["nombre", "referencia", "codigo_secundario", "categoria", "marca", "precio_venta", "precio_costo", "stock", "stock_minimo", "descripcion"],
-      ["Esmalte Ejemplo", "COD-001", "REF-A", "Esmaltes", "OPI", 15000, 8000, 20, 3, "Esmalte de ejemplo"],
+      ["nombre", "referencia", "codigo_secundario", "categoria", "marca", "proveedor", "tamano", "empaque", "precio_venta", "precio_costo", "stock", "stock_minimo", "descripcion"],
+      ["Esmalte Ejemplo", "COD-001", "REF-A", "Esmaltes", "OPI", "Distribuidor ABC", "15 ml", "Frasco", 15000, 8000, 20, 3, "Esmalte de ejemplo"],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Artículos");
@@ -328,6 +334,9 @@ export default function ArticulosPage() {
       nombre: `${art.nombre} (copia)`,
       categoria: art.categoria,
       marca: art.marca,
+      proveedor: art.proveedor,
+      tamano: art.tamano,
+      empaque: art.empaque,
       descripcion: art.descripcion,
       precio_venta: art.precio_venta,
       precio_costo: art.precio_costo,
@@ -437,6 +446,9 @@ export default function ArticulosPage() {
 
     if (typeof values.categoria === "string" && values.categoria.trim()) payload.categoria = values.categoria.trim();
     if (typeof values.marca === "string" && values.marca.trim()) payload.marca = values.marca.trim();
+    if (typeof values.proveedor === "string" && values.proveedor.trim()) payload.proveedor = values.proveedor.trim();
+    if (typeof values.tamano === "string" && values.tamano.trim()) payload.tamano = values.tamano.trim();
+    if (typeof values.empaque === "string" && values.empaque.trim()) payload.empaque = values.empaque.trim();
     if (typeof values.stock_minimo === "number") payload.stock_minimo = values.stock_minimo;
     if (typeof values.descuento_porcentaje === "number") payload.descuento_porcentaje = values.descuento_porcentaje;
     if (typeof values.activo === "boolean") payload.activo = values.activo;
@@ -1167,6 +1179,23 @@ export default function ArticulosPage() {
           </Row>
           <Row gutter={16}>
             <Col span={8}>
+              <Form.Item name="proveedor" label="Proveedor">
+                <Input placeholder="Ej: Distribuidor XYZ" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="tamano" label="Tamaño">
+                <Input placeholder="Ej: 15 ml" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="empaque" label="Empaque">
+                <Input placeholder="Ej: Frasco" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}>
               <Form.Item name="precio_venta" label="Precio venta ($)" rules={[{ required: true }]}>
                 <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
               </Form.Item>
@@ -1226,6 +1255,21 @@ export default function ArticulosPage() {
             <Col xs={24} md={12}>
               <Form.Item name="marca" label="Nueva marca">
                 <Input placeholder="Ej: OPI" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="proveedor" label="Nuevo proveedor">
+                <Input placeholder="Ej: Distribuidor XYZ" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="tamano" label="Nuevo tamaño">
+                <Input placeholder="Ej: 15 ml" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="empaque" label="Nuevo empaque">
+                <Input placeholder="Ej: Frasco" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
