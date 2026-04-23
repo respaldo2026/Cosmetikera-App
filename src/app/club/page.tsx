@@ -46,6 +46,7 @@ import {
   isRewardEligibleDynamic,
   getNivelDinamico,
 } from "@/hooks/useClubConfig";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -589,6 +590,23 @@ export default function ClubPage() {
 
       {cliente && nivel && (
         <div style={{ width: "100%", maxWidth: 980, boxSizing: "border-box" }}>
+          <Card
+            style={{
+              ...sectionCardStyle,
+              marginBottom: 12,
+              border: "1px solid #ffc1df",
+            }}
+            styles={{ body: { padding: isMobile ? 12 : 14 } }}
+          >
+            <Space direction="vertical" size={10} style={{ width: "100%" }}>
+              <Text strong style={{ color: BRAND_FUCHSIA }}>Instala Club La Cosmetikera en tu telefono</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Instala el portal como app para entrar mas rapido, recibir notificaciones y usar tus beneficios sin buscar en el navegador.
+              </Text>
+              <PwaInstallPrompt inline dismissKey="club-portal-install" autoHideDays={14} />
+            </Space>
+          </Card>
+
           <Card
             style={{ borderRadius: 16, marginBottom: 12, background: `linear-gradient(135deg, ${nivel.color}18, ${nivel.color}30)`, border: `2px solid ${nivel.color}` }}
             styles={{ body: { padding: isMobile ? 14 : 20 } }}

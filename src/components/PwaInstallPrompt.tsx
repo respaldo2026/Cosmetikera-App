@@ -10,9 +10,15 @@ type DeferredPrompt = Event & {
 
 interface PwaInstallPromptProps {
   inline?: boolean;
+  dismissKey?: string;
+  autoHideDays?: number;
 }
 
-export const PwaInstallPrompt = ({ inline = false }: PwaInstallPromptProps) => {
+export const PwaInstallPrompt = ({
+  inline = false,
+  dismissKey,
+  autoHideDays = 7,
+}: PwaInstallPromptProps) => {
   const [deferredPrompt, setDeferredPrompt] = useState<DeferredPrompt | null>(null);
   const [visible, setVisible] = useState(true);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -21,6 +27,18 @@ export const PwaInstallPrompt = ({ inline = false }: PwaInstallPromptProps) => {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    if (dismissKey) {
+      const raw = window.localStorage.getItem(`pwa-prompt-dismissed:${dismissKey}`);
+      if (raw) {
+        const dismissedAt = Number(raw);
+        const maxAgeMs = autoHideDays * 24 * 60 * 60 * 1000;
+        if (!Number.isNaN(dismissedAt) && Date.now() - dismissedAt < maxAgeMs) {
+          setVisible(false);
+          return;
+        }
+      }
+    }
 
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
     setIsStandalone(standalone);
@@ -107,6 +125,9 @@ export const PwaInstallPrompt = ({ inline = false }: PwaInstallPromptProps) => {
   ) : null;
 
   const closePrompt = () => {
+    if (dismissKey && typeof window !== "undefined") {
+      window.localStorage.setItem(`pwa-prompt-dismissed:${dismissKey}`, String(Date.now()));
+    }
     setVisible(false);
     setGuideFor(null);
   };
