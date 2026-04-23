@@ -41,6 +41,7 @@ type Articulo = {
   id: string;
   nombre: string;
   referencia?: string;
+  codigo_barras?: string;
   codigo_secundario?: string;
   categoria?: string;
   precio_venta: number;
@@ -49,9 +50,30 @@ type Articulo = {
   stock_minimo?: number;
   marca?: string;
   descripcion?: string;
+  proveedor?: string;
+  tamano?: string;
+  empaque?: string;
   activo?: boolean;
   imagen_url?: string;
 };
+
+const normalizeText = (value: unknown) =>
+  typeof value === "string" ? value.toLowerCase().trim() : "";
+
+const getArticuloProveedor = (articulo: Articulo) =>
+  normalizeText((articulo as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor)
+  || normalizeText((articulo as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_nombre)
+  || normalizeText((articulo as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_label);
+
+const getArticuloTamano = (articulo: Articulo) =>
+  normalizeText((articulo as Articulo & { talla?: string; presentacion_tamano?: string }).tamano)
+  || normalizeText((articulo as Articulo & { talla?: string; presentacion_tamano?: string }).talla)
+  || normalizeText((articulo as Articulo & { talla?: string; presentacion_tamano?: string }).presentacion_tamano);
+
+const getArticuloEmpaque = (articulo: Articulo) =>
+  normalizeText((articulo as Articulo & { presentacion?: string; tipo_empaque?: string }).empaque)
+  || normalizeText((articulo as Articulo & { presentacion?: string; tipo_empaque?: string }).presentacion)
+  || normalizeText((articulo as Articulo & { presentacion?: string; tipo_empaque?: string }).tipo_empaque);
 
 export default function ArticulosPage() {
   const screens = useBreakpoint();
@@ -67,7 +89,15 @@ export default function ArticulosPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState<string | null>(null);
+  const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
+  const [filtroProveedor, setFiltroProveedor] = useState("");
+  const [filtroTamano, setFiltroTamano] = useState("");
+  const [filtroEmpaque, setFiltroEmpaque] = useState("");
   const [vista, setVista] = useState<"grid" | "lista">("grid");
+  const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkForm] = Form.useForm();
 
   // Ajuste masivo
   const [ajusteOpen, setAjusteOpen] = useState(false);
@@ -104,19 +134,42 @@ export default function ArticulosPage() {
   useEffect(() => { cargar(); }, [cargar]);
 
   const articulosFiltrados = articulos.filter((a) => {
-    const matchSearch = !search ||
-      a.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      (a.referencia || "").toLowerCase().includes(search.toLowerCase()) ||
-      (a.codigo_secundario || "").toLowerCase().includes(search.toLowerCase()) ||
-      (a.marca || "").toLowerCase().includes(search.toLowerCase());
+    const normalizedSearch = normalizeText(search);
+    const searchableText = [
+      a.nombre,
+      a.referencia,
+      a.codigo_secundario,
+      a.codigo_barras,
+      a.marca,
+      a.categoria,
+      a.descripcion,
+      getArticuloProveedor(a),
+      getArticuloTamano(a),
+      getArticuloEmpaque(a),
+    ].map(normalizeText).join(" ");
+
+    const matchSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
     const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
-    return matchSearch && matchCat;
+    const proveedorSource = [getArticuloProveedor(a), a.descripcion, a.nombre, a.marca].map(normalizeText).join(" ");
+    const tamanoSource = [getArticuloTamano(a), a.descripcion, a.nombre].map(normalizeText).join(" ");
+    const empaqueSource = [getArticuloEmpaque(a), a.descripcion, a.nombre].map(normalizeText).join(" ");
+
+    const matchMarca = filtroMarca.length === 0 || filtroMarca.includes(a.marca || "");
+    const matchProveedor = !normalizeText(filtroProveedor) || proveedorSource.includes(normalizeText(filtroProveedor));
+    const matchTamano = !normalizeText(filtroTamano) || tamanoSource.includes(normalizeText(filtroTamano));
+    const matchEmpaque = !normalizeText(filtroEmpaque) || empaqueSource.includes(normalizeText(filtroEmpaque));
+    return matchSearch && matchCat && matchMarca && matchProveedor && matchTamano && matchEmpaque;
   });
 
   const stockBajo = articulos.filter((a) => a.stock <= (a.stock_minimo ?? 3));
   const valorInventario = articulos.reduce((s, a) => s + a.stock * (a.precio_costo || 0), 0);
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
   const marcas = [...new Set(articulos.map((a) => a.marca).filter(Boolean))];
+  const selectedCount = selectedIds.length;
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => articulosFiltrados.some((a) => a.id === id)));
+  }, [articulosFiltrados]);
 
   // Previsualización ajuste masivo
   const articulosAjuste = useMemo(() => {
@@ -341,6 +394,86 @@ export default function ArticulosPage() {
     });
   };
 
+  const eliminarSeleccionados = () => {
+    if (selectedCount === 0) {
+      message.warning("Selecciona artículos para eliminar");
+      return;
+    }
+
+    modal.confirm({
+      title: `Eliminar ${selectedCount} artículo(s)`,
+      content: "Esta acción no se puede deshacer.",
+      okType: "danger",
+      okText: "Eliminar seleccionados",
+      cancelText: "Cancelar",
+      onOk: async () => {
+        const results = await Promise.all(
+          selectedIds.map(async (id) => {
+            const res = await fetch(`/api/articulos?id=${id}`, { method: "DELETE" });
+            return res.ok;
+          })
+        );
+
+        const okCount = results.filter(Boolean).length;
+        const failCount = results.length - okCount;
+
+        if (okCount > 0) message.success(`${okCount} artículo(s) eliminado(s)`);
+        if (failCount > 0) message.warning(`${failCount} artículo(s) no se pudieron eliminar`);
+
+        setSelectedIds([]);
+        cargar();
+      },
+    });
+  };
+
+  const aplicarCambiosSeleccionados = async () => {
+    if (selectedCount === 0) {
+      message.warning("Selecciona artículos para modificar");
+      return;
+    }
+
+    const values = await bulkForm.validateFields();
+    const payload: Record<string, unknown> = {};
+
+    if (typeof values.categoria === "string" && values.categoria.trim()) payload.categoria = values.categoria.trim();
+    if (typeof values.marca === "string" && values.marca.trim()) payload.marca = values.marca.trim();
+    if (typeof values.stock_minimo === "number") payload.stock_minimo = values.stock_minimo;
+    if (typeof values.descuento_porcentaje === "number") payload.descuento_porcentaje = values.descuento_porcentaje;
+    if (typeof values.activo === "boolean") payload.activo = values.activo;
+
+    if (Object.keys(payload).length === 0) {
+      message.warning("Define al menos un cambio para aplicar");
+      return;
+    }
+
+    setBulkSaving(true);
+    try {
+      const results = await Promise.all(
+        selectedIds.map(async (id) => {
+          const res = await fetch(`/api/articulos?id=${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          return res.ok;
+        })
+      );
+
+      const okCount = results.filter(Boolean).length;
+      const failCount = results.length - okCount;
+      if (okCount > 0) message.success(`${okCount} artículo(s) actualizado(s)`);
+      if (failCount > 0) message.warning(`${failCount} artículo(s) no se pudieron actualizar`);
+
+      setBulkEditOpen(false);
+      bulkForm.resetFields();
+      cargar();
+    } catch {
+      message.error("Error al aplicar cambios masivos");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const getStockColor = (art: Articulo) => {
     if (art.stock === 0) return "#ff4d4f";
     if (art.stock <= (art.stock_minimo ?? 3)) return "#fa8c16";
@@ -377,6 +510,18 @@ export default function ArticulosPage() {
               ? <img src={art.imagen_url} alt={art.nombre} style={{ height: "100%", objectFit: "cover", width: "100%" }} />
               : <ShopOutlined style={{ fontSize: 40, color: "#d81b87", opacity: 0.4 }} />
             }
+            <div style={{ position: "absolute", top: 6, left: 6 }}>
+              <Checkbox
+                checked={selectedIds.includes(art.id)}
+                onClick={detenerEvento}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setSelectedIds((prev) =>
+                    checked ? [...new Set([...prev, art.id])] : prev.filter((id) => id !== art.id)
+                  );
+                }}
+              />
+            </div>
             <div style={{ position: "absolute", top: 6, right: 6 }}>
               {getStockTag(art)}
             </div>
@@ -459,6 +604,21 @@ export default function ArticulosPage() {
                 {isMobile ? "Precios" : "Ajuste masivo"}
               </Button>
               <Button
+                icon={<EditOutlined />}
+                disabled={selectedCount === 0}
+                onClick={() => setBulkEditOpen(true)}
+              >
+                {isMobile ? "Editar sel." : `Editar selección (${selectedCount})`}
+              </Button>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                disabled={selectedCount === 0}
+                onClick={eliminarSeleccionados}
+              >
+                {isMobile ? "Borrar" : `Borrar selección (${selectedCount})`}
+              </Button>
+              <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => openModal()}
@@ -510,7 +670,7 @@ export default function ArticulosPage() {
         <Row gutter={[12, 8]}>
           <Col xs={24} sm={12} md={10}>
             <Input
-              placeholder="Buscar por nombre, referencia o marca..."
+              placeholder="Buscar por palabras parciales (nombre, marca, código, categoría, descripción...)"
               prefix={<SearchOutlined />}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -527,6 +687,56 @@ export default function ArticulosPage() {
               options={[...CATEGORIAS_DEFAULT, ...categorias.filter(c => !CATEGORIAS_DEFAULT.includes(c!))]
                 .map((c) => ({ label: c, value: c }))}
             />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Select
+              mode="multiple"
+              placeholder="Filtrar por marca"
+              allowClear
+              style={{ width: "100%" }}
+              value={filtroMarca}
+              onChange={setFiltroMarca}
+              options={marcas.map((m) => ({ label: m, value: m }))}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Input
+              placeholder="Proveedor (parcial)"
+              value={filtroProveedor}
+              onChange={(e) => setFiltroProveedor(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Input
+              placeholder="Tamaño (parcial)"
+              value={filtroTamano}
+              onChange={(e) => setFiltroTamano(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Input
+              placeholder="Empaque (parcial)"
+              value={filtroEmpaque}
+              onChange={(e) => setFiltroEmpaque(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24}>
+            <Space wrap>
+              <Button
+                size="small"
+                onClick={() => setSelectedIds(articulosFiltrados.map((a) => a.id))}
+                disabled={articulosFiltrados.length === 0}
+              >
+                Seleccionar filtrados ({articulosFiltrados.length})
+              </Button>
+              <Button size="small" onClick={() => setSelectedIds([])} disabled={selectedCount === 0}>
+                Limpiar selección
+              </Button>
+              {selectedCount > 0 ? <Tag color="blue">{selectedCount} seleccionado(s)</Tag> : null}
+            </Space>
           </Col>
           {stockBajo.length > 0 && (
             <Col xs={24} md={6}>
@@ -552,6 +762,11 @@ export default function ArticulosPage() {
           <Table
             dataSource={articulosFiltrados}
             rowKey="id"
+            rowSelection={{
+              selectedRowKeys: selectedIds,
+              onChange: (keys) => setSelectedIds(keys),
+              preserveSelectedRowKeys: true,
+            }}
             size="small"
             pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} artículos` }}
             scroll={{ x: 700 }}
@@ -982,6 +1197,60 @@ export default function ArticulosPage() {
           <Form.Item name="descripcion" label="Descripción">
             <Input.TextArea rows={2} placeholder="Notas del producto..." />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`Editar ${selectedCount} artículo(s) seleccionados`}
+        open={bulkEditOpen}
+        onCancel={() => setBulkEditOpen(false)}
+        onOk={aplicarCambiosSeleccionados}
+        confirmLoading={bulkSaving}
+        okText="Aplicar cambios"
+        cancelText="Cancelar"
+        width={640}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Solo se aplicarán los campos que llenes. Los vacíos no se modifican."
+        />
+        <Form form={bulkForm} layout="vertical">
+          <Row gutter={12}>
+            <Col xs={24} md={12}>
+              <Form.Item name="categoria" label="Nueva categoría">
+                <Input placeholder="Ej: Tintes" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="marca" label="Nueva marca">
+                <Input placeholder="Ej: OPI" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="stock_minimo" label="Stock mínimo">
+                <InputNumber style={{ width: "100%" }} min={0} placeholder="Ej: 3" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="descuento_porcentaje" label="Descuento (%)">
+                <InputNumber style={{ width: "100%" }} min={0} max={100} placeholder="Ej: 10" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="activo" label="Estado">
+                <Select
+                  allowClear
+                  placeholder="Sin cambios"
+                  options={[
+                    { label: "Activo", value: true },
+                    { label: "Inactivo", value: false },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </>
