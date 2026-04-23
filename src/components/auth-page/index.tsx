@@ -98,7 +98,7 @@ export const AuthPage = (props: AuthPageProps) => {
               disabled={isPending}
               style={{
                 borderRadius: 10,
-                borderColor: "#e7d4df",
+                borderColor: "#f3c2dc",
                 height: isMobile ? 36 : 40,
               }}
             />
@@ -135,21 +135,21 @@ export const AuthPage = (props: AuthPageProps) => {
               disabled={isPending}
               style={{
                 borderRadius: 10,
-                borderColor: "#e7d4df",
+                borderColor: "#f3c2dc",
                 height: isMobile ? 36 : 40,
               }}
             />
           </Form.Item>
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -6, marginBottom: 12 }}>
-            <Link href="/forgot-password" style={{ fontSize: 12, fontWeight: 600, color: "#1f4f8f" }}>
+            <Link href="/forgot-password" style={{ fontSize: 12, fontWeight: 600, color: "#c21875" }}>
               ¿Olvidaste tu contraseña?
             </Link>
           </div>
 
           {authError === "email-no-registrado" && !passwordError && (
             <Alert
-              message="Solo puedes iniciar sesion con el correo registrado en tu ficha de inscripcion."
+              message="Solo puedes iniciar sesion con el correo registrado en tu perfil de cliente."
               type="error"
               showIcon
               style={{
@@ -195,12 +195,12 @@ export const AuthPage = (props: AuthPageProps) => {
             style={{
               fontSize: isMobile ? "13px" : "14px",
               height: isMobile ? "38px" : "42px",
-              background: "#1f4f8f",
+              background: "linear-gradient(90deg, #d81b87 0%, #ff4fa3 100%)",
               border: "none",
               borderRadius: 10,
               fontWeight: 700,
               color: "#ffffff",
-              boxShadow: "0 8px 18px rgba(31, 79, 143, 0.28)",
+              boxShadow: "0 10px 20px rgba(216, 27, 135, 0.35)",
             }}
           >
             {isPending ? "Iniciando sesión..." : "Iniciar sesión"}

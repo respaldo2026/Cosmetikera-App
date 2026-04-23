@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import React, { useState, useEffect } from "react";
+import { GiftFilled } from "@ant-design/icons";
 import { PwaInstallPrompt } from "../PwaInstallPrompt";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
@@ -84,14 +85,32 @@ export function LoginLanding({ children }: { children?: ReactNode }) {
             borderRadius: 16,
             padding: isMobile ? "16px" : "20px",
             background: "#ffffff",
-            border: "1px solid #e6eaf2",
-            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+            border: "1px solid #ffd6e7",
+            boxShadow: "0 12px 24px rgba(216, 27, 135, 0.12)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: 10,
           }}
         >
+          <div
+            style={{
+              width: isMobile ? 54 : 60,
+              height: isMobile ? 54 : 60,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "linear-gradient(135deg, #d81b87 0%, #ff4fa3 100%)",
+              color: "#ffffff",
+              boxShadow: "0 10px 18px rgba(216, 27, 135, 0.35)",
+              fontSize: isMobile ? 26 : 30,
+            }}
+            aria-label="Icono La Cosmetikera"
+          >
+            <GiftFilled />
+          </div>
+
           {logoUrl ? (
             <img
               src={logoUrl}
@@ -109,12 +128,23 @@ export function LoginLanding({ children }: { children?: ReactNode }) {
               margin: 0,
               fontSize: isMobile ? "1.15rem" : "1.3rem",
               fontWeight: 700,
-              color: "#1f2937",
+              color: "#8a0f57",
               textAlign: "center",
             }}
           >
             {nombreAcademia}
           </h1>
+
+          <p
+            style={{
+              margin: 0,
+              color: "#9d174d",
+              fontSize: isMobile ? 12 : 13,
+              textAlign: "center",
+            }}
+          >
+            Tu sistema POS y fidelizacion de clientes
+          </p>
         </div>
 
         <div
