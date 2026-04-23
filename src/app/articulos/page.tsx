@@ -133,7 +133,7 @@ export default function ArticulosPage() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const articulosFiltrados = articulos.filter((a) => {
+  const articulosFiltrados = useMemo(() => articulos.filter((a) => {
     const normalizedSearch = normalizeText(search);
     const searchableText = [
       a.nombre,
@@ -159,7 +159,7 @@ export default function ArticulosPage() {
     const matchTamano = !normalizeText(filtroTamano) || tamanoSource.includes(normalizeText(filtroTamano));
     const matchEmpaque = !normalizeText(filtroEmpaque) || empaqueSource.includes(normalizeText(filtroEmpaque));
     return matchSearch && matchCat && matchMarca && matchProveedor && matchTamano && matchEmpaque;
-  });
+  }), [articulos, search, filtroCategoria, filtroMarca, filtroProveedor, filtroTamano, filtroEmpaque]);
 
   const stockBajo = articulos.filter((a) => a.stock <= (a.stock_minimo ?? 3));
   const valorInventario = articulos.reduce((s, a) => s + a.stock * (a.precio_costo || 0), 0);
@@ -168,7 +168,13 @@ export default function ArticulosPage() {
   const selectedCount = selectedIds.length;
 
   useEffect(() => {
-    setSelectedIds((prev) => prev.filter((id) => articulosFiltrados.some((a) => a.id === id)));
+    setSelectedIds((prev) => {
+      const next = prev.filter((id) => articulosFiltrados.some((a) => a.id === id));
+      if (next.length === prev.length && next.every((id, idx) => id === prev[idx])) {
+        return prev;
+      }
+      return next;
+    });
   }, [articulosFiltrados]);
 
   // Previsualización ajuste masivo
