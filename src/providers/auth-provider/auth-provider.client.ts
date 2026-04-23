@@ -148,14 +148,26 @@ export const authProvider: AuthProvider = {
     }
 
     try {
+      // 🚀 DESARROLLO TEMPORAL: Todas las rutas son públicas excepto /club
+      // Después del desarrollo inicial, restaurar a autenticación requerida en todas partes
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isClubPage = currentPath.startsWith('/club');
+
       const { data: { session }, error } = await supabaseBrowserClient.auth.getSession();
       
       if (error) {
         console.error("Auth Check Error:", error);
+        // Si hay error y estamos en /club, denegar acceso
+        if (isClubPage) {
+          return {
+            authenticated: false,
+            redirectTo: "/login",
+            logout: true,
+          };
+        }
+        // Si hay error pero no estamos en /club, permitir acceso
         return {
-          authenticated: false,
-          redirectTo: "/login",
-          logout: true,
+          authenticated: true,
         };
       }
 
@@ -165,22 +177,39 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // Sin sesión, redirigir
+      // Sin sesión: solo requerir autenticación en /club
+      if (isClubPage) {
+        return {
+          authenticated: false,
+          redirectTo: "/login",
+          logout: true,
+        };
+      }
+
+      // En cualquier otra ruta, permitir acceso sin autenticación
       return {
-        authenticated: false,
-        redirectTo: "/login",
-        logout: true,
+        authenticated: true,
       };
     } catch (error: any) {
       console.error("Auth Check Exception:", error);
+      
+      // Si hay error y estamos en /club, denegar
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      if (currentPath.startsWith('/club')) {
+        return {
+          authenticated: false,
+          redirectTo: "/login",
+          logout: true,
+          error: {
+            name: "CheckError",
+            message: error?.message || "Error al verificar sesión",
+          },
+        };
+      }
+
+      // En otras rutas, permitir acceso incluso con error
       return {
-        authenticated: false,
-        redirectTo: "/login",
-        logout: true,
-        error: {
-          name: "CheckError",
-          message: error?.message || "Error al verificar sesión",
-        },
+        authenticated: true,
       };
     }
   },
