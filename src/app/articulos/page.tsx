@@ -14,9 +14,17 @@ import {
   DollarOutlined, RiseOutlined, FallOutlined, ControlOutlined, CopyOutlined,
   FileExcelOutlined, UploadOutlined,
 } from "@ant-design/icons";
-import * as XLSX from "xlsx";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { useRouter } from "next/navigation";
+
+let xlsxModulePromise: Promise<typeof import("xlsx")> | null = null;
+
+const loadXlsx = () => {
+  if (!xlsxModulePromise) {
+    xlsxModulePromise = import("xlsx");
+  }
+  return xlsxModulePromise;
+};
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -165,8 +173,9 @@ export default function ArticulosPage() {
   const handleArchivoImport = (file: File) => {
     setImportFileName(file.name);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await loadXlsx();
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: "array" });
         const firstSheetName = wb.SheetNames[0];
@@ -243,7 +252,8 @@ export default function ArticulosPage() {
     }
   };
 
-  const descargarPlantilla = () => {
+  const descargarPlantilla = async () => {
+    const XLSX = await loadXlsx();
     const ws = XLSX.utils.aoa_to_sheet([
       ["nombre", "referencia", "codigo_secundario", "categoria", "marca", "precio_venta", "precio_costo", "stock", "stock_minimo", "descripcion"],
       ["Esmalte Ejemplo", "COD-001", "REF-A", "Esmaltes", "OPI", 15000, 8000, 20, 3, "Esmalte de ejemplo"],
