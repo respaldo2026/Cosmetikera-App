@@ -24,6 +24,56 @@ async function cargarQZ() {
   return qz;
 }
 
+// ── Configuración POS (cargada desde Supabase) ────────────────────────────────
+
+interface PosConfig {
+  printerName: string | null;
+  printerWidth: number;
+}
+
+let cachedPosConfig: PosConfig | null = null;
+
+/** Carga la config de impresora desde la tabla `configuracion` de Supabase. */
+export async function cargarConfigPOS(): Promise<PosConfig> {
+  if (cachedPosConfig) return cachedPosConfig;
+  try {
+    const { supabaseBrowserClient } = await import("@utils/supabase/client");
+    const { data } = await supabaseBrowserClient
+      .from("configuracion")
+      .select("pos_printer_name, pos_printer_width")
+      .limit(1)
+      .maybeSingle();
+    cachedPosConfig = {
+      printerName: data?.pos_printer_name ?? process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null,
+      printerWidth: data?.pos_printer_width ?? Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 48),
+    };
+  } catch {
+    cachedPosConfig = {
+      printerName: process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null,
+      printerWidth: Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 48),
+    };
+  }
+  return cachedPosConfig;
+}
+
+/** Invalida el caché para que la próxima impresión relean la config. */
+export function invalidarConfigPOS(): void {
+  cachedPosConfig = null;
+}
+
+/** Lista todas las impresoras disponibles en QZ Tray. */
+export async function listarImpresoras(): Promise<string[]> {
+  try {
+    const q = await cargarQZ();
+    const conectado = await qzConectar();
+    if (!conectado) return [];
+    const result = await q.printers.find("");
+    return Array.isArray(result) ? result : [result].filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 // ── Conexión ─────────────────────────────────────────────────────────────────
 
 export async function qzConectar(): Promise<boolean> {
@@ -227,9 +277,10 @@ export async function imprimirTicketTermico(
   impresora?: string | null,
   ancho?: number
 ): Promise<{ ok: boolean; error?: string }> {
-  // Usar variables de entorno si no se pasan parámetros
-  const printerName = impresora ?? process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null;
-  const printWidth = ancho ?? Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 32);
+  // Usar config de Supabase si no se pasan parámetros explícitos
+  const cfg = await cargarConfigPOS();
+  const printerName = impresora ?? cfg.printerName;
+  const printWidth = ancho ?? cfg.printerWidth;
   try {
     const q = await cargarQZ();
 
@@ -282,7 +333,9 @@ export async function abrirCajon(
       return { ok: false, error: "QZ Tray no disponible" };
     }
 
-    let printerName = impresora;
+    // Usar config de Supabase si no se pasa impresora explícita
+    const cfg = await cargarConfigPOS();
+    let printerName = impresora ?? cfg.printerName;
     if (!printerName) {
       printerName = await q.printers.getDefault();
     }
@@ -456,16 +509,4 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
   setTimeout(() => {
     try { win.print(); } catch (_) {}
   }, 600);
-}
-
-// ── Listar impresoras ─────────────────────────────────────────────────────────
-export async function listarImpresoras(): Promise<string[]> {
-  try {
-    const q = await cargarQZ();
-    await qzConectar();
-    const lista = await q.printers.find(""); // busca todas
-    return Array.isArray(lista) ? lista : [lista];
-  } catch (_) {
-    return [];
-  }
 }

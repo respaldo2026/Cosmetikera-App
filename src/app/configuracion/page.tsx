@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid } from "antd";
-import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined } from "@ant-design/icons";
+import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid, Alert, Badge, Radio } from "antd";
+import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd/es/_util/responsiveObserver";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon, type DatosTicket } from "@utils/pos-hardware";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
 import { ROLES } from "@/constants/roles";
 
@@ -158,6 +159,17 @@ export default function ConfiguracionPage() {
   const [editingPlantilla, setEditingPlantilla] = useState<PlantillaWhatsApp | null>(null);
   const [submittingPlantilla, setSubmittingPlantilla] = useState(false);
 
+  // ── Estados POS / Impresora ──────────────────────────────────────────────
+  const [qzEstado, setQzEstado] = useState<"desconocido" | "conectado" | "desconectado">("desconocido");
+  const [conectandoQZ, setConectandoQZ] = useState(false);
+  const [impresorasDisponibles, setImpresorasDisponibles] = useState<string[]>([]);
+  const [buscandoImpresoras, setBuscandoImpresoras] = useState(false);
+  const [posPrinterName, setPosPrinterName] = useState<string>("");
+  const [posPrinterWidth, setPosPrinterWidth] = useState<number>(48);
+  const [savingPos, setSavingPos] = useState(false);
+  const [testImprimiendo, setTestImprimiendo] = useState(false);
+  const [testCajon, setTestCajon] = useState(false);
+
   const modulos: ModuleDefinition[] = MODULES;
 
   const roleKeys = Object.keys(ROLES);
@@ -266,8 +278,110 @@ export default function ConfiguracionPage() {
       cargarMediosPago();
     } else if (key === "plantillas-whatsapp" && plantillasWhatsApp.length === 0) {
       cargarPlantillasWhatsApp();
+    } else if (key === "pos") {
+      cargarConfigPosTab();
     }
   };
+
+  // ==================== FUNCIONES POS / IMPRESORA ====================
+  const cargarConfigPosTab = useCallback(async () => {
+    // Cargar config guardada
+    try {
+      const { data } = await supabaseBrowserClient
+        .from("configuracion")
+        .select("pos_printer_name, pos_printer_width")
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setPosPrinterName(data.pos_printer_name ?? "");
+        setPosPrinterWidth(data.pos_printer_width ?? 48);
+      }
+    } catch { /* ignorar */ }
+    // Verificar estado QZ Tray
+    setQzEstado(qzActivo() ? "conectado" : "desconectado");
+  }, []);
+
+  const conectarQZ = async () => {
+    setConectandoQZ(true);
+    const ok = await qzConectar();
+    setQzEstado(ok ? "conectado" : "desconectado");
+    if (ok) {
+      buscarImpresoras();
+    } else {
+      messageApi.error("No se pudo conectar a QZ Tray. Verifica que esté instalado y corriendo.");
+    }
+    setConectandoQZ(false);
+  };
+
+  const buscarImpresoras = async () => {
+    setBuscandoImpresoras(true);
+    const lista = await listarImpresoras();
+    setImpresorasDisponibles(lista);
+    setBuscandoImpresoras(false);
+  };
+
+  const guardarConfigPos = async () => {
+    setSavingPos(true);
+    try {
+      // Obtener ID del registro de configuración existente
+      const { data: configs } = await supabaseBrowserClient
+        .from("configuracion")
+        .select("id")
+        .limit(1);
+      const id = configs?.[0]?.id;
+      if (!id) {
+        messageApi.error("No hay registro de configuración. Guarda primero la pestaña Negocio.");
+        return;
+      }
+      const { error } = await supabaseBrowserClient
+        .from("configuracion")
+        .update({ pos_printer_name: posPrinterName || null, pos_printer_width: posPrinterWidth })
+        .eq("id", id);
+      if (error) throw error;
+      invalidarConfigPOS();
+      messageApi.success("Configuración de impresora guardada");
+    } catch (e: any) {
+      messageApi.error("Error al guardar: " + e.message);
+    } finally {
+      setSavingPos(false);
+    }
+  };
+
+  const testImprimir = async () => {
+    setTestImprimiendo(true);
+    const ticket: DatosTicket = {
+      nombreTienda: "La Cosmetikera",
+      numeroVenta: "TEST-001",
+      fecha: new Date().toLocaleString("es-CO"),
+      metodoPago: "Prueba",
+      mensaje: "\u00a1Impresora configurada correctamente!",
+      lineas: [
+        { tipo: "item", descripcion: "Producto de prueba", cantidad: 1, precio: 10000 },
+        { tipo: "total", etiqueta: "TOTAL", valor: 10000 },
+      ],
+    };
+    const result = await imprimirTicketTermico(ticket, posPrinterName || null, posPrinterWidth);
+    if (!result.ok) {
+      messageApi.warning("QZ Tray no disponible. Abriendo impresión del navegador...");
+      const { imprimirTicketNavegador } = await import("@utils/pos-hardware");
+      imprimirTicketNavegador(ticket);
+    } else {
+      messageApi.success("Ticket de prueba enviado a la impresora");
+    }
+    setTestImprimiendo(false);
+  };
+
+  const testAbrirCajon = async () => {
+    setTestCajon(true);
+    const result = await abrirCajon(posPrinterName || null);
+    if (!result.ok) {
+      messageApi.error("No se pudo abrir el cajón: " + (result.error ?? "desconocido"));
+    } else {
+      messageApi.success("\u00a1Señal enviada al cajón monedero!");
+    }
+    setTestCajon(false);
+  };
+
 
   // ==================== FUNCIONES DEL NEGOCIO ====================
   const cargarConfiguracionAcademia = useCallback(async () => {
@@ -1295,6 +1409,131 @@ export default function ConfiguracionPage() {
     </Spin>
   );
 
+  const posTab = (
+    <div style={{ maxWidth: 640 }}>
+      {/* Estado QZ Tray */}
+      <Divider orientation="left">Estado de QZ Tray</Divider>
+      <Alert
+        type={qzEstado === "conectado" ? "success" : qzEstado === "desconectado" ? "error" : "info"}
+        showIcon
+        message={
+          qzEstado === "conectado"
+            ? "QZ Tray conectado — la impresora está lista"
+            : qzEstado === "desconectado"
+            ? "QZ Tray no está conectado"
+            : "Estado desconocido — haz clic en Conectar"
+        }
+        description={
+          qzEstado !== "conectado" && (
+            <span>
+              Descarga QZ Tray desde{" "}
+              <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer">
+                qz.io/download
+              </a>{" "}
+              e instálalo en el PC donde está la impresora.
+            </span>
+          )
+        }
+        style={{ marginBottom: 16 }}
+      />
+      <Space style={{ marginBottom: 24 }}>
+        <Button
+          icon={<WifiOutlined />}
+          loading={conectandoQZ}
+          onClick={conectarQZ}
+          type={qzEstado === "conectado" ? "default" : "primary"}
+        >
+          {qzEstado === "conectado" ? "Reconectar" : "Conectar QZ Tray"}
+        </Button>
+        {qzEstado === "conectado" && (
+          <Button
+            icon={<ReloadOutlined />}
+            loading={buscandoImpresoras}
+            onClick={buscarImpresoras}
+          >
+            Detectar impresoras
+          </Button>
+        )}
+      </Space>
+
+      {/* Selección de impresora */}
+      <Divider orientation="left">Impresora térmica</Divider>
+      <Row gutter={[16, 16]}>
+        <Col xs={24}>
+          <div style={{ marginBottom: 8, fontWeight: 500 }}>Nombre de la impresora</div>
+          {impresorasDisponibles.length > 0 ? (
+            <Select
+              showSearch
+              value={posPrinterName || undefined}
+              placeholder="Selecciona la impresora"
+              style={{ width: "100%" }}
+              onChange={(v) => setPosPrinterName(v)}
+              options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
+            />
+          ) : (
+            <Input
+              value={posPrinterName}
+              onChange={(e) => setPosPrinterName(e.target.value)}
+              placeholder="Ej: EPSON TM-T20II"
+              prefix={<PrinterOutlined />}
+            />
+          )}
+          <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+            Deja vacío para usar la impresora predeterminada del sistema.
+          </div>
+        </Col>
+        <Col xs={24}>
+          <div style={{ marginBottom: 8, fontWeight: 500 }}>Ancho de papel</div>
+          <Radio.Group
+            value={posPrinterWidth}
+            onChange={(e) => setPosPrinterWidth(e.target.value)}
+          >
+            <Radio value={48}>
+              <strong>80 mm</strong>{" "}
+              <span style={{ color: "#888", fontSize: 12 }}>(48 chars — Epson TM-T20II)</span>
+            </Radio>
+            <Radio value={32}>
+              <strong>58 mm</strong>{" "}
+              <span style={{ color: "#888", fontSize: 12 }}>(32 chars)</span>
+            </Radio>
+          </Radio.Group>
+        </Col>
+      </Row>
+
+      <Button
+        type="primary"
+        icon={<SaveOutlined />}
+        loading={savingPos}
+        onClick={guardarConfigPos}
+        style={{ marginTop: 20, background: "#d81b87", borderColor: "#d81b87" }}
+      >
+        Guardar configuración
+      </Button>
+
+      {/* Prueba de hardware */}
+      <Divider orientation="left">Prueba de hardware</Divider>
+      <Space wrap>
+        <Button
+          icon={<PrinterOutlined />}
+          loading={testImprimiendo}
+          onClick={testImprimir}
+        >
+          Imprimir ticket de prueba
+        </Button>
+        <Button
+          icon={<span style={{ marginRight: 4 }}>💰</span>}
+          loading={testCajon}
+          onClick={testAbrirCajon}
+        >
+          Abrir cajón monedero
+        </Button>
+      </Space>
+      <div style={{ marginTop: 12, color: "#888", fontSize: 12 }}>
+        Asegúrate de que el cajón monedero esté conectado al puerto RJ-11 de la impresora.
+      </div>
+    </div>
+  );
+
   const tabsItems = [
     {
       key: "negocio",
@@ -1340,6 +1579,15 @@ export default function ConfiguracionPage() {
         </span>
       ),
       children: plantillasTab,
+    },
+    {
+      key: "pos",
+      label: (
+        <span>
+          <PrinterOutlined /> Impresora POS
+        </span>
+      ),
+      children: posTab,
     },
   ];
 

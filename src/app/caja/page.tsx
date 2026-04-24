@@ -33,6 +33,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { abrirCajon } from "@utils/pos-hardware";
 
 let ticketUtilsPromise: Promise<typeof import("@utils/pago-ticket")> | null = null;
 let ticketStoragePromise: Promise<typeof import("@utils/ticket-storage")> | null = null;
@@ -722,32 +723,11 @@ export default function CajaPage() {
   }, [cuotasSeleccionadas, cuotas, form, messageApi, clienteSeleccionado, totalAPagar, configuracion]);
 
   const abrirCajonRegistrador = () => {
-    try {
-      // Comando ESC/POS para abrir cajón: ESC p m t1 t2
-      // ESC = 27, p = 112, m = 0 (pin 2), t1 = 50 (tiempo on en ms), t2 = 50 (tiempo off en ms)
-      const comando = String.fromCharCode(27, 112, 0, 50, 50);
-      
-      // Crear un iframe oculto para enviar el comando a la impresora
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      document.body.appendChild(iframe);
-      
-      const iframeDoc = iframe.contentWindow?.document;
-      if (iframeDoc) {
-        iframeDoc.open();
-        iframeDoc.write(`<pre>${comando}</pre>`);
-        iframeDoc.close();
-        
-        setTimeout(() => {
-          iframe.contentWindow?.print();
-          setTimeout(() => document.body.removeChild(iframe), 1000);
-        }, 100);
+    abrirCajon().then((result) => {
+      if (!result.ok) {
+        console.warn("[Caja] No se pudo abrir cajón vía QZ Tray:", result.error);
       }
-      
-      console.log("Comando de apertura de cajón enviado");
-    } catch (error) {
-      console.error("Error abriendo cajón registrador:", error);
-    }
+    });
   };
 
   const cuotasColumns = [
