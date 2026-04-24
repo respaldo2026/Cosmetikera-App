@@ -59,9 +59,17 @@ async function inicializarSeguridadQZ(q: any): Promise<void> {
     return;
   }
 
-  q.security.setCertificatePromise(() => Promise.resolve(certificate));
+  console.log("[POS/QZ] Certificado cargado, configurando seguridad...");
+  q.security.setCertificatePromise(() => {
+    console.log("[POS/QZ] ✓ Certificado enviado a QZ Tray");
+    return Promise.resolve(certificate);
+  });
+  
   q.security.setSignatureAlgorithm("SHA512");
+  console.log("[POS/QZ] Algoritmo de firma: SHA512");
+  
   q.security.setSignaturePromise(async (stringToSign: string) => {
+    console.log("[POS/QZ] Firmando solicitud...");
     const controller = new AbortController();
     const abortId = setTimeout(() => controller.abort(), QZ_OPERATION_TIMEOUT_MS);
     const response = await fetch("/api/qz/sign", {
@@ -79,17 +87,21 @@ async function inicializarSeguridadQZ(q: any): Promise<void> {
         const body = await response.json();
         if (body?.error) detalle = String(body.error);
       } catch (_) {}
+      console.error("[POS/QZ] ✗ Error en endpoint de firma:", detalle);
       throw new Error(detalle);
     }
 
     const payload = await response.json();
     if (!payload?.signature) {
+      console.error("[POS/QZ] ✗ Endpoint devolvió sin firma");
       throw new Error("La firma de QZ no fue generada");
     }
+    console.log("[POS/QZ] ✓ Firma recibida del servidor");
     return payload.signature as string;
   });
 
   qzSecurityInitialized = true;
+  console.log("[POS/QZ] Inicialización de seguridad completada");
 }
 
 async function cargarQZ() {
