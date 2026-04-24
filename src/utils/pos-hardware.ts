@@ -147,7 +147,7 @@ export async function listarImpresoras(): Promise<string[]> {
       QZ_OPERATION_TIMEOUT_MS,
       "QZ Tray tardó demasiado detectando impresoras"
     );
-    return Array.isArray(result) ? result : [result].filter(Boolean);
+    return Array.isArray(result) ? (result as string[]) : [(result as string)].filter(Boolean);
   } catch {
     return [];
   }
