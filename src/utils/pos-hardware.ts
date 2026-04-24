@@ -183,6 +183,8 @@ export type DatosTicket = {
   puntosAcumulados?: number;    // puntos totales del cliente tras la compra
   nivelFidelidad?: string;      // nivel actual del cliente
   mensaje?: string;
+  nota?: string;
+  pie?: string;
 };
 
 function centrar(texto: string, ancho = 32): string {
@@ -229,9 +231,11 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
 
   // CABECERA — centrado
   cmds.push(`${ESC}a\x01`); // centrar
-  cmds.push(`${ESC}!\x38`); // doble ancho + alto
-  cmds.push(datos.nombreTienda + LF);
-  cmds.push(`${ESC}!\x00`); // texto normal
+  if (datos.nombreTienda) {
+    cmds.push(`${ESC}!\x38`); // doble ancho + alto
+    cmds.push(datos.nombreTienda + LF);
+    cmds.push(`${ESC}!\x00`); // texto normal
+  }
   if (datos.nit) cmds.push(`NIT: ${datos.nit}` + LF);
   if (datos.direccion) cmds.push(datos.direccion + LF);
   if (datos.telefono) cmds.push(`Tel: ${datos.telefono}` + LF);
@@ -240,7 +244,7 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   // DATOS VENTA
   cmds.push(`${ESC}a\x00`); // izquierda
   cmds.push(`Ticket #: ${datos.numeroVenta}` + LF);
-  cmds.push(`Fecha   : ${datos.fecha}` + LF);
+  if (datos.fecha) cmds.push(`Fecha   : ${datos.fecha}` + LF);
   if (datos.cajero) cmds.push(`Cajero  : ${datos.cajero}` + LF);
   if (datos.cliente) cmds.push(`Cliente : ${datos.cliente}` + LF);
   cmds.push(sep + LF);
@@ -311,8 +315,9 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   // MENSAJE FINAL
   cmds.push(sep + LF);
   cmds.push(`${ESC}a\x01`);
-  cmds.push((datos.mensaje || "¡Gracias por tu compra!") + LF);
-  cmds.push("La Cosmetikera" + LF);
+  if (datos.mensaje) cmds.push(datos.mensaje + LF);
+  if (datos.nota) cmds.push(datos.nota + LF);
+  cmds.push((datos.pie || "¡Gracias por tu compra!") + LF);
   cmds.push(`${ESC}a\x00`);
 
   // Avanzar papel y cortar
@@ -467,6 +472,8 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
   const cambioHtml = datos.cambio !== undefined && datos.cambio > 0
     ? `<p class="cambio">Cambio: <strong>${fmtPrecio(datos.cambio)}</strong></p>` : "";
 
+  const notaHtml = datos.nota ? `<p style="margin-top:8px">${esc(datos.nota)}</p>` : "";
+
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -549,8 +556,9 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
   ${puntosHtml}
   <div class="footer">
     <hr class="sep" />
-    <p>${esc(datos.mensaje || "¡Gracias por tu compra!")}</p>
-    <p style="margin-top:4px;font-weight:bold;">${esc(datos.nombreTienda)}</p>
+    ${datos.mensaje ? `<p>${esc(datos.mensaje)}</p>` : ""}
+    ${notaHtml}
+    <p style="margin-top:4px;font-weight:bold;">${esc(datos.pie || "¡Gracias por tu compra!")}</p>
   </div>
 </body>
 </html>`;

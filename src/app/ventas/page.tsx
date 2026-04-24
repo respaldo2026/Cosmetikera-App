@@ -16,6 +16,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
 import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, DatosTicket } from "@utils/pos-hardware";
+import { aplicarPlantillaTicketPOS, cargarConfigTicketPOS } from "@utils/pos-ticket-template";
 import { PrinterOutlined, GoldOutlined, BarcodeOutlined } from "@ant-design/icons";
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -441,7 +442,7 @@ export default function VentasPage() {
         }
       }
 
-      const ticketDatos: DatosTicket = {
+      const ticketBase: DatosTicket = {
         nombreTienda: "La Cosmetikera",
         numeroVenta: venta?.id?.slice(-6).toUpperCase() ?? "------",
         fecha: dayjs().format("DD/MM/YYYY HH:mm"),
@@ -482,6 +483,8 @@ export default function VentasPage() {
           { tipo: "total", etiqueta: "TOTAL", valor: totalFinal },
         ],
       };
+      const ticketTemplate = await cargarConfigTicketPOS();
+      const ticketDatos = aplicarPlantillaTicketPOS(ticketBase, ticketTemplate);
 
       setUltimaVentaId(venta?.id ?? null);
       setUltimoTicket(ticketDatos);
@@ -522,7 +525,7 @@ export default function VentasPage() {
     if (!ultimoTicket && !ultimaVentaId) return;
     setImprimiendo(true);
 
-    const ticketParaImprimir = ultimoTicket || {
+    const ticketBase = ultimoTicket || {
       nombreTienda: "La Cosmetikera",
       numeroVenta: ultimaVentaId?.slice(-6).toUpperCase() ?? "------",
       fecha: dayjs().format("DD/MM/YYYY HH:mm"),
@@ -530,6 +533,9 @@ export default function VentasPage() {
       mensaje: "¡Gracias por tu compra en La Cosmetikera!",
       lineas: [{ tipo: "total" as const, etiqueta: "TOTAL", valor: totalFinal }],
     };
+    const ticketParaImprimir = ultimoTicket
+      ? ultimoTicket
+      : aplicarPlantillaTicketPOS(ticketBase, await cargarConfigTicketPOS());
 
     // Intentar con QZ Tray (impresora térmica)
     const result = await imprimirTicketTermico(ticketParaImprimir);

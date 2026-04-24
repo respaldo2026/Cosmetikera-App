@@ -7,7 +7,8 @@ import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd/es/_util/responsiveObserver";
 import { supabaseBrowserClient } from "@utils/supabase/client";
-import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon, type DatosTicket } from "@utils/pos-hardware";
+import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
+import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
 import { ROLES } from "@/constants/roles";
 
@@ -68,21 +69,7 @@ export default function ConfiguracionPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [configuracionId, setConfiguracionId] = useState<string | null>(null);
 
-  const [ticketFields, setTicketFields] = useState({
-    logo: true,
-    nombreAcademia: true,
-    ruc: true,
-    direccion: true,
-    telefono: true,
-    email: true,
-    fecha: true,
-    concepto: true,
-    monto: true,
-    puntos: true,
-    nota: true,
-    pie: true,
-    titulo: true,
-  });
+  const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
 
   const previewNombreAcademia = Form.useWatch("nombre_academia", formAcademia) as string | undefined;
   const previewRuc = Form.useWatch("ruc", formAcademia) as string | undefined;
@@ -339,6 +326,7 @@ export default function ConfiguracionPage() {
         .eq("id", id);
       if (error) throw error;
       invalidarConfigPOS();
+      invalidarConfigTicketPOS();
       messageApi.success("Configuración de impresora guardada");
     } catch (e: any) {
       messageApi.error("Error al guardar: " + e.message);
@@ -349,17 +337,9 @@ export default function ConfiguracionPage() {
 
   const testImprimir = async () => {
     setTestImprimiendo(true);
-    const ticket: DatosTicket = {
-      nombreTienda: "La Cosmetikera",
-      numeroVenta: "TEST-001",
-      fecha: new Date().toLocaleString("es-CO"),
-      metodoPago: "Prueba",
-      mensaje: "\u00a1Impresora configurada correctamente!",
-      lineas: [
-        { tipo: "item", descripcion: "Producto de prueba", cantidad: 1, precio: 10000 },
-        { tipo: "total", etiqueta: "TOTAL", valor: 10000 },
-      ],
-    };
+    const ticket = crearTicketPruebaPOS(
+      crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields)
+    );
     const result = await imprimirTicketTermico(ticket, posPrinterName || null, posPrinterWidth);
     if (!result.ok) {
       messageApi.warning("QZ Tray no disponible. Abriendo impresión del navegador...");
@@ -380,6 +360,121 @@ export default function ConfiguracionPage() {
       messageApi.success("\u00a1Señal enviada al cajón monedero!");
     }
     setTestCajon(false);
+  };
+
+  const renderTicketDesigner = () => {
+    const ticketTemplate = crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields);
+    const ticketPreview = crearTicketPruebaPOS(ticketTemplate);
+    const previewItems = ticketPreview.lineas.filter((linea) => linea.tipo === "item");
+    const previewTotals = ticketPreview.lineas.filter((linea) => linea.tipo === "total");
+
+    return (
+      <>
+        <Divider orientation="left">Diseño del ticket de venta</Divider>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Este diseño se usa tanto en la prueba de impresora como en el ticket real de cada venta."
+        />
+        <Row gutter={[16, 8]}>
+          <Col xs={24} md={12}>
+            <Form.Item label="Título del ticket" name="ticket_titulo">
+              <Input placeholder="Detalle de venta" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Texto del pie" name="ticket_pie">
+              <Input placeholder="Gracias por tu compra" />
+            </Form.Item>
+          </Col>
+          <Col span={24}>
+            <Form.Item label="Mensaje adicional" name="ticket_nota">
+              <TextArea rows={3} placeholder="Indicaciones, campaña o mensaje comercial para el ticket" />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]} style={{ marginTop: 8 }}>
+          <Col xs={24} lg={8}>
+            <Card size="small" title="Campos visibles">
+              <Row gutter={[8, 8]}>
+                <Col xs={24} sm={12}>
+                  <Space direction="vertical" size="small" style={{ width: "100%" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937", textTransform: "uppercase", letterSpacing: 0.5, padding: "4px 8px", background: "#f3f4f6", borderRadius: 6 }}>
+                      Encabezado
+                    </div>
+                    <Switch checked={ticketFields.logo} onChange={(value) => setTicketFields((prev) => ({ ...prev, logo: value }))} /> Logo
+                    <Switch checked={ticketFields.nombreAcademia} onChange={(value) => setTicketFields((prev) => ({ ...prev, nombreAcademia: value }))} /> Nombre del negocio
+                    <Switch checked={ticketFields.ruc} onChange={(value) => setTicketFields((prev) => ({ ...prev, ruc: value }))} /> RUC/NIT
+                    <Switch checked={ticketFields.direccion} onChange={(value) => setTicketFields((prev) => ({ ...prev, direccion: value }))} /> Dirección
+                    <Switch checked={ticketFields.telefono} onChange={(value) => setTicketFields((prev) => ({ ...prev, telefono: value }))} /> Teléfono
+                    <Switch checked={ticketFields.email} onChange={(value) => setTicketFields((prev) => ({ ...prev, email: value }))} /> Email
+                  </Space>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Space direction="vertical" size="small" style={{ width: "100%" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937", textTransform: "uppercase", letterSpacing: 0.5, padding: "4px 8px", background: "#f3f4f6", borderRadius: 6 }}>
+                      Contenido
+                    </div>
+                    <Switch checked={ticketFields.titulo} onChange={(value) => setTicketFields((prev) => ({ ...prev, titulo: value }))} /> Título
+                    <Switch checked={ticketFields.fecha} onChange={(value) => setTicketFields((prev) => ({ ...prev, fecha: value }))} /> Fecha
+                    <Switch checked={ticketFields.concepto} onChange={(value) => setTicketFields((prev) => ({ ...prev, concepto: value }))} /> Productos
+                    <Switch checked={ticketFields.monto} onChange={(value) => setTicketFields((prev) => ({ ...prev, monto: value }))} /> Totales
+                    <Switch checked={ticketFields.nota} onChange={(value) => setTicketFields((prev) => ({ ...prev, nota: value }))} /> Nota
+                    <Switch checked={ticketFields.pie} onChange={(value) => setTicketFields((prev) => ({ ...prev, pie: value }))} /> Pie final
+                    <Switch checked={ticketFields.puntos} onChange={(value) => setTicketFields((prev) => ({ ...prev, puntos: value }))} /> Bloque de fidelidad
+                  </Space>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+          <Col xs={24} lg={16}>
+            <Card size="small" style={{ borderStyle: "dashed" }} title={`Previsualización del ticket (${posPrinterWidth === 48 ? "80mm" : "58mm"})`}>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <div style={{ width: posPrinterWidth === 48 ? "80mm" : "58mm", background: "#fff", padding: 12, border: "1px dashed #e5e7eb" }}>
+                  <div style={{ textAlign: "center", marginBottom: 12 }}>
+                    {ticketFields.logo && previewLogoUrl ? <img src={previewLogoUrl} alt="Logo" style={{ maxHeight: 56, maxWidth: 160, objectFit: "contain" }} /> : null}
+                    {ticketPreview.nombreTienda ? <div style={{ fontWeight: 700, fontSize: 16, marginTop: 6 }}>{ticketPreview.nombreTienda}</div> : null}
+                    {ticketPreview.nit ? <div style={{ fontSize: 12, color: "#6b7280" }}>RUC/NIT: {ticketPreview.nit}</div> : null}
+                    {ticketPreview.direccion ? <div style={{ fontSize: 12, color: "#6b7280" }}>{ticketPreview.direccion}</div> : null}
+                    {ticketPreview.telefono ? <div style={{ fontSize: 12, color: "#6b7280" }}>Tel: {ticketPreview.telefono}</div> : null}
+                    {ticketFields.email && previewEmail ? <div style={{ fontSize: 12, color: "#6b7280" }}>{previewEmail}</div> : null}
+                  </div>
+
+                  <div style={{ borderTop: "1px dashed #e5e7eb", paddingTop: 8 }}>
+                    {ticketPreview.fecha ? <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Fecha: {ticketPreview.fecha}</div> : null}
+                    {previewItems.map((linea, index) => (
+                      <div key={`item-${index}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, gap: 8 }}>
+                        <span>{linea.cantidad}x {linea.descripcion}</span>
+                        <span>${(linea.precio * linea.cantidad).toLocaleString("es-CO")}</span>
+                      </div>
+                    ))}
+                    {previewTotals.map((linea, index) => (
+                      <div key={`total-${index}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, fontWeight: linea.etiqueta === "TOTAL" ? 700 : 500 }}>
+                        <span>{linea.etiqueta}</span>
+                        <span>${linea.valor.toLocaleString("es-CO")}</span>
+                      </div>
+                    ))}
+                    {ticketPreview.mensaje ? <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>{ticketPreview.mensaje}</div> : null}
+                    {ticketPreview.nota ? <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>{ticketPreview.nota}</div> : null}
+                    {ticketPreview.pie ? <div style={{ fontSize: 12, color: "#6b7280", marginTop: 10 }}>{ticketPreview.pie}</div> : null}
+                    {ticketPreview.puntosAcumulados !== undefined ? (
+                      <div style={{ marginTop: 10, background: "#fff8e1", border: "1px dashed #f5a623", borderRadius: 4, padding: "6px 8px", textAlign: "center", fontSize: 11 }}>
+                        <span style={{ color: "#f5a623", fontSize: 14 }}>★</span>
+                        {" "}Ganaste <strong>{ticketPreview.puntosFidelidad}</strong> puntos en esta compra<br />
+                        Total acumulado: <strong>{ticketPreview.puntosAcumulados} pts</strong><br />
+                        Nivel: <strong>{ticketPreview.nivelFidelidad?.toUpperCase()}</strong>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </>
+    );
   };
 
 
@@ -1090,134 +1185,12 @@ export default function ConfiguracionPage() {
             </Form.Item>
           </Col>
         </Row>
-        <Divider orientation="left">Ticket de Pago</Divider>
-        <Row gutter={[16, 8]}>
-          <Col xs={24} md={12}>
-            <Form.Item label="Título del ticket" name="ticket_titulo">
-              <Input placeholder="Recibo de Pago" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item label="Texto del pie" name="ticket_pie">
-              <Input placeholder="Gracias por tu preferencia" />
-            </Form.Item>
-          </Col>
-          <Col span={24}>
-            <Form.Item label="Mensaje adicional" name="ticket_nota">
-              <TextArea rows={3} placeholder="Condiciones, notas o agradecimientos que aparecerán en el ticket" />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={[16, 16]} style={{ marginTop: 8 }}>
-          <Col xs={24} lg={8}>
-            <Card size="small" title="Campos visibles">
-              <Row gutter={[8, 8]}>
-                <Col xs={24} sm={12}>
-                  <Space direction="vertical" size="small" style={{ width: "100%" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937", textTransform: "uppercase", letterSpacing: 0.5, padding: "4px 8px", background: "#f3f4f6", borderRadius: 6 }}>
-                      Encabezado
-                    </div>
-                    <Switch checked={ticketFields.logo} onChange={(value) => setTicketFields((prev) => ({ ...prev, logo: value }))} /> Logo
-                    <Switch checked={ticketFields.nombreAcademia} onChange={(value) => setTicketFields((prev) => ({ ...prev, nombreAcademia: value }))} /> Nombre del negocio
-                    <Switch checked={ticketFields.ruc} onChange={(value) => setTicketFields((prev) => ({ ...prev, ruc: value }))} /> RUC/NIT
-                    <Switch checked={ticketFields.direccion} onChange={(value) => setTicketFields((prev) => ({ ...prev, direccion: value }))} /> Dirección
-                    <Switch checked={ticketFields.telefono} onChange={(value) => setTicketFields((prev) => ({ ...prev, telefono: value }))} /> Teléfono
-                    <Switch checked={ticketFields.email} onChange={(value) => setTicketFields((prev) => ({ ...prev, email: value }))} /> Email
-                    <Divider style={{ margin: "6px 0" }} />
-                  </Space>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Space direction="vertical" size="small" style={{ width: "100%" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937", textTransform: "uppercase", letterSpacing: 0.5, padding: "4px 8px", background: "#f3f4f6", borderRadius: 6 }}>
-                      Detalle
-                    </div>
-                    <Switch checked={ticketFields.titulo} onChange={(value) => setTicketFields((prev) => ({ ...prev, titulo: value }))} /> Título ticket
-                    <Switch checked={ticketFields.fecha} onChange={(value) => setTicketFields((prev) => ({ ...prev, fecha: value }))} /> Fecha
-                    <Switch checked={ticketFields.concepto} onChange={(value) => setTicketFields((prev) => ({ ...prev, concepto: value }))} /> Concepto
-                    <Switch checked={ticketFields.monto} onChange={(value) => setTicketFields((prev) => ({ ...prev, monto: value }))} /> Monto
-                    <Divider style={{ margin: "6px 0" }} />
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937", textTransform: "uppercase", letterSpacing: 0.5, padding: "4px 8px", background: "#f3f4f6", borderRadius: 6, marginTop: 6 }}>
-                      Pie
-                    </div>
-                    <Switch checked={ticketFields.nota} onChange={(value) => setTicketFields((prev) => ({ ...prev, nota: value }))} /> Mensaje adicional
-                    <Switch checked={ticketFields.pie} onChange={(value) => setTicketFields((prev) => ({ ...prev, pie: value }))} /> Texto del pie
-                    <Switch checked={ticketFields.puntos} onChange={(value) => setTicketFields((prev) => ({ ...prev, puntos: value }))} /> Puntos de fidelidad
-                  </Space>
-                </Col>
-              </Row>
-            </Card>
-          </Col>
-          <Col xs={24} lg={16}>
-            <Card
-              size="small"
-              style={{ borderStyle: "dashed" }}
-              title="Previsualización del ticket (80mm)"
-            >
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <div style={{ width: "80mm", background: "#fff", padding: 12, border: "1px dashed #e5e7eb" }}>
-                  <div style={{ textAlign: "center", marginBottom: 12 }}>
-                    {ticketFields.logo && previewLogoUrl ? (
-                      <img src={previewLogoUrl} alt="Logo" style={{ maxHeight: 56, maxWidth: 160, objectFit: "contain" }} />
-                    ) : null}
-                    {ticketFields.nombreAcademia ? (
-                      <div style={{ fontWeight: 700, fontSize: 16, marginTop: 6 }}>
-                        {previewNombreAcademia || "Nombre del Negocio"}
-                      </div>
-                    ) : null}
-                    {ticketFields.ruc && previewRuc ? <div style={{ fontSize: 12, color: "#6b7280" }}>RUC/NIT: {previewRuc}</div> : null}
-                    {ticketFields.direccion && previewDireccion ? <div style={{ fontSize: 12, color: "#6b7280" }}>{previewDireccion}</div> : null}
-                    {ticketFields.telefono && previewTelefono ? <div style={{ fontSize: 12, color: "#6b7280" }}>Tel: {previewTelefono}</div> : null}
-                    {ticketFields.email && previewEmail ? <div style={{ fontSize: 12, color: "#6b7280" }}>{previewEmail}</div> : null}
-                  </div>
-
-                  <div style={{ borderTop: "1px dashed #e5e7eb", paddingTop: 8 }}>
-                    {ticketFields.titulo ? (
-                      <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                        {previewTicketTitulo || "Recibo de Pago"}
-                      </div>
-                    ) : null}
-                    {ticketFields.fecha ? (
-                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>
-                        Fecha: {new Date().toLocaleDateString("es-CO")}
-                      </div>
-                    ) : null}
-                    {ticketFields.concepto ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
-                        <span>Concepto</span>
-                        <span>Compra en tienda</span>
-                      </div>
-                    ) : null}
-                    {ticketFields.monto ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
-                        <span>Monto</span>
-                        <span>$120.000</span>
-                      </div>
-                    ) : null}
-                    {ticketFields.nota && previewTicketNota ? (
-                      <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>
-                        {previewTicketNota}
-                      </div>
-                    ) : null}
-                    {ticketFields.pie ? (
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 10 }}>
-                        {previewTicketPie || "Gracias por tu preferencia"}
-                      </div>
-                    ) : null}
-                    {ticketFields.puntos ? (
-                      <div style={{ marginTop: 10, background: "#fff8e1", border: "1px dashed #f5a623", borderRadius: 4, padding: "6px 8px", textAlign: "center", fontSize: 11 }}>
-                        <span style={{ color: "#f5a623", fontSize: 14 }}>★</span>
-                        {" "}Ganaste <strong>5 puntos</strong> en esta compra<br />
-                        Total acumulado: <strong>150 pts</strong><br />
-                        Nivel: <strong>PLATA</strong>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        </Row>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginTop: 16 }}
+          message="El diseño del ticket de ventas ahora se configura desde la pestaña Impresora."
+        />
 
         <Form.Item style={{ marginTop: 16 }}>
           <Button type="primary" icon={<SaveOutlined />} loading={savingAcademia} onClick={guardarConfiguracionAcademia}>
@@ -1410,7 +1383,7 @@ export default function ConfiguracionPage() {
   );
 
   const posTab = (
-    <div style={{ maxWidth: 640 }}>
+    <div style={{ maxWidth: 980 }}>
       {/* Estado QZ Tray */}
       <Divider orientation="left">Estado de QZ Tray</Divider>
       <Alert
@@ -1443,7 +1416,7 @@ export default function ConfiguracionPage() {
           onClick={conectarQZ}
           type={qzEstado === "conectado" ? "default" : "primary"}
         >
-          {qzEstado === "conectado" ? "Reconectar" : "Conectar QZ Tray"}
+          {qzEstado === "conectado" ? "Verificar servicio QZ Tray" : "Conectar QZ Tray"}
         </Button>
         {qzEstado === "conectado" && (
           <Button
@@ -1531,6 +1504,8 @@ export default function ConfiguracionPage() {
       <div style={{ marginTop: 12, color: "#888", fontSize: 12 }}>
         Asegúrate de que el cajón monedero esté conectado al puerto RJ-11 de la impresora.
       </div>
+
+      {renderTicketDesigner()}
     </div>
   );
 
