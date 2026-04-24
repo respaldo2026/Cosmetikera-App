@@ -14,6 +14,7 @@
     "pos:agent:install": "cd pos-agent && npm install",
     "pos:agent:start": "cd pos-agent && npm start",
     "pos:agent:zip": "powershell -ExecutionPolicy Bypass -File ./scripts/pack-pos-agent.ps1",
+    "pos:agent:setup": "powershell -ExecutionPolicy Bypass -File ./pos-agent/setup-windows.ps1",
     "build": "refine build",
     "start": "refine start",
     "lint": "next lint",
