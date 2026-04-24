@@ -156,7 +156,10 @@ export default function ConfiguracionPage() {
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
   const [testCajon, setTestCajon] = useState(false);
-  const usaQZ = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase() === "qz";
+  const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
+  const usaQZ = posPrintMode === "qz";
+  const usaAgenteLocal = posPrintMode === "agent" || posPrintMode === "auto";
+  const permiteCajon = usaQZ || usaAgenteLocal;
   const currentSiteOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   const modulos: ModuleDefinition[] = MODULES;
@@ -292,7 +295,7 @@ export default function ConfiguracionPage() {
 
   const conectarQZ = async () => {
     if (!usaQZ) {
-      messageApi.info("El modo actual es navegador. No se requiere conexión con QZ Tray.");
+      messageApi.info("El modo actual no usa QZ Tray. Esta acción no aplica.");
       return;
     }
     setConectandoQZ(true);
@@ -353,11 +356,17 @@ export default function ConfiguracionPage() {
       );
       const result = await imprimirTicketTermico(ticket, posPrinterName || null, posPrinterWidth);
       if (!result.ok) {
-        messageApi.warning(`QZ Tray no respondió: ${result.error ?? "sin detalle"}. Abriendo impresión del navegador...`);
+        messageApi.warning(`No se pudo imprimir por backend local: ${result.error ?? "sin detalle"}. Abriendo impresión del navegador...`);
         const { imprimirTicketNavegador } = await import("@utils/pos-hardware");
         imprimirTicketNavegador(ticket);
       } else {
-        messageApi.success(usaQZ ? "Ticket de prueba enviado a la impresora" : "Se abrió la impresión del navegador");
+        messageApi.success(
+          usaQZ
+            ? "Ticket de prueba enviado a la impresora"
+            : usaAgenteLocal
+            ? "Ticket de prueba enviado por agente local"
+            : "Se abrió la impresión del navegador"
+        );
       }
     } catch (e: any) {
       messageApi.error("La prueba de impresión falló: " + (e?.message ?? "desconocido"));
@@ -367,8 +376,8 @@ export default function ConfiguracionPage() {
   };
 
   const testAbrirCajon = async () => {
-    if (!usaQZ) {
-      messageApi.info("En modo navegador no se puede abrir cajón físico. Eso requiere QZ Tray.");
+    if (!permiteCajon) {
+      messageApi.info("Este modo no tiene backend de hardware para abrir cajón.");
       return;
     }
     setTestCajon(true);
@@ -1533,6 +1542,14 @@ export default function ConfiguracionPage() {
             }
           />
         </>
+      ) : usaAgenteLocal ? (
+        <Alert
+          type="success"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Modo agente local activo"
+          description="La impresión y apertura de cajón se envían al servicio local (http://127.0.0.1:17891)."
+        />
       ) : (
         <Alert
           type="info"
@@ -1546,7 +1563,7 @@ export default function ConfiguracionPage() {
       {/* Selección de impresora */}
       <Divider orientation="left">Configuración de impresión</Divider>
       <Row gutter={[16, 16]}>
-        {usaQZ && (
+        {(usaQZ || usaAgenteLocal) && (
           <Col xs={24}>
             <div style={{ marginBottom: 8, fontWeight: 500 }}>Nombre de la impresora</div>
             {impresorasDisponibles.length > 0 ? (
@@ -1609,7 +1626,7 @@ export default function ConfiguracionPage() {
         >
           Imprimir ticket de prueba
         </Button>
-        {usaQZ && (
+        {permiteCajon && (
           <Button
             icon={<span style={{ marginRight: 4 }}>💰</span>}
             loading={testCajon}
@@ -1619,7 +1636,7 @@ export default function ConfiguracionPage() {
           </Button>
         )}
       </Space>
-      {usaQZ && (
+      {permiteCajon && (
         <div style={{ marginTop: 12, color: "#888", fontSize: 12 }}>
           Asegúrate de que el cajón monedero esté conectado al puerto RJ-11 de la impresora.
         </div>

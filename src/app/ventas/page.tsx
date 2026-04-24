@@ -81,7 +81,8 @@ const getDetallePagoMixto = (pagoMixto: PagoMixto) =>
     .join(" · ");
 
 export default function VentasPage() {
-  const usaQZ = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase() === "qz";
+  const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
+  const permiteCajon = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
@@ -490,8 +491,8 @@ export default function VentasPage() {
       setUltimaVentaId(venta?.id ?? null);
       setUltimoTicket(ticketDatos);
       message.success("¡Venta registrada exitosamente! 🎉");
-      // Abrir cajón monedero automáticamente solo cuando QZ está habilitado
-      if (metodoPago === "efectivo" && usaQZ) {
+      // Abrir cajón monedero automáticamente cuando hay backend de hardware (QZ o agente local)
+      if (metodoPago === "efectivo" && permiteCajon) {
         abrirCajon().catch(() => {});
       }
       setModalPagoOpen(false);
@@ -1236,7 +1237,7 @@ export default function VentasPage() {
               <Button
                 block
                 icon={<GoldOutlined />}
-                disabled={!usaQZ}
+                disabled={!permiteCajon}
                 onClick={() => abrirCajon().then(r => !r.ok && message.warning("No se pudo abrir el cajón: " + r.error))}
               >
                 Abrir cajón

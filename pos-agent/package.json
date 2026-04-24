@@ -1,0 +1,13 @@
+{
+  "name": "la-cosmetikera-pos-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agente local para imprimir tickets ESC/POS y abrir cajon sin QZ Tray",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

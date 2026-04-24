@@ -20,10 +20,48 @@ let qzSecurityInitialized = false;
 
 const QZ_CONNECT_TIMEOUT_MS = 8000;
 const QZ_OPERATION_TIMEOUT_MS = 10000;
-const POS_PRINT_MODE = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase();
+const POS_PRINT_MODE = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
+const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.1:17891").replace(/\/$/, "");
+const POS_AGENT_TIMEOUT_MS = 2500;
+const POS_AGENT_TOKEN = process.env.NEXT_PUBLIC_POS_AGENT_TOKEN ?? "";
 
 function usarQZTray(): boolean {
   return POS_PRINT_MODE === "qz";
+}
+
+function usarAgentePOS(): boolean {
+  return POS_PRINT_MODE === "agent" || POS_PRINT_MODE === "auto";
+}
+
+async function llamarAgentePOS<T = any>(ruta: string, payload: Record<string, any>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), POS_AGENT_TIMEOUT_MS);
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (POS_AGENT_TOKEN) {
+      headers["x-pos-agent-token"] = POS_AGENT_TOKEN;
+    }
+
+    const response = await fetch(`${POS_AGENT_URL}${ruta}`, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(typeof data?.error === "string" ? data.error : "Agente POS no disponible");
+    }
+
+    return data as T;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
@@ -388,6 +426,37 @@ export async function imprimirTicketTermico(
   impresora?: string | null,
   ancho?: number
 ): Promise<{ ok: boolean; error?: string }> {
+  // Usar config de Supabase si no se pasan parámetros explícitos
+  const cfg = await cargarConfigPOS();
+  const printerName = impresora ?? cfg.printerName;
+  const printWidth = ancho ?? cfg.printerWidth;
+
+  if (usarAgentePOS()) {
+    try {
+      const comandos = construirComandosEscpos(datos, printWidth);
+      const resp = await llamarAgentePOS<{ ok: boolean; error?: string }>("/print-raw", {
+        printerName,
+        raw: comandos.join(""),
+        encoding: "cp1252",
+      });
+
+      if (resp?.ok) {
+        return { ok: true };
+      }
+      return { ok: false, error: resp?.error ?? "El agente POS no pudo imprimir" };
+    } catch (e: any) {
+      if (POS_PRINT_MODE === "agent") {
+        return { ok: false, error: e?.message ?? "No fue posible contactar el agente POS" };
+      }
+      try {
+        imprimirTicketNavegador(datos);
+        return { ok: true };
+      } catch (err: any) {
+        return { ok: false, error: err?.message ?? "No se pudo abrir la impresión del navegador" };
+      }
+    }
+  }
+
   if (!usarQZTray()) {
     try {
       imprimirTicketNavegador(datos);
@@ -397,10 +466,6 @@ export async function imprimirTicketTermico(
     }
   }
 
-  // Usar config de Supabase si no se pasan parámetros explícitos
-  const cfg = await cargarConfigPOS();
-  const printerName = impresora ?? cfg.printerName;
-  const printWidth = ancho ?? cfg.printerWidth;
   try {
     const q = await cargarQZ();
 
@@ -453,10 +518,23 @@ export async function imprimirTicketTermico(
 export async function abrirCajon(
   impresora?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
+  if (usarAgentePOS()) {
+    try {
+      const cfg = await cargarConfigPOS();
+      const printerName = impresora ?? cfg.printerName;
+      const resp = await llamarAgentePOS<{ ok: boolean; error?: string }>("/drawer", {
+        printerName,
+      });
+      return resp?.ok ? { ok: true } : { ok: false, error: resp?.error ?? "No se pudo abrir el cajón" };
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? "No fue posible contactar el agente POS" };
+    }
+  }
+
   if (!usarQZTray()) {
     return {
       ok: false,
-      error: "El modo navegador no puede abrir cajón físico. Para eso necesitas QZ Tray.",
+      error: "Este modo no puede abrir cajón físico sin un agente local o QZ Tray.",
     };
   }
 

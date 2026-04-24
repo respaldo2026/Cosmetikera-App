@@ -146,7 +146,8 @@ const metodoPagoLabels: Record<MetodoPago, string> = {
 };
 
 export default function CajaPage() {
-  const usaQZ = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase() === "qz";
+  const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
+  const permiteCajon = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
   const { message: messageApi } = App.useApp();
   const [form] = Form.useForm();
 
@@ -724,10 +725,10 @@ export default function CajaPage() {
   }, [cuotasSeleccionadas, cuotas, form, messageApi, clienteSeleccionado, totalAPagar, configuracion]);
 
   const abrirCajonRegistrador = () => {
-    if (!usaQZ) return;
+    if (!permiteCajon) return;
     abrirCajon().then((result) => {
       if (!result.ok) {
-        console.warn("[Caja] No se pudo abrir cajón vía QZ Tray:", result.error);
+        console.warn("[Caja] No se pudo abrir cajón:", result.error);
       }
     });
   };

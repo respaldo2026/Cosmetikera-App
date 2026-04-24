@@ -2,6 +2,7 @@ node_modules
 .next/
 .next-dev-*/
 out/
+dist/
 
 # Variables de entorno
 .env.local
