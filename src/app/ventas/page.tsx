@@ -81,6 +81,7 @@ const getDetallePagoMixto = (pagoMixto: PagoMixto) =>
     .join(" · ");
 
 export default function VentasPage() {
+  const usaQZ = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase() === "qz";
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
@@ -489,8 +490,8 @@ export default function VentasPage() {
       setUltimaVentaId(venta?.id ?? null);
       setUltimoTicket(ticketDatos);
       message.success("¡Venta registrada exitosamente! 🎉");
-      // Abrir cajón monedero automáticamente si el pago fue en efectivo
-      if (metodoPago === "efectivo") {
+      // Abrir cajón monedero automáticamente solo cuando QZ está habilitado
+      if (metodoPago === "efectivo" && usaQZ) {
         abrirCajon().catch(() => {});
       }
       setModalPagoOpen(false);
@@ -537,7 +538,7 @@ export default function VentasPage() {
       ? ultimoTicket
       : aplicarPlantillaTicketPOS(ticketBase, await cargarConfigTicketPOS());
 
-    // Intentar con QZ Tray (impresora térmica)
+    // En modo navegador abre el diálogo nativo; en modo QZ usa impresora térmica
     const result = await imprimirTicketTermico(ticketParaImprimir);
 
     if (!result.ok) {
@@ -545,7 +546,7 @@ export default function VentasPage() {
       try {
         imprimirTicketNavegador(ticketParaImprimir);
       } catch (e) {
-        message.warning("No se pudo imprimir. Verifica QZ Tray o permite ventanas emergentes.");
+        message.warning("No se pudo imprimir. Verifica la impresora o permite ventanas emergentes.");
       }
     }
 
@@ -1235,6 +1236,7 @@ export default function VentasPage() {
               <Button
                 block
                 icon={<GoldOutlined />}
+                disabled={!usaQZ}
                 onClick={() => abrirCajon().then(r => !r.ok && message.warning("No se pudo abrir el cajón: " + r.error))}
               >
                 Abrir cajón

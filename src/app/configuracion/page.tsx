@@ -156,6 +156,7 @@ export default function ConfiguracionPage() {
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
   const [testCajon, setTestCajon] = useState(false);
+  const usaQZ = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase() === "qz";
   const currentSiteOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   const modulos: ModuleDefinition[] = MODULES;
@@ -290,6 +291,10 @@ export default function ConfiguracionPage() {
   }, []);
 
   const conectarQZ = async () => {
+    if (!usaQZ) {
+      messageApi.info("El modo actual es navegador. No se requiere conexión con QZ Tray.");
+      return;
+    }
     setConectandoQZ(true);
     const ok = await qzConectar();
     setQzEstado(ok ? "conectado" : "desconectado");
@@ -302,6 +307,10 @@ export default function ConfiguracionPage() {
   };
 
   const buscarImpresoras = async () => {
+    if (!usaQZ) {
+      setImpresorasDisponibles([]);
+      return;
+    }
     setBuscandoImpresoras(true);
     const lista = await listarImpresoras();
     setImpresorasDisponibles(lista);
@@ -348,7 +357,7 @@ export default function ConfiguracionPage() {
         const { imprimirTicketNavegador } = await import("@utils/pos-hardware");
         imprimirTicketNavegador(ticket);
       } else {
-        messageApi.success("Ticket de prueba enviado a la impresora");
+        messageApi.success(usaQZ ? "Ticket de prueba enviado a la impresora" : "Se abrió la impresión del navegador");
       }
     } catch (e: any) {
       messageApi.error("La prueba de impresión falló: " + (e?.message ?? "desconocido"));
@@ -358,6 +367,10 @@ export default function ConfiguracionPage() {
   };
 
   const testAbrirCajon = async () => {
+    if (!usaQZ) {
+      messageApi.info("En modo navegador no se puede abrir cajón físico. Eso requiere QZ Tray.");
+      return;
+    }
     setTestCajon(true);
     try {
       const result = await abrirCajon(posPrinterName || null);
@@ -1451,99 +1464,113 @@ export default function ConfiguracionPage() {
 
   const posTab = (
     <div style={{ maxWidth: 980 }}>
-      {/* Estado QZ Tray */}
-      <Divider orientation="left">Estado de QZ Tray</Divider>
-      <Alert
-        type={qzEstado === "conectado" ? "success" : qzEstado === "desconectado" ? "error" : "info"}
-        showIcon
-        message={
-          qzEstado === "conectado"
-            ? "QZ Tray conectado — la impresora está lista"
-            : qzEstado === "desconectado"
-            ? "QZ Tray no está conectado"
-            : "Estado desconocido — haz clic en Conectar"
-        }
-        description={
-          qzEstado !== "conectado" && (
-            <span>
-              Descarga QZ Tray desde{" "}
-              <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer">
-                qz.io/download
-              </a>{" "}
-              e instálalo en el PC donde está la impresora.
-            </span>
-          )
-        }
-        style={{ marginBottom: 16 }}
-      />
-      <Space style={{ marginBottom: 24 }}>
-        <Button
-          icon={<WifiOutlined />}
-          loading={conectandoQZ}
-          onClick={conectarQZ}
-          type={qzEstado === "conectado" ? "default" : "primary"}
-        >
-          {qzEstado === "conectado" ? "Verificar servicio QZ Tray" : "Conectar QZ Tray"}
-        </Button>
-        {qzEstado === "conectado" && (
-          <Button
-            icon={<ReloadOutlined />}
-            loading={buscandoImpresoras}
-            onClick={buscarImpresoras}
-          >
-            Detectar impresoras
-          </Button>
-        )}
-      </Space>
-      <Alert
-        type="warning"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message="Sitio permitido en QZ Tray"
-        description={
-          <Space direction="vertical" size={8} style={{ width: "100%" }}>
-            <span>
-              Si QZ Tray sigue bloqueando o pidiendo autorización, agrega este sitio en Allowed / Trusted Sites dentro de QZ Tray.
-            </span>
-            <Input
-              value={currentSiteOrigin}
-              readOnly
-              addonAfter={
-                <Button type="link" icon={<CopyOutlined />} onClick={copiarSitioActualQZ}>
-                  Copiar
-                </Button>
-              }
-            />
+      {usaQZ ? (
+        <>
+          {/* Estado QZ Tray */}
+          <Divider orientation="left">Estado de QZ Tray</Divider>
+          <Alert
+            type={qzEstado === "conectado" ? "success" : qzEstado === "desconectado" ? "error" : "info"}
+            showIcon
+            message={
+              qzEstado === "conectado"
+                ? "QZ Tray conectado — la impresora está lista"
+                : qzEstado === "desconectado"
+                ? "QZ Tray no está conectado"
+                : "Estado desconocido — haz clic en Conectar"
+            }
+            description={
+              qzEstado !== "conectado" && (
+                <span>
+                  Descarga QZ Tray desde{" "}
+                  <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer">
+                    qz.io/download
+                  </a>{" "}
+                  e instálalo en el PC donde está la impresora.
+                </span>
+              )
+            }
+            style={{ marginBottom: 16 }}
+          />
+          <Space style={{ marginBottom: 24 }}>
+            <Button
+              icon={<WifiOutlined />}
+              loading={conectandoQZ}
+              onClick={conectarQZ}
+              type={qzEstado === "conectado" ? "default" : "primary"}
+            >
+              {qzEstado === "conectado" ? "Verificar servicio QZ Tray" : "Conectar QZ Tray"}
+            </Button>
+            {qzEstado === "conectado" && (
+              <Button
+                icon={<ReloadOutlined />}
+                loading={buscandoImpresoras}
+                onClick={buscarImpresoras}
+              >
+                Detectar impresoras
+              </Button>
+            )}
           </Space>
-        }
-      />
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Sitio permitido en QZ Tray"
+            description={
+              <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                <span>
+                  Si QZ Tray sigue bloqueando o pidiendo autorización, agrega este sitio en Allowed / Trusted Sites dentro de QZ Tray.
+                </span>
+                <Input
+                  value={currentSiteOrigin}
+                  readOnly
+                  addonAfter={
+                    <Button type="link" icon={<CopyOutlined />} onClick={copiarSitioActualQZ}>
+                      Copiar
+                    </Button>
+                  }
+                />
+              </Space>
+            }
+          />
+        </>
+      ) : (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Modo de impresión por navegador activo"
+          description="La app abrirá el diálogo de impresión del navegador directamente. QZ Tray no es necesario en este modo."
+        />
+      )}
 
       {/* Selección de impresora */}
-      <Divider orientation="left">Impresora térmica</Divider>
+      <Divider orientation="left">Configuración de impresión</Divider>
       <Row gutter={[16, 16]}>
-        <Col xs={24}>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>Nombre de la impresora</div>
-          {impresorasDisponibles.length > 0 ? (
-            <Select
-              showSearch
-              value={posPrinterName || undefined}
-              placeholder="Selecciona la impresora"
-              style={{ width: "100%" }}
-              onChange={(v) => setPosPrinterName(v)}
-              options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
-            />
-          ) : (
-            <Input
-              value={posPrinterName}
-              onChange={(e) => setPosPrinterName(e.target.value)}
-              placeholder="Ej: EPSON TM-T20II"
-              prefix={<PrinterOutlined />}
-            />
-          )}
-          <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
-            Deja vacío para usar la impresora predeterminada del sistema.
-          </div>
-        </Col>
+        {usaQZ && (
+          <Col xs={24}>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>Nombre de la impresora</div>
+            {impresorasDisponibles.length > 0 ? (
+              <Select
+                showSearch
+                value={posPrinterName || undefined}
+                placeholder="Selecciona la impresora"
+                style={{ width: "100%" }}
+                onChange={(v) => setPosPrinterName(v)}
+                options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
+              />
+            ) : (
+              <Input
+                value={posPrinterName}
+                onChange={(e) => setPosPrinterName(e.target.value)}
+                placeholder="Ej: EPSON TM-T20II"
+                prefix={<PrinterOutlined />}
+              />
+            )}
+            <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+              Deja vacío para usar la impresora predeterminada del sistema.
+            </div>
+          </Col>
+        )}
         <Col xs={24}>
           <div style={{ marginBottom: 8, fontWeight: 500 }}>Ancho de papel</div>
           <Radio.Group
@@ -1572,8 +1599,8 @@ export default function ConfiguracionPage() {
         Guardar configuración
       </Button>
 
-      {/* Prueba de hardware */}
-      <Divider orientation="left">Prueba de hardware</Divider>
+      {/* Pruebas */}
+      <Divider orientation="left">Pruebas</Divider>
       <Space wrap>
         <Button
           icon={<PrinterOutlined />}
@@ -1582,17 +1609,21 @@ export default function ConfiguracionPage() {
         >
           Imprimir ticket de prueba
         </Button>
-        <Button
-          icon={<span style={{ marginRight: 4 }}>💰</span>}
-          loading={testCajon}
-          onClick={testAbrirCajon}
-        >
-          Abrir cajón monedero
-        </Button>
+        {usaQZ && (
+          <Button
+            icon={<span style={{ marginRight: 4 }}>💰</span>}
+            loading={testCajon}
+            onClick={testAbrirCajon}
+          >
+            Abrir cajón monedero
+          </Button>
+        )}
       </Space>
-      <div style={{ marginTop: 12, color: "#888", fontSize: 12 }}>
-        Asegúrate de que el cajón monedero esté conectado al puerto RJ-11 de la impresora.
-      </div>
+      {usaQZ && (
+        <div style={{ marginTop: 12, color: "#888", fontSize: 12 }}>
+          Asegúrate de que el cajón monedero esté conectado al puerto RJ-11 de la impresora.
+        </div>
+      )}
 
       {renderTicketDesigner()}
     </div>

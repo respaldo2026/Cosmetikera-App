@@ -146,6 +146,7 @@ const metodoPagoLabels: Record<MetodoPago, string> = {
 };
 
 export default function CajaPage() {
+  const usaQZ = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase() === "qz";
   const { message: messageApi } = App.useApp();
   const [form] = Form.useForm();
 
@@ -723,6 +724,7 @@ export default function CajaPage() {
   }, [cuotasSeleccionadas, cuotas, form, messageApi, clienteSeleccionado, totalAPagar, configuracion]);
 
   const abrirCajonRegistrador = () => {
+    if (!usaQZ) return;
     abrirCajon().then((result) => {
       if (!result.ok) {
         console.warn("[Caja] No se pudo abrir cajón vía QZ Tray:", result.error);
