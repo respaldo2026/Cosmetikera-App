@@ -69,18 +69,51 @@ Write-Output "[POS-AGENT] NPM : $npmCmd"
 
 & $npmCmd install
 
+# ── Instalar tarea programada (arranca al iniciar sesión) ───────────────────
 powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
 
-Start-Sleep -Seconds 2
+# ── Arrancar el agente AHORA mismo (no esperar al próximo login) ─────────────
+Write-Output "[POS-AGENT] Arrancando agente..."
 
-try {
-  $health = Invoke-RestMethod -Uri "http://127.0.0.1:17891/health" -Method GET -TimeoutSec 5
-  if ($health.ok -eq $true) {
-    Write-Output "[POS-AGENT] Listo: servicio activo en http://127.0.0.1:17891"
-    exit 0
-  }
-} catch {
-  Write-Warning "[POS-AGENT] Instalado, pero health check no respondió aún. Revisa la tarea programada '$TaskName'."
+# Matar instancia anterior si existe (por si estaba corriendo)
+Get-Process -Name "node" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like "*server.js*" } |
+  Stop-Process -Force -ErrorAction SilentlyContinue
+
+# Lanzar en ventana minimizada para que no moleste
+$startInfo = New-Object System.Diagnostics.ProcessStartInfo
+$startInfo.FileName        = $nodePath
+$startInfo.Arguments       = "`"$agentDir\server.js`""
+$startInfo.WorkingDirectory = $agentDir
+$startInfo.WindowStyle     = [System.Diagnostics.ProcessWindowStyle]::Minimized
+$startInfo.UseShellExecute = $true
+[System.Diagnostics.Process]::Start($startInfo) | Out-Null
+
+Write-Output "[POS-AGENT] Esperando que el agente arranque..."
+Start-Sleep -Seconds 5
+
+$intentos = 0
+$ok = $false
+while ($intentos -lt 6 -and -not $ok) {
+  try {
+    $health = Invoke-RestMethod -Uri "http://127.0.0.1:17891/health" -Method GET -TimeoutSec 3
+    if ($health.ok -eq $true) { $ok = $true }
+  } catch {}
+  if (-not $ok) { Start-Sleep -Seconds 2 }
+  $intentos++
+}
+
+if ($ok) {
+  Write-Output ""
+  Write-Output "=========================================="
+  Write-Output "  LISTO: Agente activo en puerto 17891"
+  Write-Output "  Prueba: http://127.0.0.1:17891/health"
+  Write-Output "=========================================="
+} else {
+  Write-Warning ""
+  Write-Warning "El agente no respondió al health check."
+  Write-Warning "Intenta abrir start-agent.bat en la carpeta pos-agent"
+  Write-Warning "y luego visita http://127.0.0.1:17891/health"
 }
 
 exit 0
