@@ -473,32 +473,34 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
   const fmtPrecio = (v: number) =>
     "$" + v.toLocaleString("es-CO");
 
-  // Construir filas del detalle
-  const filasDetalle = datos.lineas.map((linea) => {
-    if (linea.tipo === "item") {
-      return `
-        <tr>
-          <td>${esc(linea.descripcion)}</td>
-          <td class="center">${linea.cantidad}</td>
-          <td class="right">${fmtPrecio(linea.precio)}</td>
-          <td class="right">${fmtPrecio(linea.precio * linea.cantidad)}</td>
-        </tr>`;
+  const detalleHtml = datos.lineas.map((linea) => {
+    if (linea.tipo === "titulo") {
+      return `<div class="title-row">${esc(linea.texto.toUpperCase())}</div>`;
     }
-    if (linea.tipo === "total") {
-      const clase = linea.etiqueta === "TOTAL" ? "total-row" : "subtotal-row";
-      return `
-        <tr class="${clase}">
-          <td colspan="3">${esc(linea.etiqueta)}</td>
-          <td class="right">${fmtPrecio(linea.valor)}</td>
-        </tr>`;
+    if (linea.tipo === "subtitulo") {
+      return `<div class="subtitle-row">${esc(linea.texto)}</div>`;
     }
     if (linea.tipo === "linea") {
-      return `<tr><td colspan="4"><hr class="sep" /></td></tr>`;
+      return `<hr class="sep" />`;
+    }
+    if (linea.tipo === "item") {
+      return `
+        <div class="detail-row item-row">
+          <span>${esc(`${linea.cantidad}x ${linea.descripcion}`)}</span>
+          <span>${fmtPrecio(linea.precio * linea.cantidad)}</span>
+        </div>`;
+    }
+    if (linea.tipo === "total") {
+      return `
+        <div class="detail-row ${linea.etiqueta === "TOTAL" ? "total-row" : "subtotal-row"}">
+          <span>${esc(linea.etiqueta)}</span>
+          <span>${fmtPrecio(linea.valor)}</span>
+        </div>`;
     }
     if (linea.tipo === "texto") {
-      return `<tr><td colspan="4" class="center small">${esc(linea.texto)}</td></tr>`;
+      return `<div class="text-row">${esc(linea.texto)}</div>`;
     }
-    return "";
+    return `<div class="spacer-row"></div>`;
   }).join("");
 
   const puntosHtml = datos.puntosAcumulados !== undefined ? `
@@ -539,14 +541,14 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
     hr.sep { border: none; border-top: 1px dashed #999; margin: 6px 0; }
     .info-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
     .info-row span:first-child { font-weight: bold; }
-    table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-    th { font-size: 10px; border-bottom: 1px solid #333; padding: 2px 0; }
-    td { padding: 2px 0; vertical-align: top; }
-    .center { text-align: center; }
-    .right { text-align: right; }
-    .small { font-size: 10px; }
-    .subtotal-row td { font-size: 10px; color: #555; }
-    .total-row td { font-size: 13px; font-weight: 900; border-top: 2px solid #111; padding-top: 4px; }
+    .detail-row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+    .detail-row span:last-child { text-align: right; white-space: nowrap; }
+    .title-row { text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+    .subtitle-row { text-align: center; font-size: 12px; margin-bottom: 6px; }
+    .text-row { text-align: center; font-size: 11px; color: #4b5563; margin-bottom: 6px; }
+    .spacer-row { height: 8px; }
+    .subtotal-row { color: #555; }
+    .total-row { font-size: 13px; font-weight: 900; border-top: 2px solid #111; padding-top: 4px; }
     .pago { margin-top: 6px; font-size: 11px; }
     .cambio { font-size: 11px; margin-top: 2px; }
     .puntos {
@@ -582,17 +584,7 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
   ${datos.cliente ? `<div class="info-row"><span>Cliente</span><span>${esc(datos.cliente)}</span></div>` : ""}
   <hr class="sep" />
 
-  <table>
-    <thead>
-      <tr>
-        <th style="text-align:left">Artículo</th>
-        <th class="center">Cant</th>
-        <th class="right">P.Unit</th>
-        <th class="right">Total</th>
-      </tr>
-    </thead>
-    <tbody>${filasDetalle}</tbody>
-  </table>
+  <div>${detalleHtml}</div>
 
   <hr class="sep" />
   <p class="pago">Método de pago: <strong>${esc(datos.metodoPago.toUpperCase())}</strong></p>

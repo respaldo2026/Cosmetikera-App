@@ -388,8 +388,6 @@ export default function ConfiguracionPage() {
   const renderTicketDesigner = () => {
     const ticketTemplate = crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields);
     const ticketPreview = crearTicketPruebaPOS(ticketTemplate);
-    const previewItems = ticketPreview.lineas.filter((linea) => linea.tipo === "item");
-    const previewTotals = ticketPreview.lineas.filter((linea) => linea.tipo === "total");
 
     return (
       <>
@@ -467,18 +465,64 @@ export default function ConfiguracionPage() {
 
                   <div style={{ borderTop: "1px dashed #e5e7eb", paddingTop: 8 }}>
                     {ticketPreview.fecha ? <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Fecha: {ticketPreview.fecha}</div> : null}
-                    {previewItems.map((linea, index) => (
-                      <div key={`item-${index}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, gap: 8 }}>
-                        <span>{linea.cantidad}x {linea.descripcion}</span>
-                        <span>${(linea.precio * linea.cantidad).toLocaleString("es-CO")}</span>
+                    {ticketPreview.lineas.map((linea, index) => {
+                      if (linea.tipo === "titulo") {
+                        return (
+                          <div key={`linea-${index}`} style={{ textAlign: "center", fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                            {linea.texto.toUpperCase()}
+                          </div>
+                        );
+                      }
+
+                      if (linea.tipo === "subtitulo") {
+                        return (
+                          <div key={`linea-${index}`} style={{ textAlign: "center", fontSize: 12, marginBottom: 6 }}>
+                            {linea.texto}
+                          </div>
+                        );
+                      }
+
+                      if (linea.tipo === "linea") {
+                        return <div key={`linea-${index}`} style={{ borderTop: "1px dashed #e5e7eb", margin: "8px 0" }} />;
+                      }
+
+                      if (linea.tipo === "item") {
+                        return (
+                          <div key={`linea-${index}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, gap: 8 }}>
+                            <span>{linea.cantidad}x {linea.descripcion}</span>
+                            <span>${(linea.precio * linea.cantidad).toLocaleString("es-CO")}</span>
+                          </div>
+                        );
+                      }
+
+                      if (linea.tipo === "total") {
+                        return (
+                          <div key={`linea-${index}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, fontWeight: linea.etiqueta === "TOTAL" ? 700 : 500 }}>
+                            <span>{linea.etiqueta}</span>
+                            <span>${linea.valor.toLocaleString("es-CO")}</span>
+                          </div>
+                        );
+                      }
+
+                      if (linea.tipo === "texto") {
+                        return (
+                          <div key={`linea-${index}`} style={{ textAlign: "center", fontSize: 12, color: "#4b5563", marginBottom: 6 }}>
+                            {linea.texto}
+                          </div>
+                        );
+                      }
+
+                      return <div key={`linea-${index}`} style={{ height: 8 }} />;
+                    })}
+                    <div style={{ borderTop: "1px dashed #e5e7eb", margin: "8px 0" }} />
+                    <div style={{ fontSize: 12, marginBottom: 6 }}>
+                      Pago: <strong>{ticketPreview.metodoPago}</strong>
+                    </div>
+                    {ticketPreview.cambio && ticketPreview.cambio > 0 ? (
+                      <div style={{ fontSize: 12, marginBottom: 6 }}>
+                        Cambio: <strong>${ticketPreview.cambio.toLocaleString("es-CO")}</strong>
                       </div>
-                    ))}
-                    {previewTotals.map((linea, index) => (
-                      <div key={`total-${index}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, fontWeight: linea.etiqueta === "TOTAL" ? 700 : 500 }}>
-                        <span>{linea.etiqueta}</span>
-                        <span>${linea.valor.toLocaleString("es-CO")}</span>
-                      </div>
-                    ))}
+                    ) : null}
                     {ticketPreview.mensaje ? <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>{ticketPreview.mensaje}</div> : null}
                     {ticketPreview.nota ? <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>{ticketPreview.nota}</div> : null}
                     {ticketPreview.pie ? <div style={{ fontSize: 12, color: "#6b7280", marginTop: 10 }}>{ticketPreview.pie}</div> : null}
