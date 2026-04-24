@@ -20,6 +20,11 @@ let qzSecurityInitialized = false;
 
 const QZ_CONNECT_TIMEOUT_MS = 8000;
 const QZ_OPERATION_TIMEOUT_MS = 10000;
+const POS_PRINT_MODE = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "browser").toLowerCase();
+
+function usarQZTray(): boolean {
+  return POS_PRINT_MODE === "qz";
+}
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -150,6 +155,7 @@ export function invalidarConfigPOS(): void {
 
 /** Lista todas las impresoras disponibles en QZ Tray. */
 export async function listarImpresoras(): Promise<string[]> {
+  if (!usarQZTray()) return [];
   try {
     const q = await cargarQZ();
     const conectado = await qzConectar();
@@ -168,6 +174,9 @@ export async function listarImpresoras(): Promise<string[]> {
 // ── Conexión ─────────────────────────────────────────────────────────────────
 
 export async function qzConectar(): Promise<boolean> {
+  if (!usarQZTray()) {
+    return false;
+  }
   try {
     const q = await cargarQZ();
     await inicializarSeguridadQZ(q);
@@ -192,6 +201,7 @@ export async function qzDesconectar() {
 }
 
 export function qzActivo(): boolean {
+  if (!usarQZTray()) return false;
   if (!qz) return false;
   return qz.websocket.isActive?.() ?? false;
 }
@@ -378,6 +388,15 @@ export async function imprimirTicketTermico(
   impresora?: string | null,
   ancho?: number
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!usarQZTray()) {
+    try {
+      imprimirTicketNavegador(datos);
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? "No se pudo abrir la impresión del navegador" };
+    }
+  }
+
   // Usar config de Supabase si no se pasan parámetros explícitos
   const cfg = await cargarConfigPOS();
   const printerName = impresora ?? cfg.printerName;
@@ -434,6 +453,13 @@ export async function imprimirTicketTermico(
 export async function abrirCajon(
   impresora?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!usarQZTray()) {
+    return {
+      ok: false,
+      error: "El modo navegador no puede abrir cajón físico. Para eso necesitas QZ Tray.",
+    };
+  }
+
   try {
     const q = await cargarQZ();
 
