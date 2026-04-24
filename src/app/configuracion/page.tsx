@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid, Alert, Badge, Radio } from "antd";
-import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined } from "@ant-design/icons";
+import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined, CopyOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd/es/_util/responsiveObserver";
@@ -156,6 +156,7 @@ export default function ConfiguracionPage() {
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
   const [testCajon, setTestCajon] = useState(false);
+  const currentSiteOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   const modulos: ModuleDefinition[] = MODULES;
 
@@ -337,29 +338,51 @@ export default function ConfiguracionPage() {
 
   const testImprimir = async () => {
     setTestImprimiendo(true);
-    const ticket = crearTicketPruebaPOS(
-      crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields)
-    );
-    const result = await imprimirTicketTermico(ticket, posPrinterName || null, posPrinterWidth);
-    if (!result.ok) {
-      messageApi.warning("QZ Tray no disponible. Abriendo impresión del navegador...");
-      const { imprimirTicketNavegador } = await import("@utils/pos-hardware");
-      imprimirTicketNavegador(ticket);
-    } else {
-      messageApi.success("Ticket de prueba enviado a la impresora");
+    try {
+      const ticket = crearTicketPruebaPOS(
+        crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields)
+      );
+      const result = await imprimirTicketTermico(ticket, posPrinterName || null, posPrinterWidth);
+      if (!result.ok) {
+        messageApi.warning(`QZ Tray no respondió: ${result.error ?? "sin detalle"}. Abriendo impresión del navegador...`);
+        const { imprimirTicketNavegador } = await import("@utils/pos-hardware");
+        imprimirTicketNavegador(ticket);
+      } else {
+        messageApi.success("Ticket de prueba enviado a la impresora");
+      }
+    } catch (e: any) {
+      messageApi.error("La prueba de impresión falló: " + (e?.message ?? "desconocido"));
+    } finally {
+      setTestImprimiendo(false);
     }
-    setTestImprimiendo(false);
   };
 
   const testAbrirCajon = async () => {
     setTestCajon(true);
-    const result = await abrirCajon(posPrinterName || null);
-    if (!result.ok) {
-      messageApi.error("No se pudo abrir el cajón: " + (result.error ?? "desconocido"));
-    } else {
-      messageApi.success("\u00a1Señal enviada al cajón monedero!");
+    try {
+      const result = await abrirCajon(posPrinterName || null);
+      if (!result.ok) {
+        messageApi.error("No se pudo abrir el cajón: " + (result.error ?? "desconocido"));
+      } else {
+        messageApi.success("\u00a1Señal enviada al cajón monedero!");
+      }
+    } finally {
+      setTestCajon(false);
     }
-    setTestCajon(false);
+  };
+
+  const copiarSitioActualQZ = async () => {
+    if (!currentSiteOrigin) {
+      messageApi.warning("No se pudo detectar la URL actual de la app.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(currentSiteOrigin);
+      messageApi.success("Sitio copiado. Pégalo en los sitios permitidos de QZ Tray.");
+    } catch {
+      messageApi.warning(`Copia manualmente este sitio en QZ Tray: ${currentSiteOrigin}`);
+    }
   };
 
   const renderTicketDesigner = () => {
@@ -1428,6 +1451,28 @@ export default function ConfiguracionPage() {
           </Button>
         )}
       </Space>
+      <Alert
+        type="warning"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="Sitio permitido en QZ Tray"
+        description={
+          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+            <span>
+              Si QZ Tray sigue bloqueando o pidiendo autorización, agrega este sitio en Allowed / Trusted Sites dentro de QZ Tray.
+            </span>
+            <Input
+              value={currentSiteOrigin}
+              readOnly
+              addonAfter={
+                <Button type="link" icon={<CopyOutlined />} onClick={copiarSitioActualQZ}>
+                  Copiar
+                </Button>
+              }
+            />
+          </Space>
+        }
+      />
 
       {/* Selección de impresora */}
       <Divider orientation="left">Impresora térmica</Divider>

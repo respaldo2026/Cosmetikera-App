@@ -18,6 +18,23 @@
 let qz: any = null;
 let qzSecurityInitialized = false;
 
+const QZ_CONNECT_TIMEOUT_MS = 8000;
+const QZ_OPERATION_TIMEOUT_MS = 10000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function normalizarPem(valor: string): string {
   return valor
     .replace(/\\n/g, "\n")
@@ -45,13 +62,16 @@ async function inicializarSeguridadQZ(q: any): Promise<void> {
   q.security.setCertificatePromise(() => Promise.resolve(certificate));
   q.security.setSignatureAlgorithm("SHA512");
   q.security.setSignaturePromise(async (stringToSign: string) => {
+    const controller = new AbortController();
+    const abortId = setTimeout(() => controller.abort(), QZ_OPERATION_TIMEOUT_MS);
     const response = await fetch("/api/qz/sign", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      signal: controller.signal,
       body: JSON.stringify({ stringToSign }),
-    });
+    }).finally(() => clearTimeout(abortId));
 
     if (!response.ok) {
       let detalle = "Error firmando solicitud";
@@ -122,7 +142,11 @@ export async function listarImpresoras(): Promise<string[]> {
     const q = await cargarQZ();
     const conectado = await qzConectar();
     if (!conectado) return [];
-    const result = await q.printers.find("");
+    const result = await withTimeout(
+      q.printers.find(""),
+      QZ_OPERATION_TIMEOUT_MS,
+      "QZ Tray tardó demasiado detectando impresoras"
+    );
     return Array.isArray(result) ? result : [result].filter(Boolean);
   } catch {
     return [];
@@ -136,7 +160,11 @@ export async function qzConectar(): Promise<boolean> {
     const q = await cargarQZ();
     await inicializarSeguridadQZ(q);
     if (q.websocket.isActive()) return true;
-    await q.websocket.connect({ retries: 2, delay: 1 });
+    await withTimeout(
+      q.websocket.connect({ retries: 2, delay: 1 }),
+      QZ_CONNECT_TIMEOUT_MS,
+      "QZ Tray no respondió a tiempo al conectar"
+    );
     return true;
   } catch (e) {
     console.error("[POS] No se pudo conectar a QZ Tray:", e);
@@ -353,7 +381,11 @@ export async function imprimirTicketTermico(
     // Obtener la impresora
     let resolvedPrinter = printerName;
     if (!resolvedPrinter) {
-      resolvedPrinter = await q.printers.getDefault();
+      resolvedPrinter = await withTimeout(
+        q.printers.getDefault(),
+        QZ_OPERATION_TIMEOUT_MS,
+        "QZ Tray tardó demasiado obteniendo la impresora predeterminada"
+      );
     }
     if (!resolvedPrinter) {
       return { ok: false, error: "No se encontró ninguna impresora configurada." };
@@ -368,7 +400,11 @@ export async function imprimirTicketTermico(
     const comandos = construirComandosEscpos(datos, printWidth);
     const data = [{ type: "raw", format: "plain", data: comandos.join("") }];
 
-    await q.print(config, data);
+    await withTimeout(
+      q.print(config, data),
+      QZ_OPERATION_TIMEOUT_MS,
+      "QZ Tray tardó demasiado procesando la impresión"
+    );
     return { ok: true };
   } catch (e: any) {
     console.error("[POS] Error al imprimir:", e);
@@ -398,7 +434,11 @@ export async function abrirCajon(
     const cfg = await cargarConfigPOS();
     let printerName = impresora ?? cfg.printerName;
     if (!printerName) {
-      printerName = await q.printers.getDefault();
+      printerName = await withTimeout(
+        q.printers.getDefault(),
+        QZ_OPERATION_TIMEOUT_MS,
+        "QZ Tray tardó demasiado obteniendo la impresora para abrir el cajón"
+      );
     }
 
     const config = q.configs.create(printerName, { encoding: "Cp1252" });
@@ -408,7 +448,11 @@ export async function abrirCajon(
     const pulso = "\x1B\x70\x00\x19\xFA";
     const data = [{ type: "raw", format: "plain", data: pulso }];
 
-    await q.print(config, data);
+    await withTimeout(
+      q.print(config, data),
+      QZ_OPERATION_TIMEOUT_MS,
+      "QZ Tray tardó demasiado enviando la señal al cajón"
+    );
     return { ok: true };
   } catch (e: any) {
     console.error("[POS] Error al abrir cajón:", e);
