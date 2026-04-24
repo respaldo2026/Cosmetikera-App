@@ -315,7 +315,7 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
     `${ESC}t\x12`,
   ];
 
-  const sep = "─".repeat(ancho);
+  const sep = "-".repeat(ancho);
 
   // CABECERA — centrado
   cmds.push(`${ESC}a\x01`); // centrar
@@ -388,9 +388,9 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
     cmds.push(`${ESC}a\x01`);
     cmds.push(`${ESC}!\x08`); // negrita
     if (datos.puntosFidelidad !== undefined && datos.puntosFidelidad > 0) {
-      cmds.push(`\u2605 Ganaste ${datos.puntosFidelidad} puntos` + LF);
+      cmds.push(`* Ganaste ${datos.puntosFidelidad} puntos` + LF);
     } else {
-      cmds.push(`\u2605 Puntos de fidelidad` + LF);
+      cmds.push(`* Puntos de fidelidad` + LF);
     }
     cmds.push(`${ESC}!\x00`);
     cmds.push(`Total acumulado: ${datos.puntosAcumulados.toLocaleString("es-CO")} pts` + LF);

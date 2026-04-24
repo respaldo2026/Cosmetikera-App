@@ -356,9 +356,13 @@ export default function ConfiguracionPage() {
       );
       const result = await imprimirTicketTermico(ticket, posPrinterName || null, posPrinterWidth);
       if (!result.ok) {
-        messageApi.warning(`No se pudo imprimir por backend local: ${result.error ?? "sin detalle"}. Abriendo impresión del navegador...`);
-        const { imprimirTicketNavegador } = await import("@utils/pos-hardware");
-        imprimirTicketNavegador(ticket);
+        if (usaAgenteLocal) {
+          messageApi.error(`El agente no pudo imprimir: ${result.error ?? "sin detalle"}`);
+        } else {
+          messageApi.warning(`No se pudo imprimir por backend local: ${result.error ?? "sin detalle"}. Abriendo impresión del navegador...`);
+          const { imprimirTicketNavegador } = await import("@utils/pos-hardware");
+          imprimirTicketNavegador(ticket);
+        }
       } else {
         messageApi.success(
           usaQZ
