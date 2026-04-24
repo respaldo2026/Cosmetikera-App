@@ -9,6 +9,8 @@
     "dev": "cross-env NODE_OPTIONS=--max_old_space_size=6144 REFINE_DEVTOOLS_PORT=5002 NEXT_DEV_DIST_SUFFIX=3001 refine dev --port 3001",
     "dev:restart": "node scripts/restart-next-dev.js",
     "dev:reset": "node scripts/reset-next-dev-cache.js",
+    "pos:kiosk": "powershell -ExecutionPolicy Bypass -File ./scripts/start-pos-kiosk.ps1",
+    "pos:kiosk:ventas": "powershell -ExecutionPolicy Bypass -File ./scripts/start-pos-kiosk.ps1 -Url http://localhost:3001/ventas -AppMode",
     "build": "refine build",
     "start": "refine start",
     "lint": "next lint",
