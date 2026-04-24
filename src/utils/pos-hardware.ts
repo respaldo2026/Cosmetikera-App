@@ -16,6 +16,61 @@
 
 // qz-tray usa import dinámico porque manipula `window`
 let qz: any = null;
+let qzSecurityInitialized = false;
+
+function normalizarPem(valor: string): string {
+  return valor
+    .replace(/\\n/g, "\n")
+    .trim();
+}
+
+async function inicializarSeguridadQZ(q: any): Promise<void> {
+  if (qzSecurityInitialized) return;
+
+  const certRaw =
+    process.env.NEXT_PUBLIC_QZ_CERTIFICATE ??
+    process.env.NEXT_PUBLIC_QZ_CERT ??
+    "";
+
+  const certificate = normalizarPem(certRaw);
+  if (!certificate) {
+    console.warn(
+      "[POS] QZ Tray sin certificado (NEXT_PUBLIC_QZ_CERTIFICATE). " +
+      "Solicitara autorizacion manual en cada impresion/apertura de cajon."
+    );
+    qzSecurityInitialized = true;
+    return;
+  }
+
+  q.security.setCertificatePromise(() => Promise.resolve(certificate));
+  q.security.setSignatureAlgorithm("SHA512");
+  q.security.setSignaturePromise(async (stringToSign: string) => {
+    const response = await fetch("/api/qz/sign", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ stringToSign }),
+    });
+
+    if (!response.ok) {
+      let detalle = "Error firmando solicitud";
+      try {
+        const body = await response.json();
+        if (body?.error) detalle = String(body.error);
+      } catch (_) {}
+      throw new Error(detalle);
+    }
+
+    const payload = await response.json();
+    if (!payload?.signature) {
+      throw new Error("La firma de QZ no fue generada");
+    }
+    return payload.signature as string;
+  });
+
+  qzSecurityInitialized = true;
+}
 
 async function cargarQZ() {
   if (!qz) {
@@ -79,6 +134,7 @@ export async function listarImpresoras(): Promise<string[]> {
 export async function qzConectar(): Promise<boolean> {
   try {
     const q = await cargarQZ();
+    await inicializarSeguridadQZ(q);
     if (q.websocket.isActive()) return true;
     await q.websocket.connect({ retries: 2, delay: 1 });
     return true;
