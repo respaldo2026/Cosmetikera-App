@@ -88,9 +88,9 @@ export async function POST(request: Request) {
       cedula,
       fecha_nacimiento,
       rol = "cliente",
-      puntos_fidelidad = 50,
+      puntos_fidelidad = 0,
       nivel_fidelidad = "bronce",
-      puntos_ganados = 50,
+      puntos_ganados = 0,
       activo = true,
     } = body;
 

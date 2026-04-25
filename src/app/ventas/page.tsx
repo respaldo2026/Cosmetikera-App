@@ -194,7 +194,6 @@ export default function VentasPage() {
     () => clientesFiltrados.map((c) => ({
       value: c.id,
       label: c.nombre_completo,
-      subtitle: [c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · "),
     })),
     [clientesFiltrados]
   );
@@ -204,7 +203,6 @@ export default function VentasPage() {
       value: c.id,
       label: c.nombre_completo,
       searchText: `${c.nombre_completo || ""} ${c.cedula || ""} ${c.telefono || ""}`.toLowerCase(),
-      subtitle: [c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · "),
     })),
     [clientes]
   );
@@ -826,15 +824,6 @@ export default function VentasPage() {
                   .slice(0, 5);
                 setClientesFiltrados(matches);
               }}
-              optionRender={(opt) => {
-                const c = (opt as any).data;
-                return (
-                  <div style={{ lineHeight: 1.4, padding: "2px 0" }}>
-                    <div style={{ fontWeight: 600 }}>{c?.label}</div>
-                    {c?.subtitle && <div style={{ fontSize: 11, color: "#888" }}>{c.subtitle}</div>}
-                  </div>
-                );
-              }}
               options={opcionesClientesRapidos}
             />
           </Col>
@@ -1168,15 +1157,6 @@ export default function VentasPage() {
                     const q = input.toLowerCase().trim();
                     if (!q) return true;
                     return String((opt as any)?.searchText || "").includes(q);
-                  }}
-                  optionRender={(opt) => {
-                    const c = (opt as any).data;
-                    return (
-                      <div style={{ lineHeight: 1.3 }}>
-                        <div style={{ fontWeight: 500 }}>{c?.label}</div>
-                        {c?.subtitle && <div style={{ fontSize: 11, color: "#888" }}>{c.subtitle}</div>}
-                      </div>
-                    );
                   }}
                   options={opcionesClientesCobro}
                 />

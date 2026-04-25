@@ -134,7 +134,7 @@ export default function ClientesPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al crear");
-      message.success("✅ Cliente creado — 50 pts de bienvenida");
+      message.success("✅ Cliente creado con 0 puntos iniciales");
       setCreando(false);
       formNuevo.resetFields();
       cargar();
@@ -337,7 +337,7 @@ export default function ClientesPage() {
             <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="DD/MM/AAAA" />
           </Form.Item>
           <div style={{ background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-            <Text style={{ fontSize: 12 }}>🌟 El cliente recibirá <strong>50 puntos de bienvenida</strong></Text>
+            <Text style={{ fontSize: 12 }}>🌟 El cliente iniciará con <strong>0 puntos</strong></Text>
           </div>
           <div style={{ background: "#f0f5ff", border: "1px solid #adc6ff", borderRadius: 8, padding: "10px 14px" }}>
             <Text style={{ fontSize: 12 }}>🔑 El cliente podrá entrar al <strong>Portal Club</strong> con su <strong>cédula</strong>, teléfono principal o teléfono alterno.</Text>
