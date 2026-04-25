@@ -1,3 +1,4 @@
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidAssignmentToAutomaticVariable', '', Scope = 'Script')]
 param(
   [string]$Url = "",
   [switch]$AppMode
@@ -26,15 +27,11 @@ if (-not $browser) {
   throw "No se encontró Chrome/Edge instalado en rutas estándar."
 }
 
-$args = @("--kiosk-printing", "--new-window")
-
 if ($AppMode) {
-  $args += "--app=$Url"
+  Start-Process -FilePath $browser -ArgumentList @("--kiosk-printing", "--new-window", "--app=$Url")
 } else {
-  $args += $Url
+  Start-Process -FilePath $browser -ArgumentList @("--kiosk-printing", "--new-window", $Url)
 }
-
-Start-Process -FilePath $browser -ArgumentList $args
 
 Write-Output "POS iniciado en modo impresión silenciosa. URL: $Url"
 Write-Output "Importante: establece la impresora térmica como predeterminada en Windows."
