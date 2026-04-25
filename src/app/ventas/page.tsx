@@ -84,6 +84,7 @@ export default function VentasPage() {
   const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
   const permiteCajon = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
   const permiteImpresionSilenciosa = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
+  const usaUIRapidaPOS = permiteImpresionSilenciosa;
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
@@ -128,11 +129,11 @@ export default function VentasPage() {
         imprimirTicketTermico(ticket, undefined, undefined, { allowBrowserFallback: false })
           .then((result) => {
             if (!result.ok) {
-              message.warning(`Venta registrada, pero el ticket no se imprimió: ${result.error ?? "sin detalle"}`);
+              console.warn("[POS] Venta registrada, pero el ticket no se imprimió:", result.error ?? "sin detalle");
             }
           })
           .catch((error: any) => {
-            message.warning(`Venta registrada, pero el ticket no se imprimió: ${error?.message ?? "sin detalle"}`);
+            console.warn("[POS] Venta registrada, pero el ticket no se imprimió:", error?.message ?? "sin detalle");
           })
       );
     }
@@ -141,14 +142,14 @@ export default function VentasPage() {
       tareas.push(
         abrirCajon().then((result) => {
           if (!result.ok) {
-            message.warning(`Venta registrada, pero el cajón no respondió: ${result.error ?? "sin detalle"}`);
+            console.warn("[POS] Venta registrada, pero el cajón no respondió:", result.error ?? "sin detalle");
           }
         }).catch(() => {})
       );
     }
 
     void Promise.allSettled(tareas);
-  }, [message, permiteCajon, permiteImpresionSilenciosa]);
+  }, [permiteCajon, permiteImpresionSilenciosa]);
   const vuelta = efectivoRecibido - totalFinal;
   const totalPagoMixto = useMemo(
     () => Object.values(pagoMixto).reduce((acc, monto) => acc + Number(monto || 0), 0),
@@ -522,10 +523,12 @@ export default function VentasPage() {
       setUltimaVentaId(venta?.id ?? null);
       setUltimoTicket(ticketDatos);
       lanzarProcesosPOS(ticketDatos, metodoPago === "efectivo");
-      message.success("¡Venta registrada exitosamente! 🎉");
       setModalPagoOpen(false);
       limpiarVenta();
       cargar();
+      if (!usaUIRapidaPOS) {
+        message.success("¡Venta registrada exitosamente! 🎉");
+      }
     } catch (e: any) {
       message.error("Error al procesar: " + (e?.message || "desconocido"));
     } finally {

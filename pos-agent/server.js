@@ -9,6 +9,9 @@ const PORT = Number(process.env.POS_AGENT_PORT || 17891);
 const HOST = process.env.POS_AGENT_HOST || "127.0.0.1";
 const AUTH_TOKEN = process.env.POS_AGENT_TOKEN || "";
 
+const actionQueue = [];
+let processingQueue = false;
+
 app.use(express.json({ limit: "1mb" }));
 
 app.use((req, res, next) => {
@@ -82,6 +85,32 @@ function runPrinterAction(payload) {
   });
 }
 
+function enqueueAction(payload) {
+  return new Promise((resolve, reject) => {
+    actionQueue.push({ payload, resolve, reject });
+    processQueue();
+  });
+}
+
+async function processQueue() {
+  if (processingQueue) return;
+  processingQueue = true;
+
+  while (actionQueue.length > 0) {
+    const current = actionQueue.shift();
+    if (!current) continue;
+
+    try {
+      const result = await runPrinterAction(current.payload);
+      current.resolve(result);
+    } catch (error) {
+      current.reject(error);
+    }
+  }
+
+  processingQueue = false;
+}
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "la-cosmetikera-pos-agent", version: "1.0.0" });
 });
@@ -93,7 +122,7 @@ app.post("/print-raw", async (req, res) => {
       return res.status(400).json({ ok: false, error: "raw es requerido" });
     }
 
-    const result = await runPrinterAction({
+    const result = await enqueueAction({
       action: "printRaw",
       printerName,
       raw,
@@ -109,13 +138,15 @@ app.post("/print-raw", async (req, res) => {
 app.post("/drawer", async (req, res) => {
   try {
     const { printerName = null } = req.body || {};
-    const result = await runPrinterAction({
+    enqueueAction({
       action: "openDrawer",
       printerName,
       encoding: "cp1252",
+    }).catch((error) => {
+      console.error("[POS-AGENT] No se pudo abrir cajon:", error?.message || error);
     });
 
-    return res.json(result && typeof result === "object" ? result : { ok: true });
+    return res.json({ ok: true, queued: true });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error?.message || "No se pudo abrir cajon" });
   }
