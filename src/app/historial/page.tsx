@@ -158,6 +158,14 @@ type HistorialPayload = {
   articulos: ArticuloCatalogo[];
 };
 
+type HistorialApiResponse = HistorialPayload & {
+  meta?: {
+    page?: number;
+    pageSize?: number;
+    hasMore?: boolean;
+  };
+};
+
 type TipoOperacion = "venta" | "compra" | "movimiento" | "puntos" | "voucher";
 type DireccionOperacion = "entrada" | "salida" | "neutral";
 type PeriodoRapido = "hoy" | "semana" | "mes" | "anio" | "personalizado" | "todo";
@@ -408,16 +416,30 @@ export default function HistorialPage() {
   const [anioFiltro, setAnioFiltro] = useState<number | null>(null);
   const [detalle, setDetalle] = useState<HistorialEntry | null>(null);
   const [mostrarGraficas, setMostrarGraficas] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const cargar = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/historial", { cache: "no-store" });
-      const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json?.error || "No se pudo cargar el historial");
-      }
+  const PAGE_SIZE = 300;
 
+  const mergeUniqueById = useCallback(<T extends { id: string }>(base: T[], extra: T[]) => {
+    if (!extra.length) return base;
+    const ids = new Set(base.map((item) => item.id));
+    const appended = extra.filter((item) => !ids.has(item.id));
+    return appended.length ? [...base, ...appended] : base;
+  }, []);
+
+  const loadPage = useCallback(async (targetPage: number, append: boolean) => {
+    const response = await fetch(`/api/historial?page=${targetPage}&pageSize=${PAGE_SIZE}`, { cache: "no-store" });
+    const json = await response.json() as HistorialApiResponse;
+    if (!response.ok) {
+      throw new Error((json as any)?.error || "No se pudo cargar el historial");
+    }
+
+    setPage(targetPage);
+    setHasMore(Boolean(json.meta?.hasMore));
+
+    if (!append) {
       setData({
         ventas: json.ventas || [],
         compras: json.compras || [],
@@ -427,12 +449,42 @@ export default function HistorialPage() {
         perfiles: json.perfiles || [],
         articulos: json.articulos || [],
       });
+      return;
+    }
+
+    setData((prev) => ({
+      ventas: mergeUniqueById(prev.ventas, json.ventas || []),
+      compras: mergeUniqueById(prev.compras, json.compras || []),
+      movimientos: mergeUniqueById(prev.movimientos, json.movimientos || []),
+      puntos: mergeUniqueById(prev.puntos, json.puntos || []),
+      canjes: mergeUniqueById(prev.canjes, json.canjes || []),
+      perfiles: prev.perfiles.length ? prev.perfiles : (json.perfiles || []),
+      articulos: prev.articulos.length ? prev.articulos : (json.articulos || []),
+    }));
+  }, [mergeUniqueById]);
+
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    try {
+      await loadPage(1, false);
     } catch (error) {
       message.error(error instanceof Error ? error.message : "No se pudo cargar el historial");
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [loadPage, message]);
+
+  const cargarMas = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await loadPage(page + 1, true);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "No se pudo cargar más historial");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loadPage, loadingMore, message, page]);
 
   useEffect(() => {
     cargar();
@@ -1163,6 +1215,14 @@ export default function HistorialPage() {
           />
         )}
       </Card>
+
+      {!loading && hasMore ? (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+          <Button onClick={cargarMas} loading={loadingMore} icon={<ReloadOutlined />}>
+            Cargar mas historial
+          </Button>
+        </div>
+      ) : null}
 
       {mostrarSeccionGraficas ? <HistorialCharts stats={salesStats} /> : null}
 
