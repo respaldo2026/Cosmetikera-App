@@ -274,12 +274,14 @@ export default function ClientesPage() {
         rowKey="id"
         loading={loading}
         size="small"
+        virtual
+        scroll={{ y: isMobile ? 420 : 560, x: 900 }}
         onRow={(r) => ({
           onClick: () => setClienteSeleccionado(r),
           style: { cursor: "pointer" },
         })}
         rowClassName={() => "cliente-row"}
-        pagination={{ pageSize: 20, showTotal: (t) => `${t} clientes` }}
+        pagination={{ pageSize: 30, showSizeChanger: true, pageSizeOptions: [20, 30, 50, 100], showTotal: (t) => `${t} clientes` }}
         locale={{ emptyText: <Empty description="No hay clientes registrados" /> }}
       />
 

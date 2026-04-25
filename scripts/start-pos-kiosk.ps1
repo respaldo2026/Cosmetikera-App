@@ -1,4 +1,3 @@
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidAssignmentToAutomaticVariable', '', Scope = 'Script')]
 param(
   [string]$Url = "",
   [switch]$AppMode
@@ -28,9 +27,9 @@ if (-not $browser) {
 }
 
 if ($AppMode) {
-  Start-Process -FilePath $browser -ArgumentList @("--kiosk-printing", "--new-window", "--app=$Url")
+  Start-Process $browser "--kiosk-printing --new-window --app=$Url"
 } else {
-  Start-Process -FilePath $browser -ArgumentList @("--kiosk-printing", "--new-window", $Url)
+  Start-Process $browser "--kiosk-printing --new-window $Url"
 }
 
 Write-Output "POS iniciado en modo impresión silenciosa. URL: $Url"

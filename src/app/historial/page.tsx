@@ -1157,8 +1157,9 @@ export default function HistorialPage() {
             columns={columns}
             rowKey="key"
             size={isMobile ? "small" : "middle"}
-            pagination={{ pageSize: 20, showSizeChanger: true }}
-            scroll={{ x: 980 }}
+            virtual
+            pagination={{ pageSize: 30, showSizeChanger: true, pageSizeOptions: [20, 30, 50, 100] }}
+            scroll={{ x: 980, y: isMobile ? 420 : 620 }}
           />
         )}
       </Card>
