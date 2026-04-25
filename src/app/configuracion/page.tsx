@@ -354,7 +354,12 @@ export default function ConfiguracionPage() {
       const ticket = crearTicketPruebaPOS(
         crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields)
       );
-      const result = await imprimirTicketTermico(ticket, posPrinterName || null, posPrinterWidth);
+      const result = await imprimirTicketTermico(
+        ticket,
+        posPrinterName || null,
+        posPrinterWidth,
+        { allowBrowserFallback: false }
+      );
       if (!result.ok) {
         if (usaAgenteLocal) {
           messageApi.error(`El agente no pudo imprimir: ${result.error ?? "sin detalle"}`);
