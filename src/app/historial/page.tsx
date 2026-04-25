@@ -458,8 +458,8 @@ export default function HistorialPage() {
       movimientos: mergeUniqueById(prev.movimientos, json.movimientos || []),
       puntos: mergeUniqueById(prev.puntos, json.puntos || []),
       canjes: mergeUniqueById(prev.canjes, json.canjes || []),
-      perfiles: prev.perfiles.length ? prev.perfiles : (json.perfiles || []),
-      articulos: prev.articulos.length ? prev.articulos : (json.articulos || []),
+      perfiles: mergeUniqueById(prev.perfiles, json.perfiles || []),
+      articulos: mergeUniqueById(prev.articulos, json.articulos || []),
     }));
   }, [mergeUniqueById]);
 
