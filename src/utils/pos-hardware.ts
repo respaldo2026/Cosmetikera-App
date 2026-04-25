@@ -275,6 +275,10 @@ export type DatosTicket = {
   pie?: string;
 };
 
+type OpcionesImpresionPOS = {
+  allowBrowserFallback?: boolean;
+};
+
 function centrar(texto: string, ancho = 32): string {
   if (texto.length >= ancho) return texto.slice(0, ancho);
   const pad = Math.floor((ancho - texto.length) / 2);
@@ -424,12 +428,14 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
 export async function imprimirTicketTermico(
   datos: DatosTicket,
   impresora?: string | null,
-  ancho?: number
+  ancho?: number,
+  opciones?: OpcionesImpresionPOS
 ): Promise<{ ok: boolean; error?: string }> {
   // Usar config de Supabase si no se pasan parámetros explícitos
   const cfg = await cargarConfigPOS();
   const printerName = impresora ?? cfg.printerName;
   const printWidth = ancho ?? cfg.printerWidth;
+  const allowBrowserFallback = opciones?.allowBrowserFallback ?? true;
 
   if (usarAgentePOS()) {
     try {
@@ -446,6 +452,9 @@ export async function imprimirTicketTermico(
       return { ok: false, error: resp?.error ?? "El agente POS no pudo imprimir" };
     } catch (e: any) {
       if (POS_PRINT_MODE === "agent") {
+        return { ok: false, error: e?.message ?? "No fue posible contactar el agente POS" };
+      }
+      if (!allowBrowserFallback) {
         return { ok: false, error: e?.message ?? "No fue posible contactar el agente POS" };
       }
       try {
