@@ -1,9 +1,16 @@
 param(
-  [string]$TaskName = "LaCosmetikeraPOSAgent"
+  [string]$TaskName = "LaCosmetikeraPOSAgent",
+  [string]$ServiceName = "LaCosmetikeraPOSAgent"
 )
 
 $ErrorActionPreference = "Stop"
 $agentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+function Test-IsAdministrator {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+  return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
 
 function Resolve-NodePath {
   $candidates = @(
@@ -69,25 +76,27 @@ Write-Output "[POS-AGENT] NPM : $npmCmd"
 
 & $npmCmd install
 
-# ── Instalar tarea programada (arranca al iniciar sesión) ───────────────────
-powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
+if (Test-IsAdministrator) {
+  Write-Output "[POS-AGENT] Instalando como servicio de Windows..."
+  powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-windows-service.ps1") -NodePath $nodePath -ServiceName $ServiceName
+} else {
+  Write-Warning "[POS-AGENT] Sin permisos de administrador. Se instalará como tarea programada."
+  powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
 
-# ── Arrancar el agente AHORA mismo (no esperar al próximo login) ─────────────
-Write-Output "[POS-AGENT] Arrancando agente..."
+  Write-Output "[POS-AGENT] Arrancando agente..."
 
-# Matar instancia anterior si existe (por si estaba corriendo)
-Get-Process -Name "node" -ErrorAction SilentlyContinue |
-  Where-Object { $_.CommandLine -like "*server.js*" } |
-  Stop-Process -Force -ErrorAction SilentlyContinue
+  Get-Process -Name "node" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*server.js*" } |
+    Stop-Process -Force -ErrorAction SilentlyContinue
 
-# Lanzar en ventana minimizada para que no moleste
-$startInfo = New-Object System.Diagnostics.ProcessStartInfo
-$startInfo.FileName        = $nodePath
-$startInfo.Arguments       = "`"$agentDir\server.js`""
-$startInfo.WorkingDirectory = $agentDir
-$startInfo.WindowStyle     = [System.Diagnostics.ProcessWindowStyle]::Minimized
-$startInfo.UseShellExecute = $true
-[System.Diagnostics.Process]::Start($startInfo) | Out-Null
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName        = $nodePath
+  $startInfo.Arguments       = "`"$agentDir\server.js`""
+  $startInfo.WorkingDirectory = $agentDir
+  $startInfo.WindowStyle     = [System.Diagnostics.ProcessWindowStyle]::Minimized
+  $startInfo.UseShellExecute = $true
+  [System.Diagnostics.Process]::Start($startInfo) | Out-Null
+}
 
 Write-Output "[POS-AGENT] Esperando que el agente arranque..."
 Start-Sleep -Seconds 5
@@ -112,7 +121,8 @@ if ($ok) {
 } else {
   Write-Warning ""
   Write-Warning "El agente no respondió al health check."
-  Write-Warning "Intenta abrir start-agent.bat en la carpeta pos-agent"
+  Write-Warning "Si usaste modo servicio, revisa el servicio '$ServiceName'."
+  Write-Warning "Si usaste modo tarea, intenta abrir start-agent.bat en la carpeta pos-agent"
   Write-Warning "y luego visita http://127.0.0.1:17891/health"
 }
 
