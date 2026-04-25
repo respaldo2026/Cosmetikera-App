@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } fr
 import dynamic from "next/dynamic";
 import {
   Card, Typography, Space, Tag, Row, Col, Statistic,
-  Table, Empty, Grid, Button, Avatar, Badge, Modal, Input, Form, App, DatePicker,
+  Table, Empty, Grid, Button, Avatar, Badge, Modal, Input, Form, App,
 } from "antd";
 import {
   UserOutlined, SearchOutlined, ReloadOutlined, EditOutlined,
@@ -62,6 +62,20 @@ function getProgreso(puntos: number) {
   const sig = NIVELES[idx + 1]!;
   const pct = Math.min(100, Math.round(((puntos - actual.min) / (sig.min - actual.min)) * 100));
   return { siguiente: sig, pct, faltantes: sig.min - puntos };
+}
+
+function parseDiaMesToIso(diaMes: string): string | null {
+  const match = /^(\d{2})\/(\d{2})$/.exec(String(diaMes || "").trim());
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const base = dayjs(`2000-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, "YYYY-MM-DD", true);
+  if (!base.isValid() || base.date() !== day || base.month() + 1 !== month) return null;
+
+  return base.format("YYYY-MM-DD");
 }
 
 // ─── Página principal ────────────────────────────────────────────────────
@@ -123,8 +137,7 @@ export default function ClientesPage() {
         telefono: values.telefono || null,
         telefono_2: values.telefono_2 || null,
         email: values.email || null,
-        fecha_nacimiento: values.fecha_nacimiento
-          ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD") : null,
+        fecha_nacimiento: parseDiaMesToIso(values.cumple_dia_mes || ""),
       };
       const datosNormalizados = normalizarDatosFormulario(datosParaGuardar);
       const res = await fetch("/api/perfiles", {
@@ -317,7 +330,7 @@ export default function ClientesPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="telefono" label="Teléfono principal" rules={[{ pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" }]}>
+              <Form.Item name="telefono" label="Teléfono principal" rules={[{ required: true, message: "El teléfono es obligatorio" }, { pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" }]}>
                 <Input prefix={<PhoneOutlined />} placeholder="3001234567" maxLength={15} />
               </Form.Item>
             </Col>
@@ -333,8 +346,15 @@ export default function ClientesPage() {
           <Form.Item name="email" label="Email">
             <Input prefix={<MailOutlined />} placeholder="correo@ejemplo.com" />
           </Form.Item>
-          <Form.Item name="fecha_nacimiento" label="Fecha de nacimiento">
-            <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="DD/MM/AAAA" />
+          <Form.Item
+            name="cumple_dia_mes"
+            label="Cumpleaños (día/mes)"
+            rules={[
+              { required: true, message: "El cumpleaños (día/mes) es obligatorio" },
+              { pattern: /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])$/, message: "Usa formato DD/MM" },
+            ]}
+          >
+            <Input placeholder="Ej: 07/11" maxLength={5} />
           </Form.Item>
           <div style={{ background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
             <Text style={{ fontSize: 12 }}>🌟 El cliente iniciará con <strong>0 puntos</strong></Text>

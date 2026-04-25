@@ -1337,7 +1337,14 @@ export default function VentasPage() {
           </Form.Item>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="telefono" label="Teléfono">
+              <Form.Item
+                name="telefono"
+                label="Teléfono"
+                rules={[
+                  { required: true, message: "El teléfono es obligatorio" },
+                  { pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" },
+                ]}
+              >
                 <Input placeholder="300 000 0000" />
               </Form.Item>
             </Col>
@@ -1347,6 +1354,16 @@ export default function VentasPage() {
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item
+            name="cumple_dia_mes"
+            label="Cumpleaños (día/mes)"
+            rules={[
+              { required: true, message: "El cumpleaños (día/mes) es obligatorio" },
+              { pattern: /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])$/, message: "Usa formato DD/MM" },
+            ]}
+          >
+            <Input placeholder="Ej: 07/11" maxLength={5} />
+          </Form.Item>
           <Form.Item
             name="codigo_referido"
             label={<Space size={4}><span>¿La refirió alguien?</span><span style={{ color: "#888", fontWeight: 400, fontSize: 12 }}>(opcional)</span></Space>}

@@ -16,6 +16,36 @@ function limpiarNumero(valor: unknown) {
   return digits || null;
 }
 
+function normalizarFechaNacimiento(valor: unknown): string | null {
+  if (typeof valor !== "string") return null;
+  const raw = valor.trim();
+  if (!raw) return null;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (iso) {
+    const y = Number(iso[1]);
+    const m = Number(iso[2]);
+    const d = Number(iso[3]);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d) {
+      return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    return null;
+  }
+
+  const dm = /^(\d{2})\/(\d{2})$/.exec(raw);
+  if (!dm) return null;
+
+  const day = Number(dm[1]);
+  const month = Number(dm[2]);
+  const dt = new Date(Date.UTC(2000, month - 1, day));
+  if (dt.getUTCFullYear() !== 2000 || dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) {
+    return null;
+  }
+
+  return `2000-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function normalizarPayload(body: Record<string, unknown>) {
   const payload = { ...body };
 
@@ -96,6 +126,7 @@ export async function POST(request: Request) {
 
     const cedulaNormalizada = limpiarNumero(cedula);
     const telefonoNormalizado = limpiarNumero(telefono);
+    const fechaNacimientoNormalizada = normalizarFechaNacimiento(fecha_nacimiento);
 
     if (!nombre_completo?.trim()) {
       return NextResponse.json(
@@ -118,9 +149,23 @@ export async function POST(request: Request) {
       );
     }
 
-    if (telefonoNormalizado && !/^\d{7,15}$/.test(telefonoNormalizado)) {
+    if (!telefonoNormalizado) {
+      return NextResponse.json(
+        { error: "El teléfono principal es obligatorio" },
+        { status: 400 }
+      );
+    }
+
+    if (!/^\d{7,15}$/.test(telefonoNormalizado)) {
       return NextResponse.json(
         { error: "El teléfono principal debe contener solo dígitos (7-15 caracteres)" },
+        { status: 400 }
+      );
+    }
+
+    if (!fechaNacimientoNormalizada) {
+      return NextResponse.json(
+        { error: "El cumpleaños (día/mes) es obligatorio y debe tener formato DD/MM" },
         { status: 400 }
       );
     }
@@ -134,7 +179,7 @@ export async function POST(request: Request) {
         telefono: telefonoNormalizado,
         email: email || null,
         cedula: cedulaNormalizada,
-        fecha_nacimiento: fecha_nacimiento || null,
+        fecha_nacimiento: fechaNacimientoNormalizada,
         rol,
         puntos_fidelidad,
         nivel_fidelidad,
