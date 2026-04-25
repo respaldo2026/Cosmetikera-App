@@ -39,13 +39,28 @@ try {
       Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
     }
     sc.exe delete $ServiceName | Out-Null
-    Start-Sleep -Seconds 2
+
+    $retry = 0
+    while ($retry -lt 10 -and (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) {
+      Start-Sleep -Seconds 1
+      $retry++
+    }
   }
 
-  sc.exe create $ServiceName binPath= $binPath start= auto DisplayName= "La Cosmetikera POS Agent" | Out-Null
-  sc.exe description $ServiceName "Agente local para imprimir tickets ESC/POS y abrir cajon de La Cosmetikera" | Out-Null
+  New-Service -Name $ServiceName -BinaryPathName $binPath -DisplayName "La Cosmetikera POS Agent" -Description "Agente local para imprimir tickets ESC/POS y abrir cajon de La Cosmetikera" -StartupType Automatic
+
+  # Configurar reintentos automáticos de recuperación.
   sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/5000/restart/5000 | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "No se pudo configurar la recuperación automática del servicio."
+  }
+
   Start-Service -Name $ServiceName
+
+  $installed = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+  if (-not $installed) {
+    throw "No se pudo crear el servicio '$ServiceName'."
+  }
 
   Write-Output "Servicio instalado y ejecutándose: $ServiceName"
 } catch {
