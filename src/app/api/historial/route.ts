@@ -16,7 +16,7 @@ export async function GET() {
     const [ventasRes, comprasRes, movimientosRes, puntosRes, canjesRes, perfilesRes, articulosRes] = await Promise.all([
       supabase
         .from("ventas")
-        .select("id,fecha,total,subtotal,descuento,metodo_pago,cliente_id,items,cliente:perfiles(nombre_completo,cedula)")
+        .select("id,numero_ticket,fecha,total,subtotal,descuento,metodo_pago,cliente_id,items,cliente:perfiles(nombre_completo,cedula)")
         .order("fecha", { ascending: false })
         .limit(3000),
       supabase

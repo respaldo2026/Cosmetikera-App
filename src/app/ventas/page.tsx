@@ -81,6 +81,16 @@ const getDetallePagoMixto = (pagoMixto: PagoMixto) =>
     .map(([clave, monto]) => `${METODO_PAGO_LABELS[clave as keyof typeof METODO_PAGO_LABELS]} $${Number(monto).toLocaleString()}`)
     .join(" · ");
 
+function getVentaNumero(venta?: { numero_ticket?: number | null; id?: string | null } | null): string {
+  const numero = Number(venta?.numero_ticket ?? 0);
+  if (Number.isFinite(numero) && numero >= 1000) {
+    return String(Math.trunc(numero));
+  }
+
+  const id = String(venta?.id || "");
+  return id ? id.slice(-6).toUpperCase() : "------";
+}
+
 const toCents = (valor: number) => Math.round(Number(valor || 0) * 100);
 const moneyEquals = (a: number, b: number) => toCents(a) === toCents(b);
 
@@ -110,6 +120,7 @@ export default function VentasPage() {
   const [voucherClub, setVoucherClub] = useState<ClubVoucher | null>(null);
   const [validandoVoucher, setValidandoVoucher] = useState(false);
   const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
+  const [ultimaVentaNumero, setUltimaVentaNumero] = useState<string | null>(null);
   const [ultimoTicket, setUltimoTicket] = useState<DatosTicket | null>(null);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [pagoMixto, setPagoMixto] = useState<PagoMixto>({ efectivo: 0, tarjeta: 0, transferencia: 0 });
@@ -391,6 +402,7 @@ export default function VentasPage() {
         .single();
 
       if (ventaErr) throw ventaErr;
+      const numeroVenta = getVentaNumero(venta as any);
 
       // Actualizar stock
       await Promise.all(carrito.map((i) =>
@@ -419,8 +431,8 @@ export default function VentasPage() {
         // Registrar en historial (service role)
         const tipo = esCumpleCliente ? "cumpleanos" : "ganados";
         const conceptoHistorial = esCumpleCliente
-          ? `Compra POS${venta?.id ? ` #${String(venta.id).slice(-6).toUpperCase()}` : ""} · ${multiplicadorCumple}x cumpleaños 🎂 (${puntosBase} base × ${multiplicadorCumple})`
-          : `Compra POS${venta?.id ? ` #${String(venta.id).slice(-6).toUpperCase()}` : ""} · $${totalFinal.toLocaleString()}`;
+          ? `Compra POS #${numeroVenta} · ${multiplicadorCumple}x cumpleaños 🎂 (${puntosBase} base × ${multiplicadorCumple})`
+          : `Compra POS #${numeroVenta} · $${totalFinal.toLocaleString()}`;
 
         fetch("/api/club/puntos", {
           method: "POST",
@@ -450,7 +462,7 @@ export default function VentasPage() {
           fecha: dayjs().format("YYYY-MM-DD"),
           tipo: "ingreso",
           monto: totalFinal,
-          concepto: `Venta POS ${venta?.id ? `#${String(venta.id).slice(-6).toUpperCase()}` : ""}`.trim(),
+          concepto: `Venta POS #${numeroVenta}`,
           categoria: "ventas",
           metodo_pago: metodoPagoPersistido,
           referencia: venta?.id || null,
@@ -490,7 +502,7 @@ export default function VentasPage() {
 
       const ticketBase: DatosTicket = {
         nombreTienda: "La Cosmetikera",
-        numeroVenta: venta?.id?.slice(-6).toUpperCase() ?? "------",
+        numeroVenta,
         fecha: dayjs().format("DD/MM/YYYY HH:mm"),
         cliente: clienteSeleccionado?.nombre_completo,
         metodoPago: metodoPago === "mixto" ? `Mixto (${getDetallePagoMixto(pagoMixto)})` : metodoPago,
@@ -533,6 +545,7 @@ export default function VentasPage() {
       const ticketDatos = aplicarPlantillaTicketPOS(ticketBase, ticketTemplate);
 
       setUltimaVentaId(venta?.id ?? null);
+      setUltimaVentaNumero(numeroVenta);
       setUltimoTicket(ticketDatos);
       lanzarProcesosPOS(ticketDatos, metodoPago === "efectivo");
       setModalPagoOpen(false);
@@ -572,7 +585,7 @@ export default function VentasPage() {
 
     const ticketBase = ultimoTicket || {
       nombreTienda: "La Cosmetikera",
-      numeroVenta: ultimaVentaId?.slice(-6).toUpperCase() ?? "------",
+      numeroVenta: ultimaVentaNumero ?? (ultimaVentaId ? String(ultimaVentaId).slice(-6).toUpperCase() : "------"),
       fecha: dayjs().format("DD/MM/YYYY HH:mm"),
       metodoPago,
       mensaje: "¡Gracias por tu compra en La Cosmetikera!",

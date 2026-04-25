@@ -73,6 +73,7 @@ type VentaItem = {
 
 type Venta = {
   id: string;
+  numero_ticket?: number | null;
   fecha: string;
   total: number;
   subtotal?: number;
@@ -179,6 +180,15 @@ type HistorialEntry = {
   items?: VentaItem[] | Array<{ nombre: string; cantidad: number; precio_unitario: number }> | null;
   raw: Venta | Compra | Movimiento | Punto | Canje;
 };
+
+function getVentaTicketLabel(venta: Venta): string {
+  const numero = Number(venta.numero_ticket ?? 0);
+  if (Number.isFinite(numero) && numero >= 1000) {
+    return String(Math.trunc(numero));
+  }
+
+  return venta.id.slice(-6).toUpperCase();
+}
 
 const TIPO_META: Record<TipoOperacion, { label: string; color: string; icon: React.ReactNode }> = {
   venta: { label: "Venta", color: "magenta", icon: <ShoppingCartOutlined /> },
@@ -435,7 +445,7 @@ export default function HistorialPage() {
       key: `venta-${venta.id}`,
       tipo: "venta",
       fecha: venta.fecha,
-      titulo: `Venta POS #${venta.id.slice(-6).toUpperCase()}`,
+      titulo: `Venta POS #${getVentaTicketLabel(venta)}`,
       detalle: buildItemSummary(venta.items || []),
       tercero: venta.cliente?.nombre_completo || "Venta sin cliente",
       terceroId: venta.cliente_id || null,
