@@ -708,6 +708,7 @@ export default function ConfiguracionPage() {
         setConfiguracionId(idParaGuardar);
       }
 
+      invalidarConfigTicketPOS();
       messageApi.success("Configuración guardada correctamente");
       cargarConfiguracionAcademia();
     } catch (error: any) {
