@@ -87,7 +87,15 @@ function runPrinterAction(payload) {
 
 function enqueueAction(payload) {
   return new Promise((resolve, reject) => {
-    actionQueue.push({ payload, resolve, reject });
+    const entry = { payload, resolve, reject };
+
+    // El cajon tiene prioridad para mejorar tiempo percibido en caja.
+    if (payload?.action === "openDrawer") {
+      actionQueue.unshift(entry);
+    } else {
+      actionQueue.push(entry);
+    }
+
     processQueue();
   });
 }

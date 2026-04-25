@@ -162,33 +162,44 @@ interface PosConfig {
 }
 
 let cachedPosConfig: PosConfig | null = null;
+let cachedPosConfigPromise: Promise<PosConfig> | null = null;
 
 /** Carga la config de impresora desde la tabla `configuracion` de Supabase. */
 export async function cargarConfigPOS(): Promise<PosConfig> {
   if (cachedPosConfig) return cachedPosConfig;
-  try {
-    const { supabaseBrowserClient } = await import("@utils/supabase/client");
-    const { data } = await supabaseBrowserClient
-      .from("configuracion")
-      .select("pos_printer_name, pos_printer_width")
-      .limit(1)
-      .maybeSingle();
-    cachedPosConfig = {
-      printerName: data?.pos_printer_name ?? process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null,
-      printerWidth: data?.pos_printer_width ?? Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 48),
-    };
-  } catch {
-    cachedPosConfig = {
-      printerName: process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null,
-      printerWidth: Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 48),
-    };
-  }
-  return cachedPosConfig;
+  if (cachedPosConfigPromise) return cachedPosConfigPromise;
+
+  cachedPosConfigPromise = (async () => {
+    try {
+      const { supabaseBrowserClient } = await import("@utils/supabase/client");
+      const { data } = await supabaseBrowserClient
+        .from("configuracion")
+        .select("pos_printer_name, pos_printer_width")
+        .limit(1)
+        .maybeSingle();
+      cachedPosConfig = {
+        printerName: data?.pos_printer_name ?? process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null,
+        printerWidth: data?.pos_printer_width ?? Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 48),
+      };
+    } catch {
+      cachedPosConfig = {
+        printerName: process.env.NEXT_PUBLIC_POS_PRINTER_NAME ?? null,
+        printerWidth: Number(process.env.NEXT_PUBLIC_POS_PRINTER_WIDTH ?? 48),
+      };
+    }
+
+    return cachedPosConfig;
+  })().finally(() => {
+    cachedPosConfigPromise = null;
+  });
+
+  return cachedPosConfigPromise;
 }
 
 /** Invalida el caché para que la próxima impresión relean la config. */
 export function invalidarConfigPOS(): void {
   cachedPosConfig = null;
+  cachedPosConfigPromise = null;
 }
 
 /** Lista todas las impresoras disponibles en QZ Tray. */

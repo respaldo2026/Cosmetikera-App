@@ -125,6 +125,16 @@ export default function VentasPage() {
   const lanzarProcesosPOS = useCallback((ticket: DatosTicket, debeAbrirCajon: boolean) => {
     const tareas: Promise<unknown>[] = [];
 
+    if (debeAbrirCajon && permiteCajon) {
+      tareas.push(
+        abrirCajon().then((result) => {
+          if (!result.ok) {
+            console.warn("[POS] Venta registrada, pero el cajón no respondió:", result.error ?? "sin detalle");
+          }
+        }).catch(() => {})
+      );
+    }
+
     if (permiteImpresionSilenciosa) {
       tareas.push(
         imprimirTicketTermico(ticket, undefined, undefined, { allowBrowserFallback: false })
@@ -136,16 +146,6 @@ export default function VentasPage() {
           .catch((error: any) => {
             console.warn("[POS] Venta registrada, pero el ticket no se imprimió:", error?.message ?? "sin detalle");
           })
-      );
-    }
-
-    if (debeAbrirCajon && permiteCajon) {
-      tareas.push(
-        abrirCajon().then((result) => {
-          if (!result.ok) {
-            console.warn("[POS] Venta registrada, pero el cajón no respondió:", result.error ?? "sin detalle");
-          }
-        }).catch(() => {})
       );
     }
 
