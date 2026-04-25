@@ -305,12 +305,24 @@ export default function MarketingCenterPage() {
       const values = await form.validateFields();
       setSaving(true);
 
+      const urlLimpia = values.url_archivo.trim();
+      const nombreArchivo = (() => {
+        try {
+          const segmento = new URL(urlLimpia).pathname.split("/").filter(Boolean).pop();
+          return segmento ? decodeURIComponent(segmento) : values.titulo.trim();
+        } catch {
+          const segmento = urlLimpia.split("/").filter(Boolean).pop();
+          return segmento ? segmento : values.titulo.trim();
+        }
+      })();
+
       const payload = {
         titulo: values.titulo.trim(),
         descripcion: values.descripcion?.trim() || null,
         descripcion_ia: values.descripcion_ia?.trim() || null,
         tipo_asset: values.tipo_asset,
-        url_archivo: values.url_archivo.trim(),
+        url_archivo: urlLimpia,
+        nombre_archivo: nombreArchivo,
         categoria: values.categoria?.trim() || null,
         keywords: values.keywords
           ? values.keywords.split(",").map((item) => item.trim()).filter(Boolean)
