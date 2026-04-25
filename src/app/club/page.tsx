@@ -565,8 +565,10 @@ export default function ClubPage() {
 
       {!cliente && (
         <Card style={{ width: "100%", maxWidth: 560, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 24 }}>
-          <Title level={5} style={{ marginTop: 0 }}>Consulta y canjea tus beneficios</Title>
-          <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>Ingresa tu cédula para abrir tu wallet del club. El teléfono se pedirá solo cuando uses puntos o beneficios.</Text>
+          <Space direction="vertical" size={4} style={{ marginBottom: 16 }}>
+            <Title level={5} style={{ marginTop: 0, marginBottom: 0 }}>Ingresa tu número de cédula</Title>
+            <Text type="secondary" style={{ fontSize: 13 }}>No necesitas correo ni contraseña. Solo escribe tu cédula y listo.</Text>
+          </Space>
           <Form onFinish={buscar}>
             <Space.Compact style={{ width: "100%" }}>
               <Input
@@ -576,9 +578,12 @@ export default function ClubPage() {
                 onChange={(event) => setAcceso(event.target.value.replace(/\D/g, ""))}
                 size="large"
                 maxLength={15}
+                inputMode="numeric"
+                autoFocus
+                autoComplete="off"
               />
               <Button type="primary" size="large" loading={buscando} onClick={buscar} style={{ background: BRAND_FUCHSIA, borderColor: BRAND_FUCHSIA }}>
-                Buscar
+                Entrar
               </Button>
             </Space.Compact>
           </Form>
@@ -646,7 +651,7 @@ export default function ClubPage() {
                     }}
                     style={{ marginTop: 4, color: "#888", borderColor: "#ddd", fontSize: 11 }}
                   >
-                    ← Cambiar dato de acceso
+                    ← Cambiar cédula
                   </Button>
                 </Space>
               </Col>

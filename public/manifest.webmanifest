@@ -1,10 +1,11 @@
 {
   "name": "Club La Cosmetikera",
   "short_name": "Cosmetikera",
-  "start_url": "/login",
+  "start_url": "/club",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ff2aa1",
+  "background_color": "#fff0f8",
+  "theme_color": "#d81b87",
   "icons": [
     {
       "src": "/icon.svg?v=2",
