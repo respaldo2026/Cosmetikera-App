@@ -145,6 +145,25 @@ export default function MarketingCenterPage() {
   const [previewAsset, setPreviewAsset] = useState<MarketingAsset | null>(null);
   const [editingAsset, setEditingAsset] = useState<MarketingAsset | null>(null);
 
+  // ── Push inteligente ──
+  const [pushInteligente, setPushInteligente] = useState<{
+    cargando: boolean;
+    resultado: null | { enviadas: number; sin_historial: number; suscripciones_inactivas: number; detalle: Array<{ perfil_id: string; estado: string; mensaje?: string }> };
+    error: string | null;
+  }>({ cargando: false, resultado: null, error: null });
+
+  const lanzarPushInteligente = useCallback(async () => {
+    setPushInteligente({ cargando: true, resultado: null, error: null });
+    try {
+      const res = await fetch("/api/club/push-inteligente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error enviando push");
+      setPushInteligente({ cargando: false, resultado: json, error: null });
+    } catch (err: unknown) {
+      setPushInteligente({ cargando: false, resultado: null, error: err instanceof Error ? err.message : "Error desconocido" });
+    }
+  }, []);
+
   const cargarAssets = useCallback(async () => {
     setLoadingAssets(true);
     const { data, error } = await supabaseBrowserClient
@@ -686,6 +705,118 @@ export default function MarketingCenterPage() {
                       </Col>
                     )) : <Col span={24}><Empty description="Sin productos para destacar" /></Col>}
                   </Row>
+                </Card>
+              </Space>
+            ),
+          },
+          {
+            key: "notificaciones-ia",
+            label: <Space size={4}><BellOutlined />Notificaciones IA</Space>,
+            children: (
+              <Space direction="vertical" size={20} style={{ width: "100%" }}>
+                <Card style={cardStyle} styles={{ body: { padding: 24 } }}>
+                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                    <Space size={10} align="start">
+                      <div style={{ width: 44, height: 44, borderRadius: 14, background: "linear-gradient(135deg,#d81b87,#ff5ea8)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <BellOutlined style={{ color: "#fff", fontSize: 20 }} />
+                      </div>
+                      <div>
+                        <Title level={5} style={{ margin: 0 }}>Notificaciones inteligentes personalizadas</Title>
+                        <Paragraph style={{ margin: 0, color: "#888", fontSize: 13 }}>
+                          El sistema analiza el historial de compra de cada clienta, estima si ya se le agotó el producto según la categoría,
+                          y usa IA (Gemini) para redactar un mensaje personalizado. Solo se notifica a quienes tienen la app instalada y el push activo.
+                        </Paragraph>
+                      </div>
+                    </Space>
+                    <Row gutter={[12, 12]}>
+                      {[
+                        { icon: "🔍", titulo: "Historial real",        desc: "Lee las últimas 180 días de compras de cada clienta." },
+                        { icon: "⏱️", titulo: "Duración estimada",     desc: "Shampoo ~45 días · Tinte ~35 días · Base ~90 días, etc." },
+                        { icon: "🤖", titulo: "Texto con IA",          desc: "Gemini genera el copy personalizado para cada clienta." },
+                        { icon: "📲", titulo: "Push individual",       desc: "Cada clienta recibe su propio mensaje, no una campaña masiva." },
+                      ].map((item) => (
+                        <Col xs={24} sm={12} key={item.titulo}>
+                          <Card size="small" style={{ borderRadius: 12, background: "#fff8fc", border: "1px solid #ffd6e7" }}>
+                            <Space size={8}>
+                              <span style={{ fontSize: 22 }}>{item.icon}</span>
+                              <div>
+                                <Text strong style={{ fontSize: 13 }}>{item.titulo}</Text>
+                                <div><Text type="secondary" style={{ fontSize: 12 }}>{item.desc}</Text></div>
+                              </div>
+                            </Space>
+                          </Card>
+                        </Col>
+                      ))}
+                    </Row>
+
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="¿Cuándo se envía?"
+                      description="Solo se envía push a clientas cuyo producto estimado lleva más del 85% de su tiempo de uso. Las demás se omiten para evitar spam."
+                      style={{ borderRadius: 12 }}
+                    />
+
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<RocketOutlined />}
+                      loading={pushInteligente.cargando}
+                      onClick={() => void lanzarPushInteligente()}
+                      style={{ background: "#d81b87", borderColor: "#d81b87" }}
+                    >
+                      {pushInteligente.cargando ? "Analizando y enviando..." : "Lanzar notificaciones inteligentes"}
+                    </Button>
+
+                    {pushInteligente.error && (
+                      <Alert type="error" showIcon message={pushInteligente.error} style={{ borderRadius: 12 }} />
+                    )}
+
+                    {pushInteligente.resultado && (
+                      <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                        <Row gutter={[12, 12]}>
+                          <Col xs={8}>
+                            <Card size="small" style={{ borderRadius: 12, textAlign: "center" }}>
+                              <Statistic title="Enviadas" value={pushInteligente.resultado.enviadas} valueStyle={{ color: "#52c41a" }} />
+                            </Card>
+                          </Col>
+                          <Col xs={8}>
+                            <Card size="small" style={{ borderRadius: 12, textAlign: "center" }}>
+                              <Statistic title="Sin historial" value={pushInteligente.resultado.sin_historial} valueStyle={{ color: "#faad14" }} />
+                            </Card>
+                          </Col>
+                          <Col xs={8}>
+                            <Card size="small" style={{ borderRadius: 12, textAlign: "center" }}>
+                              <Statistic title="Subs expiradas" value={pushInteligente.resultado.suscripciones_inactivas} valueStyle={{ color: "#ff4d4f" }} />
+                            </Card>
+                          </Col>
+                        </Row>
+                        <Card
+                          size="small"
+                          title="Detalle por clienta"
+                          style={{ borderRadius: 12, maxHeight: 320, overflow: "auto" }}
+                        >
+                          <Space direction="vertical" size={6} style={{ width: "100%" }}>
+                            {pushInteligente.resultado.detalle.map((d) => (
+                              <Row key={d.perfil_id} justify="space-between" wrap={false}>
+                                <Col flex="auto" style={{ minWidth: 0 }}>
+                                  <Text ellipsis style={{ fontSize: 12 }}>{d.mensaje ?? "—"}</Text>
+                                </Col>
+                                <Col style={{ flexShrink: 0, marginLeft: 8 }}>
+                                  <Tag
+                                    color={d.estado === "enviada" ? "green" : d.estado === "sin_historial" ? "orange" : "default"}
+                                    style={{ fontSize: 11 }}
+                                  >
+                                    {d.estado}
+                                  </Tag>
+                                </Col>
+                              </Row>
+                            ))}
+                          </Space>
+                        </Card>
+                      </Space>
+                    )}
+                  </Space>
                 </Card>
               </Space>
             ),
