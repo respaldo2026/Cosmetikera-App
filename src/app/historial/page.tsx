@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useDeferredValue } from "react";
 import dynamic from "next/dynamic";
 import {
   App,
@@ -398,6 +398,7 @@ export default function HistorialPage() {
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [tipoFiltro, setTipoFiltro] = useState<TipoOperacion | undefined>(undefined);
   const [direccionFiltro, setDireccionFiltro] = useState<DireccionOperacion | undefined>(undefined);
   const [periodo, setPeriodo] = useState<PeriodoRapido>("mes");
@@ -548,7 +549,7 @@ export default function HistorialPage() {
   }, [data]);
 
   const operacionesBaseFiltradas = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = deferredSearch.trim().toLowerCase();
 
     return operaciones.filter((operacion) => {
       const matchTipo = !tipoFiltro || operacion.tipo === tipoFiltro;
@@ -566,7 +567,7 @@ export default function HistorialPage() {
 
       return matchTipo && matchDireccion && matchSearch;
     });
-  }, [direccionFiltro, operaciones, search, tipoFiltro]);
+  }, [deferredSearch, direccionFiltro, operaciones, tipoFiltro]);
 
   const periodRanges = useMemo(
     () => getCurrentAndPreviousRanges(periodo, rango),

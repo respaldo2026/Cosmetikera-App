@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from "react";
 import {
   Card, Button, Typography, Space, Input, Select, Tag, App, Spin,
   Row, Col, Statistic, Divider, Grid, Tooltip, Avatar, Badge,
@@ -179,6 +179,36 @@ export default function VentasPage() {
     void cargarConfigTicketPOS().catch(() => {});
   }, []);
 
+  const deferredSearch = useDeferredValue(search);
+
+  const clientesBusqueda = useMemo(
+    () => clientes.map((c) => ({
+      ...c,
+      searchText: `${c.nombre_completo || ""} ${c.cedula || ""} ${c.telefono || ""}`.toLowerCase(),
+      telefonoDigits: (c.telefono || "").replace(/\D/g, ""),
+    })),
+    [clientes]
+  );
+
+  const opcionesClientesRapidos = useMemo(
+    () => clientesFiltrados.map((c) => ({
+      value: c.id,
+      label: c.nombre_completo,
+      subtitle: [c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · "),
+    })),
+    [clientesFiltrados]
+  );
+
+  const opcionesClientesCobro = useMemo(
+    () => clientes.map((c) => ({
+      value: c.id,
+      label: c.nombre_completo,
+      searchText: `${c.nombre_completo || ""} ${c.cedula || ""} ${c.telefono || ""}`.toLowerCase(),
+      subtitle: [c.cedula ? `CC ${c.cedula}` : null, c.telefono || null].filter(Boolean).join(" · "),
+    })),
+    [clientes]
+  );
+
   useEffect(() => {
     if (!voucherClub) return;
     if (!clienteId || voucherClub.perfilId !== clienteId) {
@@ -276,7 +306,11 @@ export default function VentasPage() {
     setLoading(true);
     try {
       const [{ data: arts, error: artsError }, clientesRes] = await Promise.all([
-        supabaseBrowserClient.from("articulos").select("*").eq("activo", true).order("nombre"),
+        supabaseBrowserClient
+          .from("articulos")
+          .select("id,nombre,precio_venta,stock,categoria,marca,imagen_url,referencia,codigo_barras,activo")
+          .eq("activo", true)
+          .order("nombre"),
         fetch("/api/perfiles?rol=cliente").then(async (r) => {
           if (!r.ok) {
             const body = await r.text();
@@ -306,13 +340,14 @@ export default function VentasPage() {
 
   const articulosFiltrados = useMemo(() =>
     articulos.filter((a) => {
-      const matchSearch = !search ||
-        a.nombre.toLowerCase().includes(search.toLowerCase()) ||
-        (a.marca || "").toLowerCase().includes(search.toLowerCase());
+      const query = deferredSearch.toLowerCase();
+      const matchSearch = !query ||
+        a.nombre.toLowerCase().includes(query) ||
+        (a.marca || "").toLowerCase().includes(query);
       const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
       return matchSearch && matchCat;
     }),
-    [articulos, search, filtroCategoria]
+    [articulos, deferredSearch, filtroCategoria]
   );
 
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
@@ -782,27 +817,25 @@ export default function VentasPage() {
                 }
                 const ql = q.toLowerCase();
                 const qd = q.replace(/\D/g, "");
-                const matches = clientes
+                const matches = clientesBusqueda
                   .filter((c) =>
-                    c.nombre_completo.toLowerCase().includes(ql) ||
-                    (c.cedula || "").toLowerCase().includes(ql) ||
-                    (qd && (c.telefono || "").replace(/\D/g, "").includes(qd))
+                    c.searchText.includes(ql) ||
+                    (qd && c.telefonoDigits.includes(qd))
                   )
+                  .map(({ searchText, telefonoDigits, ...cliente }) => cliente)
                   .slice(0, 5);
                 setClientesFiltrados(matches);
               }}
               optionRender={(opt) => {
-                const c = clientes.find((x) => x.id === opt.value);
+                const c = (opt as any).data;
                 return (
                   <div style={{ lineHeight: 1.4, padding: "2px 0" }}>
-                    <div style={{ fontWeight: 600 }}>{c?.nombre_completo}</div>
-                    <div style={{ fontSize: 11, color: "#888" }}>
-                      {[c?.cedula ? `CC ${c.cedula}` : null, c?.telefono || null].filter(Boolean).join(" · ")}
-                    </div>
+                    <div style={{ fontWeight: 600 }}>{c?.label}</div>
+                    {c?.subtitle && <div style={{ fontSize: 11, color: "#888" }}>{c.subtitle}</div>}
                   </div>
                 );
               }}
-              options={clientesFiltrados.map((c) => ({ value: c.id, label: c.nombre_completo }))}
+              options={opcionesClientesRapidos}
             />
           </Col>
           <Col>
@@ -1134,26 +1167,18 @@ export default function VentasPage() {
                   filterOption={(input, opt) => {
                     const q = input.toLowerCase().trim();
                     if (!q) return true;
-                    const c = clientes.find((x) => x.id === opt?.value);
-                    if (!c) return false;
-                    return (
-                      c.nombre_completo.toLowerCase().includes(q) ||
-                      (c.cedula || "").toLowerCase().includes(q) ||
-                      (c.telefono || "").replace(/\D/g, "").includes(q.replace(/\D/g, ""))
-                    );
+                    return String((opt as any)?.searchText || "").includes(q);
                   }}
                   optionRender={(opt) => {
-                    const c = clientes.find((x) => x.id === opt.value);
+                    const c = (opt as any).data;
                     return (
                       <div style={{ lineHeight: 1.3 }}>
-                        <div style={{ fontWeight: 500 }}>{c?.nombre_completo}</div>
-                        <div style={{ fontSize: 11, color: "#888" }}>
-                          {[c?.cedula ? `CC ${c.cedula}` : null, c?.telefono || null].filter(Boolean).join(" · ")}
-                        </div>
+                        <div style={{ fontWeight: 500 }}>{c?.label}</div>
+                        {c?.subtitle && <div style={{ fontSize: 11, color: "#888" }}>{c.subtitle}</div>}
                       </div>
                     );
                   }}
-                  options={clientes.map((c) => ({ value: c.id, label: c.nombre_completo }))}
+                  options={opcionesClientesCobro}
                 />
               </Col>
               <Col>

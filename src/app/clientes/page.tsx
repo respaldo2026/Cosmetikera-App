@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from "react";
 import dynamic from "next/dynamic";
 import {
   Card, Typography, Space, Tag, Row, Col, Statistic,
@@ -78,6 +78,7 @@ export default function ClientesPage() {
   const [creando, setCreando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [formNuevo] = Form.useForm();
+  const deferredSearch = useDeferredValue(search);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -90,14 +91,20 @@ export default function ClientesPage() {
   useEffect(() => { cargar(); }, [cargar]);
 
   const filtrados = useMemo(() =>
-    clientes.filter((c) =>
-      !search ||
-      c.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
-      (c.cedula || "").includes(search) ||
-      (c.telefono || "").includes(search) ||
-      (c.telefono_2 || "").includes(search) ||
-      (c.email || "").toLowerCase().includes(search.toLowerCase())
-    ), [clientes, search]);
+    clientes.filter((c) => {
+      const query = deferredSearch.trim().toLowerCase();
+      if (!query) return true;
+
+      return (
+        c.nombre_completo.toLowerCase().includes(query) ||
+        (c.cedula || "").includes(query) ||
+        (c.telefono || "").includes(query) ||
+        (c.telefono_2 || "").includes(query) ||
+        (c.email || "").toLowerCase().includes(query)
+      );
+    }),
+    [clientes, deferredSearch]
+  );
 
   const estadisticas = useMemo(() => ({
     total: clientes.length,
