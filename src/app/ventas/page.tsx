@@ -94,6 +94,26 @@ function getVentaNumero(venta?: { numero_ticket?: number | null; id?: string | n
 const toCents = (valor: number) => Math.round(Number(valor || 0) * 100);
 const moneyEquals = (a: number, b: number) => toCents(a) === toCents(b);
 
+function parseDiaMesToIso(diaMes: string): string | null {
+  const match = /^(\d{2})\/(\d{2})$/.exec(String(diaMes || "").trim());
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const base = dayjs(`2000-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, "YYYY-MM-DD", true);
+  if (!base.isValid() || base.date() !== day || base.month() + 1 !== month) return null;
+
+  return base.format("YYYY-MM-DD");
+}
+
+function formatDiaMesInput(value: string): string {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
 export default function VentasPage() {
   const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
   const permiteCajon = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
@@ -219,8 +239,16 @@ export default function VentasPage() {
     const values = await nuevoClienteForm.validateFields();
     setCreandoCliente(true);
     try {
-      const { codigo_referido, ...clienteData } = values;
-      const datosNormalizados = normalizarDatosFormulario(clienteData);
+      const { codigo_referido, cumple_dia_mes, ...clienteData } = values;
+      const fecha_nacimiento = parseDiaMesToIso(cumple_dia_mes || "");
+      if (!fecha_nacimiento) {
+        throw new Error("El cumpleaños (día/mes) es obligatorio y debe tener formato DD/MM");
+      }
+
+      const datosNormalizados = normalizarDatosFormulario({
+        ...clienteData,
+        fecha_nacimiento,
+      });
       const res = await fetch("/api/perfiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1326,7 +1354,7 @@ export default function VentasPage() {
             label="Nombre completo"
             rules={[{ required: true, message: "El nombre es requerido" }]}
           >
-            <Input placeholder="Ej: María García" prefix={<UserOutlined />} />
+            <Input placeholder="Ej: María García" prefix={<UserOutlined />} autoFocus />
           </Form.Item>
           <Form.Item
             name="cedula"
@@ -1357,12 +1385,21 @@ export default function VentasPage() {
           <Form.Item
             name="cumple_dia_mes"
             label="Cumpleaños (día/mes)"
+            getValueFromEvent={(e) => formatDiaMesInput(e?.target?.value)}
             rules={[
               { required: true, message: "El cumpleaños (día/mes) es obligatorio" },
               { pattern: /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])$/, message: "Usa formato DD/MM" },
             ]}
           >
-            <Input placeholder="Ej: 07/11" maxLength={5} />
+            <Input
+              placeholder="Ej: 07/11"
+              maxLength={5}
+              inputMode="numeric"
+              onPressEnter={() => {
+                const v = nuevoClienteForm.getFieldValue("cumple_dia_mes");
+                if (typeof v === "string" && v.length === 5) crearClienteRapido();
+              }}
+            />
           </Form.Item>
           <Form.Item
             name="codigo_referido"

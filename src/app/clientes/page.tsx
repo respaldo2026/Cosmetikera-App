@@ -78,6 +78,12 @@ function parseDiaMesToIso(diaMes: string): string | null {
   return base.format("YYYY-MM-DD");
 }
 
+function formatDiaMesInput(value: string): string {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
 // ─── Página principal ────────────────────────────────────────────────────
 
 export default function ClientesPage() {
@@ -321,7 +327,7 @@ export default function ClientesPage() {
       >
         <Form form={formNuevo} layout="vertical" style={{ marginTop: 12 }}>
           <Form.Item name="nombre_completo" label="Nombre completo" rules={[{ required: true, message: "Campo obligatorio" }]}>
-            <Input prefix={<UserOutlined />} placeholder="Ej: María García" />
+            <Input prefix={<UserOutlined />} placeholder="Ej: María García" autoFocus />
           </Form.Item>
           <Row gutter={12}>
             <Col span={12}>
@@ -349,12 +355,21 @@ export default function ClientesPage() {
           <Form.Item
             name="cumple_dia_mes"
             label="Cumpleaños (día/mes)"
+            getValueFromEvent={(e) => formatDiaMesInput(e?.target?.value)}
             rules={[
               { required: true, message: "El cumpleaños (día/mes) es obligatorio" },
               { pattern: /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])$/, message: "Usa formato DD/MM" },
             ]}
           >
-            <Input placeholder="Ej: 07/11" maxLength={5} />
+            <Input
+              placeholder="Ej: 07/11"
+              maxLength={5}
+              inputMode="numeric"
+              onPressEnter={() => {
+                const v = formNuevo.getFieldValue("cumple_dia_mes");
+                if (typeof v === "string" && v.length === 5) crearCliente();
+              }}
+            />
           </Form.Item>
           <div style={{ background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
             <Text style={{ fontSize: 12 }}>🌟 El cliente iniciará con <strong>0 puntos</strong></Text>
