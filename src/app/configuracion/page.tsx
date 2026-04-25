@@ -7,6 +7,7 @@ import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd/es/_util/responsiveObserver";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
 import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
@@ -697,9 +698,10 @@ export default function ConfiguracionPage() {
         }
       }
 
+      const datosNormalizados = normalizarDatosFormulario({ ...valuesSinId, ticket_campos: ticketFields });
       const { error } = await supabaseBrowserClient
         .from("configuracion")
-        .upsert({ ...valuesSinId, id: idParaGuardar, ticket_campos: ticketFields });
+        .upsert({ ...datosNormalizados, id: idParaGuardar });
 
       if (error) throw error;
 

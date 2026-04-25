@@ -12,6 +12,7 @@ import {
   SaveOutlined, CloseOutlined, IdcardOutlined, RightOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 
@@ -109,18 +110,20 @@ export default function ClientesPage() {
     try {
       const values = await formNuevo.validateFields();
       setGuardando(true);
+      const datosParaGuardar = {
+        nombre_completo: values.nombre_completo,
+        cedula: values.cedula || null,
+        telefono: values.telefono || null,
+        telefono_2: values.telefono_2 || null,
+        email: values.email || null,
+        fecha_nacimiento: values.fecha_nacimiento
+          ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD") : null,
+      };
+      const datosNormalizados = normalizarDatosFormulario(datosParaGuardar);
       const res = await fetch("/api/perfiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre_completo: values.nombre_completo,
-          cedula: values.cedula || null,
-          telefono: values.telefono || null,
-          telefono_2: values.telefono_2 || null,
-          email: values.email || null,
-          fecha_nacimiento: values.fecha_nacimiento
-            ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD") : null,
-        }),
+        body: JSON.stringify(datosNormalizados),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al crear");

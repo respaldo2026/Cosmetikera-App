@@ -13,6 +13,7 @@ import {
   GiftOutlined, CrownOutlined, ReloadOutlined, ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
 import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, DatosTicket } from "@utils/pos-hardware";
@@ -170,10 +171,11 @@ export default function VentasPage() {
     setCreandoCliente(true);
     try {
       const { codigo_referido, ...clienteData } = values;
+      const datosNormalizados = normalizarDatosFormulario(clienteData);
       const res = await fetch("/api/perfiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...clienteData, rol: "cliente", activo: true }),
+        body: JSON.stringify({ ...datosNormalizados, rol: "cliente", activo: true }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al crear cliente");

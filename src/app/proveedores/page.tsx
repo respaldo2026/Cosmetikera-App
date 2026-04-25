@@ -12,6 +12,7 @@ import {
   GlobalOutlined, WhatsAppOutlined, ShopOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { normalizarDatosFormulario } from "@utils/form-normalizer";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -71,12 +72,13 @@ export default function ProveedoresPage() {
     const values = await form.validateFields();
     setSaving(true);
     try {
+      const datosNormalizados = normalizarDatosFormulario(values);
       if (editing) {
-        const { error } = await supabaseBrowserClient.from("proveedores").update(values).eq("id", editing.id);
+        const { error } = await supabaseBrowserClient.from("proveedores").update(datosNormalizados).eq("id", editing.id);
         if (error) throw error;
         message.success("Proveedor actualizado");
       } else {
-        const { error } = await supabaseBrowserClient.from("proveedores").insert([values]);
+        const { error } = await supabaseBrowserClient.from("proveedores").insert([datosNormalizados]);
         if (error) throw error;
         message.success("Proveedor creado");
       }

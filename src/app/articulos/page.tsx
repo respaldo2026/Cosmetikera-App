@@ -15,6 +15,7 @@ import {
   FileExcelOutlined, UploadOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { useRouter } from "next/navigation";
 
 let xlsxModulePromise: Promise<typeof import("xlsx")> | null = null;
@@ -362,13 +363,14 @@ export default function ArticulosPage() {
     if (Array.isArray(values.categoria)) {
       values.categoria = values.categoria[0] ?? undefined;
     }
+    const datosNormalizados = normalizarDatosFormulario(values);
     setSaving(true);
     try {
       if (editing) {
         const res = await fetch(`/api/articulos?id=${editing.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values),
+          body: JSON.stringify(datosNormalizados),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Error al actualizar");
@@ -377,7 +379,7 @@ export default function ArticulosPage() {
         const res = await fetch("/api/articulos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ articulo: values }),
+          body: JSON.stringify({ articulo: datosNormalizados }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Error al crear");

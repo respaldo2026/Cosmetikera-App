@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Card, Button, Form, Input, Select, Table, message, Modal, Spin, Tag } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { normalizarDatosFormulario } from "@utils/form-normalizer";
 
 const { Option } = Select;
 
@@ -69,25 +70,26 @@ export default function AdministradoresPage() {
     try {
       const values = await form.validateFields();
       setSubmitting(true);
+      const datosNormalizados = normalizarDatosFormulario(values);
 
       if (editingAdmin) {
         const { error } = await supabaseBrowserClient
           .from("perfiles")
-          .update(values)
+          .update(datosNormalizados)
           .eq("id", editingAdmin.id);
         if (error) throw error;
         message.success("Administrador actualizado");
       } else {
         // Crear usuario en auth primero
         const { error } = await supabaseBrowserClient.auth.signUp({
-          email: values.email,
+          email: datosNormalizados.email,
           password: values.password,
           options: {
             data: {
-              nombre_completo: values.nombre_completo,
-              rol: values.rol,
-              identificacion: values.identificacion,
-              telefono: values.telefono,
+              nombre_completo: datosNormalizados.nombre_completo,
+              rol: datosNormalizados.rol,
+              identificacion: datosNormalizados.identificacion,
+              telefono: datosNormalizados.telefono,
             }
           }
         });
