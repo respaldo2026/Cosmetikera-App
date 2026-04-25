@@ -16,7 +16,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
-import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, DatosTicket } from "@utils/pos-hardware";
+import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, cargarConfigPOS, DatosTicket } from "@utils/pos-hardware";
 import { aplicarPlantillaTicketPOS, cargarConfigTicketPOS } from "@utils/pos-ticket-template";
 import { PrinterOutlined, GoldOutlined, BarcodeOutlined } from "@ant-design/icons";
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
@@ -80,6 +80,9 @@ const getDetallePagoMixto = (pagoMixto: PagoMixto) =>
     .filter(([, monto]) => Number(monto) > 0)
     .map(([clave, monto]) => `${METODO_PAGO_LABELS[clave as keyof typeof METODO_PAGO_LABELS]} $${Number(monto).toLocaleString()}`)
     .join(" · ");
+
+const toCents = (valor: number) => Math.round(Number(valor || 0) * 100);
+const moneyEquals = (a: number, b: number) => toCents(a) === toCents(b);
 
 export default function VentasPage() {
   const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
@@ -156,7 +159,14 @@ export default function VentasPage() {
     () => Object.values(pagoMixto).reduce((acc, monto) => acc + Number(monto || 0), 0),
     [pagoMixto]
   );
+  const pagoMixtoCuadra = useMemo(() => moneyEquals(totalPagoMixto, totalFinal), [totalPagoMixto, totalFinal]);
   const clienteSeleccionado = clientes.find((c) => c.id === clienteId);
+
+  useEffect(() => {
+    // Precarga para evitar latencia en la primera impresión/cajón.
+    void cargarConfigPOS().catch(() => {});
+    void cargarConfigTicketPOS().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!voucherClub) return;
@@ -344,7 +354,7 @@ export default function VentasPage() {
       message.warning("El efectivo recibido debe cubrir el total de la venta");
       return;
     }
-    if (metodoPago === "mixto" && totalPagoMixto !== totalFinal) {
+    if (metodoPago === "mixto" && !pagoMixtoCuadra) {
       message.warning("El desglose del pago mixto debe sumar exactamente el total de la venta");
       return;
     }
@@ -1220,13 +1230,13 @@ export default function VentasPage() {
               <div style={{
                 marginTop: 10,
                 padding: "8px 12px",
-                background: totalPagoMixto === totalFinal ? "#f6ffed" : "#fff7e6",
-                border: `1px solid ${totalPagoMixto === totalFinal ? "#b7eb8f" : "#ffd591"}`,
+                background: pagoMixtoCuadra ? "#f6ffed" : "#fff7e6",
+                border: `1px solid ${pagoMixtoCuadra ? "#b7eb8f" : "#ffd591"}`,
                 borderRadius: 8,
               }}>
-                <Text style={{ color: totalPagoMixto === totalFinal ? "#389e0d" : "#d46b08" }}>
+                <Text style={{ color: pagoMixtoCuadra ? "#389e0d" : "#d46b08" }}>
                   Total ingresado: <strong>${totalPagoMixto.toLocaleString()}</strong>
-                  {totalPagoMixto !== totalFinal ? ` · faltan/exceden ${Math.abs(totalFinal - totalPagoMixto).toLocaleString()}` : ""}
+                  {!pagoMixtoCuadra ? ` · faltan/exceden ${Math.abs(totalFinal - totalPagoMixto).toLocaleString()}` : ""}
                 </Text>
               </div>
             </div>

@@ -1,6 +1,4 @@
 const express = require("express");
-const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 
@@ -35,14 +33,11 @@ app.use((req, res, next) => {
 
 function runPrinterAction(payload) {
   return new Promise((resolve, reject) => {
-    const payloadPath = path.join(os.tmpdir(), `pos-agent-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-    fs.writeFileSync(payloadPath, JSON.stringify(payload), "utf8");
-
     const scriptPath = path.join(__dirname, "printer-raw.ps1");
     const ps = spawn(
       "powershell",
-      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "-PayloadPath", payloadPath],
-      { windowsHide: true }
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath],
+      { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }
     );
 
     let stdout = "";
@@ -57,12 +52,10 @@ function runPrinterAction(payload) {
     });
 
     ps.on("error", (err) => {
-      cleanup();
       reject(err);
     });
 
     ps.on("close", (code) => {
-      cleanup();
       if (code !== 0) {
         return reject(new Error((stderr || stdout || "Error ejecutando PowerShell").trim()));
       }
@@ -77,10 +70,11 @@ function runPrinterAction(payload) {
       }
     });
 
-    function cleanup() {
-      try {
-        fs.unlinkSync(payloadPath);
-      } catch (_) {}
+    try {
+      ps.stdin.write(JSON.stringify(payload));
+      ps.stdin.end();
+    } catch (error) {
+      reject(error);
     }
   });
 }

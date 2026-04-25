@@ -1,15 +1,23 @@
 param(
-  [Parameter(Mandatory = $true)]
   [string]$PayloadPath
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path $PayloadPath)) {
-  throw "No existe el archivo de payload"
-}
+$rawInput = [Console]::In.ReadToEnd()
 
-$payload = Get-Content $PayloadPath -Raw | ConvertFrom-Json
+if (-not [string]::IsNullOrWhiteSpace($rawInput)) {
+  $payload = $rawInput | ConvertFrom-Json
+}
+elseif (-not [string]::IsNullOrWhiteSpace($PayloadPath)) {
+  if (-not (Test-Path $PayloadPath)) {
+    throw "No existe el archivo de payload"
+  }
+  $payload = Get-Content $PayloadPath -Raw | ConvertFrom-Json
+}
+else {
+  throw "No se recibió payload"
+}
 $printerName = [string]$payload.printerName
 if ([string]::IsNullOrWhiteSpace($printerName)) {
   $defaultPrinter = Get-CimInstance Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -First 1
