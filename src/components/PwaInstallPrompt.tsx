@@ -10,6 +10,7 @@ type DeferredPrompt = Event & {
 
 interface PwaInstallPromptProps {
   inline?: boolean;
+  buttonOnly?: boolean;
   dismissKey?: string;
   autoHideDays?: number;
   title?: string;
@@ -18,6 +19,7 @@ interface PwaInstallPromptProps {
 
 export const PwaInstallPrompt = ({
   inline = false,
+  buttonOnly = false,
   dismissKey,
   autoHideDays = 7,
   title = "Instalar App",
@@ -135,6 +137,52 @@ export const PwaInstallPrompt = ({
     setVisible(false);
     setGuideFor(null);
   };
+
+  if (buttonOnly) {
+    return (
+      <div style={{ width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            onClick={handleInstall}
+            style={{
+              background: "linear-gradient(135deg,#ff2aa1,#ff6bb5)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 999,
+              padding: "8px 14px",
+              fontWeight: 700,
+              fontSize: 12,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              boxShadow: "0 6px 14px rgba(255,42,161,0.25)",
+            }}
+          >
+            Instalar app
+          </button>
+          <button
+            type="button"
+            onClick={closePrompt}
+            title="Ocultar"
+            style={{
+              background: "none",
+              border: "none",
+              color: "#999",
+              fontSize: 14,
+              cursor: "pointer",
+              padding: "2px 4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <CloseOutlined />
+          </button>
+        </div>
+        {inlineGuide ? <div style={{ marginTop: 8 }}>{inlineGuide}</div> : null}
+      </div>
+    );
+  }
 
   if (inline) {
     return (

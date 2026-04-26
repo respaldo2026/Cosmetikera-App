@@ -46,6 +46,7 @@ import {
   isRewardEligibleDynamic,
   getNivelDinamico,
 } from "@/hooks/useClubConfig";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -593,6 +594,15 @@ export default function ClubPage() {
 
       {cliente && nivel && (
         <div style={{ width: "100%", maxWidth: 980, boxSizing: "border-box" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+            <PwaInstallPrompt
+              inline
+              buttonOnly
+              dismissKey="club-portal-install"
+              autoHideDays={14}
+            />
+          </div>
+
           <Card
             style={{ borderRadius: 16, marginBottom: 12, background: `linear-gradient(135deg, ${nivel.color}18, ${nivel.color}30)`, border: `2px solid ${nivel.color}` }}
             styles={{ body: { padding: isMobile ? 14 : 20 } }}
