@@ -46,7 +46,6 @@ import {
   isRewardEligibleDynamic,
   getNivelDinamico,
 } from "@/hooks/useClubConfig";
-import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -567,7 +566,6 @@ export default function ClubPage() {
         <Card style={{ width: "100%", maxWidth: 560, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 24 }}>
           <Space direction="vertical" size={4} style={{ marginBottom: 16 }}>
             <Title level={5} style={{ marginTop: 0, marginBottom: 0 }}>Ingresa tu número de cédula</Title>
-            <Text type="secondary" style={{ fontSize: 13 }}>No necesitas correo ni contraseña. Solo escribe tu cédula y listo.</Text>
           </Space>
           <Form onFinish={buscar}>
             <Space.Compact style={{ width: "100%" }}>
@@ -595,29 +593,6 @@ export default function ClubPage() {
 
       {cliente && nivel && (
         <div style={{ width: "100%", maxWidth: 980, boxSizing: "border-box" }}>
-          <Card
-            style={{
-              ...sectionCardStyle,
-              marginBottom: 12,
-              border: "1px solid #ffc1df",
-            }}
-            styles={{ body: { padding: isMobile ? 12 : 14 } }}
-          >
-            <Space direction="vertical" size={10} style={{ width: "100%" }}>
-              <Text strong style={{ color: BRAND_FUCHSIA }}>Instala Club La Cosmetikera en tu telefono</Text>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Instala el portal como app para entrar mas rapido, recibir notificaciones y usar tus beneficios sin buscar en el navegador.
-              </Text>
-              <PwaInstallPrompt
-                inline
-                dismissKey="club-portal-install"
-                autoHideDays={14}
-                title="Instala tu app del club"
-                subtitle="Recibe promociones, puntos y acceso rapido"
-              />
-            </Space>
-          </Card>
-
           <Card
             style={{ borderRadius: 16, marginBottom: 12, background: `linear-gradient(135deg, ${nivel.color}18, ${nivel.color}30)`, border: `2px solid ${nivel.color}` }}
             styles={{ body: { padding: isMobile ? 14 : 20 } }}
