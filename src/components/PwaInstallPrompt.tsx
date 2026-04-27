@@ -11,6 +11,8 @@ type DeferredPrompt = Event & {
 interface PwaInstallPromptProps {
   inline?: boolean;
   buttonOnly?: boolean;
+  buttonLabel?: string;
+  helperText?: string;
   dismissKey?: string;
   autoHideDays?: number;
   title?: string;
@@ -20,6 +22,8 @@ interface PwaInstallPromptProps {
 export const PwaInstallPrompt = ({
   inline = false,
   buttonOnly = false,
+  buttonLabel = "Instalar app",
+  helperText = "Instala la app para ver ofertas, puntos y promociones más rápido.",
   dismissKey,
   autoHideDays = 7,
   title = "Instalar App",
@@ -85,17 +89,22 @@ export const PwaInstallPrompt = ({
 
   const handleInstallIOS = () => {
     setGuideFor("ios");
-    if (typeof window !== "undefined") {
-      window.alert("Para instalar en iPhone/iPad:\n1) Toca Compartir (□↗)\n2) Elige 'Agregar a pantalla de inicio'");
-    }
   };
 
   const handleInstall = async () => {
+    // Si el navegador expone prompt nativo, priorizarlo siempre
+    if (deferredPrompt) {
+      await handleInstallAndroid();
+      return;
+    }
+
     if (platform === "ios") {
       handleInstallIOS();
       return;
     }
-    await handleInstallAndroid();
+
+    // Desktop/Android sin beforeinstallprompt: mostrar guía contextual
+    setGuideFor(platform === "android" ? "android" : "desktop");
   };
 
   const activeGuidePlatform = guideFor ?? platform;
@@ -141,6 +150,9 @@ export const PwaInstallPrompt = ({
   if (buttonOnly) {
     return (
       <div style={{ width: "100%" }}>
+        <div style={{ marginBottom: 6, color: "#8a4f68", fontSize: 12, lineHeight: 1.35 }}>
+          {helperText}
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             type="button"
@@ -158,7 +170,7 @@ export const PwaInstallPrompt = ({
               boxShadow: "0 6px 14px rgba(255,42,161,0.25)",
             }}
           >
-            Instalar app
+            {buttonLabel}
           </button>
           <button
             type="button"
@@ -179,7 +191,22 @@ export const PwaInstallPrompt = ({
             <CloseOutlined />
           </button>
         </div>
-        {inlineGuide ? <div style={{ marginTop: 8 }}>{inlineGuide}</div> : null}
+        {guideFor ? (
+          <div
+            style={{
+              marginTop: 8,
+              borderRadius: 8,
+              background: "#fff7fb",
+              border: "1px solid #ffd6e7",
+              padding: "8px 10px",
+              color: "#7a4b62",
+              fontSize: 11,
+              lineHeight: 1.35,
+            }}
+          >
+            {guideText}
+          </div>
+        ) : null}
       </div>
     );
   }

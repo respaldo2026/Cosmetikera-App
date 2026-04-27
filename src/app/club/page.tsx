@@ -598,6 +598,8 @@ export default function ClubPage() {
             <PwaInstallPrompt
               inline
               buttonOnly
+              buttonLabel="Instalar app"
+              helperText="Instala la app para ver ofertas, puntos y promociones más rápido."
               dismissKey="club-portal-install"
               autoHideDays={14}
             />
