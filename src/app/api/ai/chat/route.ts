@@ -365,10 +365,10 @@ export async function POST(request: NextRequest) {
       }
 
       const customerMemoryContext =
-        customerContext && customerContext.messages && customerContext.messages.length > 0
-          ? `Historial reciente con ${customerName || "cliente"}:\n${customerContext.messages
+        customerContext && customerContext.historialReciente && customerContext.historialReciente.length > 0
+          ? `Historial reciente con ${customerName || "cliente"}:\n${customerContext.historialReciente
               .slice(-5)
-              .map((m: { role: string; message: string }) => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.message}`)
+              .map((m: { rol: string; mensaje: string }) => `${m.rol === "cliente" ? "Cliente" : "Asesor"}: ${m.mensaje}`)
               .join("\n")}\n\nÚltimo tema tratado: ${previousTheme || "(ninguno)"}`
           : "";
 
