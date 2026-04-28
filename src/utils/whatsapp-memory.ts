@@ -65,7 +65,7 @@ export async function getCustomerContext(
 
     const row = data[0];
     const historial = safeParseJsonb(row.historial_reciente, []) as Array<{
-      rol: string; mensaje: string; hora: string;
+      rol: "cliente" | "agente"; mensaje: string; hora: string;
     }>;
     const total = historial.length;
     // Calcular nivel de confianza por volumen de mensajes
