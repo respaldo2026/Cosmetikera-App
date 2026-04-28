@@ -203,12 +203,18 @@ export default function WhatsAppMonitorPage() {
   const [loadingList, setLoadingList] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [search, setSearch] = useState("");
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const shouldStickToBottomRef = useRef(true);
+
+  type LoadOptions = {
+    silent?: boolean;
+  };
 
   // ── Cargar lista de conversaciones ───────────────────────────────
-  const loadConversations = useCallback(async (q = "") => {
-    setLoadingList(true);
+  const loadConversations = useCallback(async (q = "", options?: LoadOptions) => {
+    if (!options?.silent) setLoadingList(true);
     try {
       const params = new URLSearchParams();
       if (q) params.set("search", q);
@@ -218,13 +224,13 @@ export default function WhatsAppMonitorPage() {
     } catch {
       // silencioso
     } finally {
-      setLoadingList(false);
+      if (!options?.silent) setLoadingList(false);
     }
   }, []);
 
   // ── Cargar mensajes de un teléfono ───────────────────────────────
-  const loadMessages = useCallback(async (phone: string) => {
-    setLoadingMessages(true);
+  const loadMessages = useCallback(async (phone: string, options?: LoadOptions) => {
+    if (!options?.silent) setLoadingMessages(true);
     try {
       const res = await fetch(`/api/whatsapp/conversations?phone=${encodeURIComponent(phone)}`);
       const json = await res.json();
@@ -233,7 +239,7 @@ export default function WhatsAppMonitorPage() {
     } catch {
       // silencioso
     } finally {
-      setLoadingMessages(false);
+      if (!options?.silent) setLoadingMessages(false);
     }
   }, []);
 
@@ -242,10 +248,20 @@ export default function WhatsAppMonitorPage() {
     loadConversations();
   }, [loadConversations]);
 
-  // Auto-scroll al último mensaje
+  // Auto-scroll al último mensaje SOLO si el usuario está cerca del final
   useEffect(() => {
+    if (!shouldStickToBottomRef.current) return;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    // Si está a <= 80px del final, permitimos auto-scroll en nuevas actualizaciones
+    shouldStickToBottomRef.current = distanceFromBottom <= 80;
+  };
 
   // Polling: refresca la conversación activa cada 8 s
   useEffect(() => {
@@ -253,9 +269,9 @@ export default function WhatsAppMonitorPage() {
     if (!selectedPhone) return;
 
     refreshTimerRef.current = setInterval(() => {
-      loadMessages(selectedPhone);
-      loadConversations(search);
-    }, 8000);
+      loadMessages(selectedPhone, { silent: true });
+      loadConversations(search, { silent: true });
+    }, 10000);
 
     return () => {
       if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
@@ -264,7 +280,6 @@ export default function WhatsAppMonitorPage() {
 
   const handleSelectConversation = (phone: string) => {
     setSelectedPhone(phone);
-    setMessages([]);
     loadMessages(phone);
   };
 
@@ -483,6 +498,8 @@ export default function WhatsAppMonitorPage() {
 
           {/* Mensajes */}
           <div
+            ref={messagesContainerRef}
+            onScroll={handleMessagesScroll}
             style={{
               flex: 1,
               overflowY: "auto",
