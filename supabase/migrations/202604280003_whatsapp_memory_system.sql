@@ -27,9 +27,9 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_conversation_history (
   CONSTRAINT check_rol CHECK (rol IN ('cliente', 'agente'))
 );
 
-CREATE INDEX idx_whatsapp_conv_perfil ON public.whatsapp_conversation_history(perfil_id);
-CREATE INDEX idx_whatsapp_conv_telefono ON public.whatsapp_conversation_history(telefono);
-CREATE INDEX idx_whatsapp_conv_created ON public.whatsapp_conversation_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_conv_perfil ON public.whatsapp_conversation_history(perfil_id);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_conv_telefono ON public.whatsapp_conversation_history(telefono);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_conv_created ON public.whatsapp_conversation_history(created_at DESC);
 
 ALTER TABLE public.whatsapp_conversation_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Acceso total whatsapp_conversation_history" ON public.whatsapp_conversation_history;
