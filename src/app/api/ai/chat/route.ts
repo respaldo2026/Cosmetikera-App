@@ -6,6 +6,13 @@ import {
   withMediaSuggestion,
   type AgentIntent,
 } from "@/utils/agent-media-suggestions";
+import {
+  getCustomerContext,
+  logConversationMessage,
+  buildContextualPrompt,
+  extractThemeFromMessage,
+  calculateTrustLevel,
+} from "@/utils/whatsapp-memory";
 
 function normalize(value: unknown): string {
   return String(value || "")
@@ -274,6 +281,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "mensaje_whatsapp requerido" }, { status: 400 });
     }
 
+    // Extraer ID del cliente y número de teléfono
+    const perfil_id = body?.perfil_id || body?.customer_id || "";
+    const telefono = body?.telefono || body?.phone || body?.numero_whatsapp || "";
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
@@ -316,20 +327,68 @@ export async function POST(request: NextRequest) {
     const contextoArticulos = buildProductContext(articulos, message, intent);
     const contextoAsesoria = buildSalesAdvisoryContext(articulos, message, intent);
 
+    // ===== INTEGRACIÓN DE MEMORIA =====
+    let customerContext = null;
+    let customerName = "";
+    let trustLevel = "nuevo";
+    let previousTheme = "";
+
+    if (perfil_id && telefono) {
+      try {
+        customerContext = await getCustomerContext(supabase, perfil_id, telefono);
+        if (customerContext?.customer?.nombre_completo) {
+          customerName = customerContext.customer.nombre_completo;
+        }
+        if (customerContext?.customer?.trust_level) {
+          trustLevel = customerContext.customer.trust_level;
+        }
+        if (customerContext?.customer?.ultimo_tema) {
+          previousTheme = customerContext.customer.ultimo_tema;
+        }
+      } catch (memoryError) {
+        console.warn("[ai/chat] Error recuperando contexto del cliente", memoryError);
+      }
+    }
+
     let responseText = "";
 
     if (geminiKey) {
       const genAI = new GoogleGenerativeAI(geminiKey);
 
+      // Construir prompt con personalización por relación
+      let toneInstruction = "";
+      if (trustLevel === "leal") {
+        toneInstruction =
+          "Este es un cliente muy leal. Usa su nombre, recuerda temas previos, sé muy personal y cálido. Busca profundizar la relación.";
+      } else if (trustLevel === "conocido") {
+        toneInstruction =
+          "Este es un cliente conocido. Usa su nombre naturalmente, refiere temas previos si es relevante, sé amable y confiable.";
+      } else {
+        toneInstruction =
+          "Este es un cliente nuevo. Sé acogedor, intenta identificar sus necesidades, presenta opciones concretas.";
+      }
+
+      const customerMemoryContext =
+        customerContext && customerContext.messages && customerContext.messages.length > 0
+          ? `Historial reciente con ${customerName || "cliente"}:\n${customerContext.messages
+              .slice(-5)
+              .map((m: { role: string; message: string }) => `${m.role === "user" ? "Cliente" : "Asesor"}: ${m.message}`)
+              .join("\n")}\n\nÚltimo tema tratado: ${previousTheme || "(ninguno)"}`
+          : "";
+
       const prompt = [
         "Eres una asesora comercial de La Cosmetikera por WhatsApp.",
+        toneInstruction,
         "Responde en español colombiano, maximo 5 lineas, tono calido y directo.",
+        customerName ? `Nombre del cliente: ${customerName}` : "",
         "No inventes precios ni stock; usa solo el contexto.",
         "Si falta data, dilo claramente y ofrece que un asesor confirme.",
         "Si el cliente pregunta por precio, sugiere 1-2 opciones concretas del catálogo.",
         "Incluye precio con formato COP y menciona oferta/descuento solo si viene en contexto.",
         "Cuando pregunten por precio/producto, agrega micro-asesoria para confianza: beneficio principal + recomendacion corta de uso/eleccion + cierre suave para concretar compra.",
         "No uses promesas absolutas, ni afirmaciones medicas, ni inventes ingredientes.",
+        "",
+        customerMemoryContext,
         "",
         `Intención detectada: ${intent}`,
         `Mensaje cliente: ${message}`,
@@ -342,7 +401,9 @@ export async function POST(request: NextRequest) {
         "",
         "Contexto de materiales de marketing:",
         contextoAssets || "(sin materiales)",
-      ].join("\n");
+      ]
+        .filter(Boolean)
+        .join("\n");
 
       try {
         responseText = await generateWithModelFallback(genAI, prompt);
@@ -353,7 +414,36 @@ export async function POST(request: NextRequest) {
     }
 
     if (!responseText) {
-      responseText = "¡Hola! Gracias por escribir a La Cosmetikera. Te ayudo con precios, productos y promociones activas. ¿Qué producto buscas hoy?";
+      const greeting = customerName ? `¡Hola ${customerName}!` : "¡Hola!";
+      responseText = `${greeting} Gracias por escribir a La Cosmetikera. Te ayudo con precios, productos y promociones activas. ¿Qué producto buscas hoy?`;
+    }
+
+    // ===== REGISTRAR MENSAJES EN MEMORIA =====
+    if (perfil_id && telefono) {
+      try {
+        await Promise.all([
+          logConversationMessage(supabase, perfil_id, telefono, message, "user"),
+          logConversationMessage(supabase, perfil_id, telefono, responseText, "assistant"),
+        ]);
+
+        // Extraer tema de la conversación
+        const detectedTheme = extractThemeFromMessage(message);
+        if (detectedTheme) {
+          // Actualizar tema en memoria del cliente
+          await supabase.from("whatsapp_customer_memory").upsert(
+            {
+              perfil_id,
+              telefono,
+              ultimo_tema: detectedTheme,
+              ultimo_mensaje: message.substring(0, 200),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "perfil_id,telefono" },
+          );
+        }
+      } catch (logError) {
+        console.warn("[ai/chat] Error registrando mensajes en memoria", logError);
+      }
     }
 
     // Sugerencia de imagen para la rama "Con imagen"
