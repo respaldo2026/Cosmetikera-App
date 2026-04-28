@@ -23,6 +23,34 @@ function normalize(value: unknown): string {
     .trim();
 }
 
+function toDisplayName(raw: string): string {
+  return raw
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function extractCustomerName(message: string): string | null {
+  const raw = String(message || "").trim();
+  if (!raw) return null;
+
+  const match = raw.match(/(?:me\s+llamo|mi\s+nombre\s+es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,}(?:\s+[a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,}){0,2})/i);
+  if (!match?.[1]) return null;
+
+  const candidate = toDisplayName(match[1]);
+  return candidate.length >= 2 ? candidate : null;
+}
+
+function looksRepeatedAnswer(current: string, previous: string): boolean {
+  const a = normalize(current).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const b = normalize(previous).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.length > 30 && b.length > 30 && (a.includes(b) || b.includes(a));
+}
+
 function detectIntent(message: string): AgentIntent {
   const m = normalize(message);
   if (/precio|cuanto|valor|costo|vale|promocion|oferta|descuento|economico|barato/.test(m)) return "precio";
@@ -229,6 +257,9 @@ function buildHeuristicFallbackResponse(params: {
   const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedMessage);
   const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedMessage);
   const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|uñas|esmalte/.test(normalizedMessage);
+  const asksPoints = /puntos|club|fidelizacion|canje|beneficio/.test(normalizedMessage);
+  const asksName = /sabes\s+mi\s+nombre|cual\s+es\s+mi\s+nombre|mi\s+nombre\??/.test(normalizedMessage);
+  const asksNails = /uñas|unas|esmalte|semipermanente|acrilicas|gel/.test(normalizedMessage);
   const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
   const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
 
@@ -260,6 +291,21 @@ function buildHeuristicFallbackResponse(params: {
 
   if (intent === "horario") {
     return `${greeting}. Te ayudo con el horario de atención enseguida. Si quieres, de una vez te dejo preseleccionados productos según tu necesidad para que compres más rápido.`;
+  }
+
+  if (asksName) {
+    if (customerName) {
+      return `😊 Sí, te tengo registrado como *${customerName}*. ¿Quieres que te recomiende algo para piel, cabello, maquillaje o uñas hoy?`;
+    }
+    return `😊 Aún no tengo tu nombre guardado. Cuéntame: *¿cómo te llamas?* Así personalizo mejor cada recomendación.`;
+  }
+
+  if (asksPoints) {
+    return `🎁 Te ayudo con tus *puntos del Club*. Para validarlos sin error, compárteme tu *cédula* y te indico saldo, nivel y opciones de canje.`;
+  }
+
+  if (asksNails && top.length === 0) {
+    return `💅 ¡Claro! Para *uñas* te recomiendo según objetivo:\n1) *Fortalecer*: base vitaminada\n2) *Duración*: esmalte semipermanente\n3) *Acabado profesional*: top coat gel\n¿Quieres acabado natural, elegante o llamativo?`;
   }
 
   // Responder útil aunque no haya coincidencias en catálogo
@@ -372,6 +418,9 @@ export async function POST(request: NextRequest) {
 
     // Extraer ID del cliente y número de teléfono
     const perfil_id = body?.perfil_id || body?.customer_id || "";
+    const nameFromPayload = toDisplayName(
+      String(body?.nombre || body?.contact_name || body?.profile_name || "").trim()
+    );
     const rawTelefono = String(
       body?.telefono ||
         body?.phone ||
@@ -429,6 +478,7 @@ export async function POST(request: NextRequest) {
     let customerName = "";
     let trustLevel = "nuevo";
     let previousTheme = "";
+    const extractedName = extractCustomerName(message);
 
     if (telefono) {
       try {
@@ -442,6 +492,9 @@ export async function POST(request: NextRequest) {
         console.warn("[ai/chat] Error recuperando contexto del cliente", memoryError);
       }
     }
+
+    // Prioridad de nombre: mensaje actual > payload > memoria previa
+    customerName = extractedName || nameFromPayload || customerName;
 
     let responseText = "";
 
@@ -483,6 +536,9 @@ export async function POST(request: NextRequest) {
         "- Usa de 1 a 3 emojis útiles por respuesta (sin saturar).",
         "- Resalta palabras clave con formato de WhatsApp: *palabra clave*.",
         "- Si explicas rutina, usa mini pasos claros: 1) ... 2) ... 3) ...",
+        "- Evita repetir saludos largos en cada mensaje; responde directo al punto cuando ya hay contexto.",
+        "- Si preguntan por su nombre, reconócelo si está disponible; si no, pide el nombre en una pregunta corta.",
+        "- Si preguntan por puntos/club, solicita cédula para validar saldo y canjes.",
         "- Atiende tanto a mujeres como a hombres con lenguaje inclusivo y cercano.",
         "- Asesora por necesidad real: piel, cabello, maquillaje, uñas, barba, rutina y fragancias.",
         "- Si detectas problema (acné, manchas, frizz, caída, resequedad, sensibilidad), primero valida necesidad y luego recomienda.",
@@ -523,6 +579,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (!responseText) {
+      responseText = buildHeuristicFallbackResponse({
+        customerName,
+        message,
+        intent,
+        articles: articulos,
+      });
+    }
+
+    // Evitar respuestas repetidas consecutivas cuando Gemini/fallback se estancan
+    const lastAgentMessage = [...(customerContext?.historialReciente || [])]
+      .reverse()
+      .find((m: { rol: string; mensaje: string }) => m.rol === "agente")?.mensaje;
+
+    if (lastAgentMessage && looksRepeatedAnswer(responseText, lastAgentMessage)) {
       responseText = buildHeuristicFallbackResponse({
         customerName,
         message,
