@@ -333,17 +333,13 @@ export async function POST(request: NextRequest) {
     let trustLevel = "nuevo";
     let previousTheme = "";
 
-    if (perfil_id && telefono) {
+    if (telefono) {
       try {
-        customerContext = await getCustomerContext(supabase, perfil_id, telefono);
-        if (customerContext?.customer?.nombre_completo) {
-          customerName = customerContext.customer.nombre_completo;
-        }
-        if (customerContext?.customer?.trust_level) {
-          trustLevel = customerContext.customer.trust_level;
-        }
-        if (customerContext?.customer?.ultimo_tema) {
-          previousTheme = customerContext.customer.ultimo_tema;
+        customerContext = await getCustomerContext(supabase, telefono);
+        if (customerContext) {
+          customerName = customerContext.nombre || "";
+          trustLevel = customerContext.nivelConfianza || "nuevo";
+          previousTheme = customerContext.ultimoTema || "";
         }
       } catch (memoryError) {
         console.warn("[ai/chat] Error recuperando contexto del cliente", memoryError);
@@ -422,24 +418,15 @@ export async function POST(request: NextRequest) {
     if (perfil_id && telefono) {
       try {
         await Promise.all([
-          logConversationMessage(supabase, perfil_id, telefono, message, "user"),
-          logConversationMessage(supabase, perfil_id, telefono, responseText, "assistant"),
+          logConversationMessage(supabase, telefono, perfil_id, "cliente", message),
+          logConversationMessage(supabase, telefono, perfil_id, "agente", responseText),
         ]);
 
         // Extraer tema de la conversación
         const detectedTheme = extractThemeFromMessage(message);
         if (detectedTheme) {
           // Actualizar tema en memoria del cliente
-          await supabase.from("whatsapp_customer_memory").upsert(
-            {
-              perfil_id,
-              telefono,
-              ultimo_tema: detectedTheme,
-              ultimo_mensaje: message.substring(0, 200),
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "perfil_id,telefono" },
-          );
+          await updateCustomerMemory(supabase, telefono, perfil_id, customerName, detectedTheme);
         }
       } catch (logError) {
         console.warn("[ai/chat] Error registrando mensajes en memoria", logError);
