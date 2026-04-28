@@ -1,8 +1,0 @@
-{
-  "/club/page": "app/club/page.js",
-  "/clientes/page": "app/clientes/page.js",
-  "/marketing-center/page": "app/marketing-center/page.js",
-  "/historial/page": "app/historial/page.js",
-  "/fidelizacion/page": "app/fidelizacion/page.js",
-  "/ventas/page": "app/ventas/page.js"
-}
