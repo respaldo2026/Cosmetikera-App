@@ -125,7 +125,6 @@ async function sendBirthdayReminder(
 
     return {
       success: result.messages && result.messages.length > 0,
-      error: result.error?.message || undefined,
     };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
