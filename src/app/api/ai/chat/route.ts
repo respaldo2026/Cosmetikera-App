@@ -61,14 +61,27 @@ async function generateWithModelFallback(
     } catch (err) {
       lastError = err;
       const message = String((err as Error)?.message || "").toLowerCase();
-      if (message.includes("404") || message.includes("not found") || message.includes("unsupported")) {
+      if (
+        message.includes("404") ||
+        message.includes("not found") ||
+        message.includes("unsupported") ||
+        message.includes("429") ||
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("resource exhausted")
+      ) {
         continue;
       }
       throw err;
     }
   }
 
-  throw lastError || new Error("No hay modelos Gemini disponibles para chat");
+  // Si no hubo modelo disponible o todos fallaron por cuota/límite,
+  // devolvemos vacío y la ruta aplicará un mensaje fallback en vez de 500.
+  if (lastError) {
+    console.warn("[ai/chat] Gemini no disponible, usando fallback de texto", lastError);
+  }
+  return "";
 }
 
 export async function POST(request: NextRequest) {
@@ -155,7 +168,12 @@ export async function POST(request: NextRequest) {
         contextoAssets || "(sin materiales)",
       ].join("\n");
 
-      responseText = await generateWithModelFallback(genAI, prompt);
+      try {
+        responseText = await generateWithModelFallback(genAI, prompt);
+      } catch (modelError) {
+        console.warn("[ai/chat] Error no recuperable de Gemini", modelError);
+        responseText = "";
+      }
     }
 
     if (!responseText) {
