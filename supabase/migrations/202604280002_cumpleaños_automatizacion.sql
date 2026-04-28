@@ -8,18 +8,12 @@ INSERT INTO public.plantillas_whatsapp (nombre, descripcion, plantilla, variable
 VALUES (
   'Cumpleaños -2 Días',
   'Plantilla transaccional: cumpleaños_recordatorio_2d_es - Se envía 2 días antes del cumpleaños',
-  'Tu cumpleaños se acerca 🎂
+  'Tu cumpleaños es en 2 días 🎂
 
-En 2 días activaremos tu descuento especial de cumpleaños.
+Accede a tu cuenta en el Club La Cosmetikera:
+https://app.cosmetikera.com/club
 
-💝 PRÓXIMAMENTE:
-- Descuento exclusivo en la app
-- Acceso a productos VIP
-- Puntos x2 en compras
-
-Mantén tu app actualizada para no perderlo.
-
-¡Nos vemos pronto! 🎉',
+¿Preguntas? Escribe "Hola" 💬',
   ARRAY[]::text[],
   true
 );
@@ -29,16 +23,12 @@ INSERT INTO public.plantillas_whatsapp (nombre, descripcion, plantilla, variable
 VALUES (
   'Cumpleaños -1 Día',
   'Plantilla transaccional: cumpleaños_recordatorio_1d_es - Se envía 1 día antes del cumpleaños',
-  '¡Casi es tu día! 🎂
+  '¡Mañana es tu cumpleaños! 🎂
 
-Mañana se activa tu descuento especial de cumpleaños.
+Entra a tu cuenta en el Club La Cosmetikera:
+https://app.cosmetikera.com/club
 
-💝 MAÑANA TENDRÁS:
-- Descuento exclusivo en compras
-- Acceso a productos especiales
-- Puntos x2 en todas tus compras
-
-¡No te lo pierdas! 🎉',
+¿Preguntas? Escribe "Hola" 💬',
   ARRAY[]::text[],
   true
 );
@@ -50,15 +40,8 @@ VALUES (
   'Plantilla transaccional: cumpleaños_celebracion_es - Se envía el día del cumpleaños',
   '¡Feliz cumpleaños! 🎂🎉
 
-Hoy es tu día especial y tenemos sorpresas para ti.
-
-💝 HOY DISFRUTAS:
-- Descuento activado en la app
-- Acceso a productos VIP exclusivos
-- Puntos x2 en todas tus compras
-
-¡Accede a la app y celebra con nosotros!
-https://app.cosmetikera.com
+Entra a tu cuenta en el Club La Cosmetikera:
+https://app.cosmetikera.com/club
 
 ¿Preguntas? Escribe "Hola" 💬',
   ARRAY[]::text[],

@@ -3,11 +3,11 @@
 ## Resumen
 
 Envía mensajes de WhatsApp automáticos a clientes en **3 momentos diferentes**:
-- **-2 días**: Previa del cumpleaños próximo
-- **-1 día**: Última oportunidad de beneficios
-- **0 (hoy)**: ¡Feliz cumpleaños! con descuento activado
+- **-2 días**: Notificación de cumpleaños próximo
+- **-1 día**: Recordatorio del cumpleaños mañana
+- **0 (hoy)**: ¡Feliz cumpleaños!
 
-Cada mensaje es **transaccional** (cumple normas Meta) y recuerda descuentos/beneficios.
+Cada mensaje es **100% transaccional** (cumple normas Meta) sin mencionar beneficios/descuentos.
 
 ---
 
@@ -16,21 +16,40 @@ Cada mensaje es **transaccional** (cumple normas Meta) y recuerda descuentos/ben
 ### 1. **Plantillas de WhatsApp** (Supabase)
 Tres nuevas plantillas transaccionales en `plantillas_whatsapp`:
 
-```sql
--- Plantilla 1: 2 días antes
-'cumpleaños_recordatorio_2d_es'
-"Tu cumpleaños se acerca 🎂
-En 2 días activaremos tu descuento..."
+**Plantilla 1: 2 días antes**
+```
+cumpleaños_recordatorio_2d_es
 
--- Plantilla 2: 1 día antes  
-'cumpleaños_recordatorio_1d_es'
-"¡Casi es tu día! 🎂
-Mañana se activa tu descuento..."
+Tu cumpleaños es en 2 días 🎂
 
--- Plantilla 3: Día del cumpleaños
-'cumpleaños_celebracion_es'
-"¡Feliz cumpleaños! 🎂🎉
-Hoy es tu día especial..."
+Accede a tu cuenta en el Club La Cosmetikera:
+https://app.cosmetikera.com/club
+
+¿Preguntas? Escribe "Hola" 💬
+```
+
+**Plantilla 2: 1 día antes**
+```
+cumpleaños_recordatorio_1d_es
+
+¡Mañana es tu cumpleaños! 🎂
+
+Entra a tu cuenta en el Club La Cosmetikera:
+https://app.cosmetikera.com/club
+
+¿Preguntas? Escribe "Hola" 💬
+```
+
+**Plantilla 3: Día del cumpleaños**
+```
+cumpleaños_celebracion_es
+
+¡Feliz cumpleaños! 🎂🎉
+
+Entra a tu cuenta en el Club La Cosmetikera:
+https://app.cosmetikera.com/club
+
+¿Preguntas? Escribe "Hola" 💬
 ```
 
 ### 2. **Tabla de Auditoría**
