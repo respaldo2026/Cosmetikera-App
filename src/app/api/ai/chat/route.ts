@@ -245,7 +245,7 @@ function buildHeuristicFallbackResponse(params: {
     const lines = top.map((p) => {
       const price = formatCOP(Number(p.precio_venta || 0));
       const discount = Number(p.descuento_porcentaje || 0) > 0 ? ` (${p.descuento_porcentaje}% OFF)` : "";
-      return `• ${p.nombre || "Producto"}: ${price}${discount}`;
+            return `• *${p.nombre || "Producto"}*: ${price}${discount}`;
     });
     return `${greeting}. Te comparto opciones reales:\n${lines.join("\n")}\n${closeByIntent}`;
   }
@@ -264,15 +264,15 @@ function buildHeuristicFallbackResponse(params: {
 
   // Responder útil aunque no haya coincidencias en catálogo
   if (hasSkinConcern && top.length === 0) {
-    return `${greeting}. Para acné/manchas/resequedad te recomiendo iniciar con rutina suave: limpieza sin sulfatos + hidratante no comedogénica + protector solar diario. Si me dices tu tipo de piel (grasa, seca o mixta) te armo una rutina exacta para ti.`;
+     return `✨ ${greeting}. Para *acné/manchas/resequedad* te sugiero esta rutina:\n1) *Limpieza suave*\n2) *Hidratante no comedogénica*\n3) *Protector solar diario* ☀️\nSi me dices si tu piel es grasa, seca o mixta, te la personalizo.`;
   }
 
   if (hasHairConcern && top.length === 0) {
-    return `${greeting}. Para frizz/caída/resequedad del cabello, lo más efectivo es: shampoo suave + mascarilla hidratante 2-3 veces por semana + protector térmico antes de calor. ¿Tu cabello es liso, ondulado o rizado para recomendarte mejor?`;
+     return `💇 ${greeting}. Para *frizz/caída/resequedad* del cabello te sirve:\n1) *Shampoo suave*\n2) *Mascarilla hidratante* 2-3 veces/semana\n3) *Protector térmico* antes de calor 🔥\n¿Tu cabello es liso, ondulado o rizado?`;
   }
 
   if (hasMakeupConcern && top.length === 0) {
-    return `${greeting}. En maquillaje te puedo guiar según acabado y tipo de piel. Para iniciar: base ligera de larga duración + corrector hidratante + sellado suave. ¿Lo quieres para diario o para evento?`;
+     return `💄 ${greeting}. En *maquillaje* te guío según tu tipo de piel:\n1) *Base ligera* de larga duración\n2) *Corrector hidratante*\n3) *Sellado suave*\n¿Lo quieres para uso diario o para evento?`;
   }
 
   if (top.length > 0) {
@@ -281,14 +281,14 @@ function buildHeuristicFallbackResponse(params: {
       return `${greeting}. Te puedo recomendar opciones concretas según tu necesidad. ${closeByIntent}`;
     }
     const price = formatCOP(Number(p.precio_venta || 0));
-    return `${greeting}. Según lo que me cuentas, una muy buena opción es ${p.nombre || "este producto"} (${price}). ${p.descripcion ? String(p.descripcion).slice(0, 110) : "Te da muy buen resultado y buena relación calidad-precio."} ${closeByIntent}`;
+     return `✅ ${greeting}. Según lo que me cuentas, una muy buena opción es *${p.nombre || "este producto"}* (${price}). ${p.descripcion ? String(p.descripcion).slice(0, 110) : "Te da muy buen resultado y buena relación calidad-precio."} ${closeByIntent}`;
   }
 
   if (isGreeting || isShortQuestion) {
-    return `${greeting}. Aquí estoy para ayudarte de verdad con belleza: piel, cabello, maquillaje, uñas y barba. Cuéntame tu necesidad puntual (ej: acné, resequedad, frizz, caída o presupuesto) y te respondo con pasos concretos.`;
+     return `👋 ${greeting}. Aquí estoy para ayudarte con *belleza* de forma práctica: piel, cabello, maquillaje, uñas y barba. Cuéntame tu necesidad puntual (ej: acné, resequedad, frizz, caída o presupuesto) y te respondo con pasos concretos.`;
   }
 
-  return `${greeting}. Claro que sí, te asesoro en belleza para mujer u hombre: piel, cabello, maquillaje, barba, uñas y rutinas. Cuéntame qué te preocupa (por ejemplo acné, manchas, frizz, caída o resequedad) y te doy opciones concretas.`;
+    return `✨ ${greeting}. Claro que sí, te asesoro en *belleza* para mujer u hombre: piel, cabello, maquillaje, barba, uñas y rutinas. Cuéntame qué te preocupa (acné, manchas, frizz, caída o resequedad) y te doy opciones concretas.`;
 }
 
 function isAuthorized(req: NextRequest): boolean {
@@ -479,6 +479,10 @@ export async function POST(request: NextRequest) {
         toneInstruction,
         "Reglas OBLIGATORIAS:",
         "- Responde en español colombiano natural, cálido y conversacional, máximo 4-6 líneas.",
+        "- Haz respuestas didácticas y fáciles de aplicar en casa.",
+        "- Usa de 1 a 3 emojis útiles por respuesta (sin saturar).",
+        "- Resalta palabras clave con formato de WhatsApp: *palabra clave*.",
+        "- Si explicas rutina, usa mini pasos claros: 1) ... 2) ... 3) ...",
         "- Atiende tanto a mujeres como a hombres con lenguaje inclusivo y cercano.",
         "- Asesora por necesidad real: piel, cabello, maquillaje, uñas, barba, rutina y fragancias.",
         "- Si detectas problema (acné, manchas, frizz, caída, resequedad, sensibilidad), primero valida necesidad y luego recomienda.",

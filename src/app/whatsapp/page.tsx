@@ -42,6 +42,16 @@ type Message = {
   perfil_id: string | null;
 };
 
+async function fetchWithTimeout(input: RequestInfo | URL, timeoutMs = 7000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { signal: controller.signal, cache: "no-store" });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("es-CO", {
@@ -203,10 +213,14 @@ export default function WhatsAppMonitorPage() {
   const [loadingList, setLoadingList] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [search, setSearch] = useState("");
+  const [hasLoadedList, setHasLoadedList] = useState(false);
+  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shouldStickToBottomRef = useRef(true);
+  const isFetchingListRef = useRef(false);
+  const isFetchingMessagesRef = useRef(false);
 
   type LoadOptions = {
     silent?: boolean;
@@ -214,34 +228,46 @@ export default function WhatsAppMonitorPage() {
 
   // ── Cargar lista de conversaciones ───────────────────────────────
   const loadConversations = useCallback(async (q = "", options?: LoadOptions) => {
-    if (!options?.silent) setLoadingList(true);
+    if (isFetchingListRef.current && options?.silent) return;
+    isFetchingListRef.current = true;
+
+    if (!options?.silent && !hasLoadedList) setLoadingList(true);
     try {
       const params = new URLSearchParams();
       if (q) params.set("search", q);
-      const res = await fetch(`/api/whatsapp/conversations?${params}`);
+      const res = await fetchWithTimeout(`/api/whatsapp/conversations?${params}`);
       const json = await res.json();
-      if (json.conversations) setConversations(json.conversations);
+      if (json.conversations) {
+        setConversations(json.conversations);
+      }
+      setHasLoadedList(true);
     } catch {
       // silencioso
     } finally {
       if (!options?.silent) setLoadingList(false);
+      isFetchingListRef.current = false;
     }
-  }, []);
+  }, [hasLoadedList]);
 
   // ── Cargar mensajes de un teléfono ───────────────────────────────
   const loadMessages = useCallback(async (phone: string, options?: LoadOptions) => {
-    if (!options?.silent) setLoadingMessages(true);
+    if (isFetchingMessagesRef.current && options?.silent) return;
+    isFetchingMessagesRef.current = true;
+
+    if (!options?.silent && !hasLoadedMessages) setLoadingMessages(true);
     try {
-      const res = await fetch(`/api/whatsapp/conversations?phone=${encodeURIComponent(phone)}`);
+      const res = await fetchWithTimeout(`/api/whatsapp/conversations?phone=${encodeURIComponent(phone)}`);
       const json = await res.json();
       if (json.messages) setMessages(json.messages);
       if (json.clientName !== undefined) setClientName(json.clientName);
+      setHasLoadedMessages(true);
     } catch {
       // silencioso
     } finally {
       if (!options?.silent) setLoadingMessages(false);
+      isFetchingMessagesRef.current = false;
     }
-  }, []);
+  }, [hasLoadedMessages]);
 
   // Carga inicial
   useEffect(() => {
@@ -280,6 +306,8 @@ export default function WhatsAppMonitorPage() {
 
   const handleSelectConversation = (phone: string) => {
     setSelectedPhone(phone);
+    setHasLoadedMessages(false);
+    setLoadingMessages(true);
     loadMessages(phone);
   };
 
@@ -508,7 +536,7 @@ export default function WhatsAppMonitorPage() {
               flexDirection: "column",
             }}
           >
-            {loadingMessages ? (
+            {loadingMessages && !hasLoadedMessages ? (
               <div style={{ textAlign: "center", padding: 40 }}>
                 <Spin size="large" />
               </div>
