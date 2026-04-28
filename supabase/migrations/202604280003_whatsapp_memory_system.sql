@@ -145,11 +145,17 @@ BEGIN
     p_tema_tratado
   )
   ON CONFLICT (telefono) DO UPDATE SET
-    perfil_id = COALESCE(p_perfil_id, EXCLUDED.perfil_id),
+    perfil_id = COALESCE(p_perfil_id, whatsapp_customer_memory.perfil_id),
     nombre = COALESCE(p_nombre, whatsapp_customer_memory.nombre),
     total_mensajes = whatsapp_customer_memory.total_mensajes + 1,
     ultima_interaccion = CURRENT_TIMESTAMP,
     último_tema_tratado = COALESCE(p_tema_tratado, whatsapp_customer_memory.último_tema_tratado),
+    -- Subir nivel de confianza automáticamente por volumen de mensajes
+    nivel_confianza = CASE
+      WHEN whatsapp_customer_memory.total_mensajes + 1 >= 20 THEN 'leal'
+      WHEN whatsapp_customer_memory.total_mensajes + 1 >= 5  THEN 'conocido'
+      ELSE whatsapp_customer_memory.nivel_confianza
+    END,
     updated_at = CURRENT_TIMESTAMP;
 END;
 $$ LANGUAGE plpgsql;

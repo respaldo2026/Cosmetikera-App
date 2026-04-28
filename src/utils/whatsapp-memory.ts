@@ -6,6 +6,28 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 
+/**
+ * Normaliza el número de teléfono a formato consistente (solo dígitos, con código país 57)
+ * Make puede enviar: "+573104239494", "573104239494", "3104239494"
+ */
+export function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("57") && digits.length >= 11) return digits;
+  if (digits.length === 10 && digits.startsWith("3")) return `57${digits}`;
+  return digits;
+}
+
+/**
+ * Parsea un valor que puede ser string JSON o ya ser un objeto/array (jsonb de Supabase)
+ */
+function safeParseJsonb(value: unknown, fallback: unknown = []): unknown {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "string") {
+    try { return JSON.parse(value); } catch { return fallback; }
+  }
+  return value; // ya es objeto
+}
+
 export interface CustomerContext {
   nombre?: string;
   nivelConfianza: "nuevo" | "conocido" | "leal";
@@ -42,12 +64,21 @@ export async function getCustomerContext(
     }
 
     const row = data[0];
+    const historial = safeParseJsonb(row.historial_reciente, []) as Array<{
+      rol: string; mensaje: string; hora: string;
+    }>;
+    const total = historial.length;
+    // Calcular nivel de confianza por volumen de mensajes
+    const nivel: "nuevo" | "conocido" | "leal" =
+      total >= 20 ? "leal" : total >= 5 ? "conocido" : (row.nivel_confianza ?? "nuevo");
+
     return {
       nombre: row.nombre,
-      nivelConfianza: row.nivel_confianza || "nuevo",
-      historialReciente: row.historial_reciente ? JSON.parse(row.historial_reciente) : [],
-      preferencias: row.preferencias || {},
+      nivelConfianza: nivel,
+      historialReciente: historial,
+      preferencias: (safeParseJsonb(row.preferencias, {}) as Record<string, unknown>),
       ultimoTema: row.ultimo_tema,
+      totalMensajes: total,
     };
   } catch (err) {
     console.error("[Memory] Exception:", err);

@@ -12,6 +12,7 @@ import {
   buildContextualPrompt,
   extractThemeFromMessage,
   updateCustomerMemory,
+  normalizePhone,
 } from "@/utils/whatsapp-memory";
 
 function normalize(value: unknown): string {
@@ -283,7 +284,8 @@ export async function POST(request: NextRequest) {
 
     // Extraer ID del cliente y número de teléfono
     const perfil_id = body?.perfil_id || body?.customer_id || "";
-    const telefono = body?.telefono || body?.phone || body?.numero_whatsapp || "";
+    const rawTelefono = String(body?.telefono || body?.phone || body?.numero_whatsapp || body?.wa_id || "");
+    const telefono = rawTelefono ? normalizePhone(rawTelefono) : "";
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -364,39 +366,47 @@ export async function POST(request: NextRequest) {
           "Este es un cliente nuevo. Sé acogedor, intenta identificar sus necesidades, presenta opciones concretas.";
       }
 
-      const customerMemoryContext =
-        customerContext && customerContext.historialReciente && customerContext.historialReciente.length > 0
-          ? `Historial reciente con ${customerName || "cliente"}:\n${customerContext.historialReciente
-              .slice(-5)
-              .map((m: { rol: string; mensaje: string }) => `${m.rol === "cliente" ? "Cliente" : "Asesor"}: ${m.mensaje}`)
-              .join("\n")}\n\nÚltimo tema tratado: ${previousTheme || "(ninguno)"}`
-          : "";
+      // Construir historial de conversación previo en formato legible
+      const historialPrevio = customerContext?.historialReciente ?? [];
+      // Los mensajes vienen ordenados DESC desde la BD → invertir para orden cronológico
+      const historialOrdenado = [...historialPrevio].reverse().slice(-8);
+      const customerMemoryContext = historialOrdenado.length > 0
+          ? `--- Historial REAL de esta conversación con ${customerName || "el cliente"} ---\n${historialOrdenado
+              .map((m: { rol: string; mensaje: string }) =>
+                `${m.rol === "cliente" ? "👤 Cliente" : "🤖 Asesor"}: ${m.mensaje}`
+              )
+              .join("\n")}\n--- Fin historial ---\nÚltimo tema tratado: ${previousTheme || "ninguno"}\nNivel de relación: ${trustLevel}`
+          : `(primera vez que escribe este número)\nNivel: ${trustLevel}`;
 
       const prompt = [
-        "Eres una asesora comercial de La Cosmetikera por WhatsApp.",
+        "Eres Dany, asesora virtual experta en cosméticos de La Cosmetikera (WhatsApp).",
         toneInstruction,
-        "Responde en español colombiano, maximo 5 lineas, tono calido y directo.",
-        customerName ? `Nombre del cliente: ${customerName}` : "",
-        "No inventes precios ni stock; usa solo el contexto.",
-        "Si falta data, dilo claramente y ofrece que un asesor confirme.",
-        "Si el cliente pregunta por precio, sugiere 1-2 opciones concretas del catálogo.",
-        "Incluye precio con formato COP y menciona oferta/descuento solo si viene en contexto.",
-        "Cuando pregunten por precio/producto, agrega micro-asesoria para confianza: beneficio principal + recomendacion corta de uso/eleccion + cierre suave para concretar compra.",
-        "No uses promesas absolutas, ni afirmaciones medicas, ni inventes ingredientes.",
+        "Reglas OBLIGATORIAS:",
+        "- Responde en español colombiano natural, máximo 4-5 líneas.",
+        "- USA el historial de conversación para dar continuidad REAL (no repitas saludos si ya conversaron).",
+        "- Si el cliente ya preguntó algo antes, recuérdalo y conecta la respuesta.",
+        "- No inventes precios ni stock; usa SOLO el contexto de productos dado.",
+        "- Si hay precio disponible, SIEMPRE dilo en formato $X.XXX COP.",
+        "- Si hay descuento, menciónalo siempre (genera urgencia).",
+        "- Al dar precio: agrega 1 beneficio clave del producto + una recomendación de uso breve.",
+        "- Cierra siempre con una pregunta para concretar: '¿Te lo reservo?', '¿Cuántos necesitas?', '¿Lo recogería en tienda o envío?'.",
+        "- Si no tienes el producto, di exactamente qué tienes similar y ofrece alternativas.",
+        "- Nunca hagas afirmaciones médicas absolutas.",
         "",
+        customerName ? `[CLIENTE: ${customerName}]` : "[CLIENTE: nuevo]",
         customerMemoryContext,
         "",
-        `Intención detectada: ${intent}`,
-        `Mensaje cliente: ${message}`,
+        `[MENSAJE ACTUAL del cliente]: ${message}`,
+        `[Intención detectada]: ${intent}`,
         "",
-        "Contexto de productos:",
-        contextoArticulos || "(sin productos)",
+        "[CATÁLOGO DISPONIBLE - úsalo para responder con precios reales]:",
+        contextoArticulos || "(catálogo no disponible)",
         "",
-        "Contexto para asesoria comercial:",
-        contextoAsesoria,
+        "[ASESORÍA COMERCIAL - top productos relevantes]:",
+        contextoAsesoria || "(sin coincidencias)",
         "",
-        "Contexto de materiales de marketing:",
-        contextoAssets || "(sin materiales)",
+        assets.length > 0 ? "[MATERIALES DE MARKETING]:" : "",
+        assets.length > 0 ? (contextoAssets || "") : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -417,17 +427,14 @@ export async function POST(request: NextRequest) {
     // ===== REGISTRAR MENSAJES EN MEMORIA =====
     if (telefono) {
       try {
+        const detectedTheme = extractThemeFromMessage(message);
+        // Guardar mensaje del cliente + respuesta del agente + actualizar memoria en paralelo
         await Promise.all([
           logConversationMessage(supabase, telefono, perfil_id || undefined, "cliente", message),
           logConversationMessage(supabase, telefono, perfil_id || undefined, "agente", responseText),
+          // SIEMPRE actualizar memoria (incrementa contador → sube nivel de confianza)
+          updateCustomerMemory(supabase, telefono, perfil_id || undefined, customerName || undefined, detectedTheme || undefined),
         ]);
-
-        // Extraer tema de la conversación
-        const detectedTheme = extractThemeFromMessage(message);
-        if (detectedTheme) {
-          // Actualizar tema en memoria del cliente
-          await updateCustomerMemory(supabase, telefono, perfil_id, customerName, detectedTheme);
-        }
       } catch (logError) {
         console.warn("[ai/chat] Error registrando mensajes en memoria", logError);
       }
