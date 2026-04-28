@@ -1054,6 +1054,16 @@ export default function ClubPage() {
                               label: "Hidratación y nutrición",
                               msg: "Hola, mi cabello esta reseco y sin vida. Que tratamientos o productos me recomiendas para hidratar y nutrir profundamente mi cabello desde casa?",
                             },
+                            {
+                              emoji: "💄",
+                              label: "Maquillaje",
+                              msg: "Hola, quiero mejorar mi rutina de maquillaje. Me puedes recomendar productos como base, corrector, labiales o sombras segun mi tono de piel y presupuesto?",
+                            },
+                            {
+                              emoji: "💅",
+                              label: "Uñas",
+                              msg: "Hola, quiero cuidar o decorar mis unas en casa. Me puedes recomendar esmaltes, geles, nail art o productos para fortalecer las unas?",
+                            },
                           ].map(({ emoji, label, msg }) => (
                             <Button
                               key={label}
