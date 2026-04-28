@@ -37,6 +37,40 @@ function isAuthorized(req: NextRequest): boolean {
   return received === expected;
 }
 
+async function generateWithModelFallback(
+  genAI: GoogleGenerativeAI,
+  prompt: string,
+): Promise<string> {
+  const candidates = [
+    process.env.GEMINI_MODEL_CHAT,
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-002",
+    "gemini-1.5-pro",
+  ].filter(Boolean) as string[];
+
+  let lastError: unknown = null;
+
+  for (const candidate of candidates) {
+    try {
+      const model = genAI.getGenerativeModel({ model: candidate });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text().trim();
+      if (text) return text;
+    } catch (err) {
+      lastError = err;
+      const message = String((err as Error)?.message || "").toLowerCase();
+      if (message.includes("404") || message.includes("not found") || message.includes("unsupported")) {
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError || new Error("No hay modelos Gemini disponibles para chat");
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!isAuthorized(request)) {
@@ -103,7 +137,6 @@ export async function POST(request: NextRequest) {
 
     if (geminiKey) {
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const prompt = [
         "Eres una asesora comercial de La Cosmetikera por WhatsApp.",
@@ -122,8 +155,7 @@ export async function POST(request: NextRequest) {
         contextoAssets || "(sin materiales)",
       ].join("\n");
 
-      const result = await model.generateContent(prompt);
-      responseText = result.response.text().trim();
+      responseText = await generateWithModelFallback(genAI, prompt);
     }
 
     if (!responseText) {
