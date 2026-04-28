@@ -3,9 +3,6 @@
  * Usado para hacer el agente más amigable y personalizado
  */
 
-import { createServerClient } from "@supabase/ssr";
-import type { NextRequest } from "next/server";
-
 /**
  * Normaliza el número de teléfono a formato consistente (solo dígitos, con código país 57)
  * Make puede enviar: "+573104239494", "573104239494", "3104239494"
