@@ -52,6 +52,7 @@ import {
   ThunderboltOutlined,
   WalletOutlined, // reserved
   TeamOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import routerProvider from "@refinedev/nextjs-router";
 import { dataProvider } from "@/providers/data-provider";
@@ -172,6 +173,16 @@ const allResources = [
     meta: {
       label: "Marketing",
       icon: <NotificationOutlined />,
+    },
+  },
+  // ── WHATSAPP AGENTE ───────────────────────────────────────────────
+  {
+    key: "whatsapp",
+    name: "whatsapp",
+    list: "/whatsapp",
+    meta: {
+      label: "WhatsApp Bot",
+      icon: <MessageOutlined />,
     },
   },
   // ── SISTEMA ───────────────────────────────────────────────────────

@@ -415,11 +415,11 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== REGISTRAR MENSAJES EN MEMORIA =====
-    if (perfil_id && telefono) {
+    if (telefono) {
       try {
         await Promise.all([
-          logConversationMessage(supabase, telefono, perfil_id, "cliente", message),
-          logConversationMessage(supabase, telefono, perfil_id, "agente", responseText),
+          logConversationMessage(supabase, telefono, perfil_id || undefined, "cliente", message),
+          logConversationMessage(supabase, telefono, perfil_id || undefined, "agente", responseText),
         ]);
 
         // Extraer tema de la conversación
