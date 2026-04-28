@@ -11,7 +11,7 @@ import {
   logConversationMessage,
   buildContextualPrompt,
   extractThemeFromMessage,
-  calculateTrustLevel,
+  updateCustomerMemory,
 } from "@/utils/whatsapp-memory";
 
 function normalize(value: unknown): string {
