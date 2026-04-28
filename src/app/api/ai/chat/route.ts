@@ -229,6 +229,8 @@ function buildHeuristicFallbackResponse(params: {
   const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedMessage);
   const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedMessage);
   const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|uñas|esmalte/.test(normalizedMessage);
+  const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
+  const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
 
   const closeByIntent =
     hasSkinConcern
@@ -260,6 +262,19 @@ function buildHeuristicFallbackResponse(params: {
     return `${greeting}. Te ayudo con el horario de atención enseguida. Si quieres, de una vez te dejo preseleccionados productos según tu necesidad para que compres más rápido.`;
   }
 
+  // Responder útil aunque no haya coincidencias en catálogo
+  if (hasSkinConcern && top.length === 0) {
+    return `${greeting}. Para acné/manchas/resequedad te recomiendo iniciar con rutina suave: limpieza sin sulfatos + hidratante no comedogénica + protector solar diario. Si me dices tu tipo de piel (grasa, seca o mixta) te armo una rutina exacta para ti.`;
+  }
+
+  if (hasHairConcern && top.length === 0) {
+    return `${greeting}. Para frizz/caída/resequedad del cabello, lo más efectivo es: shampoo suave + mascarilla hidratante 2-3 veces por semana + protector térmico antes de calor. ¿Tu cabello es liso, ondulado o rizado para recomendarte mejor?`;
+  }
+
+  if (hasMakeupConcern && top.length === 0) {
+    return `${greeting}. En maquillaje te puedo guiar según acabado y tipo de piel. Para iniciar: base ligera de larga duración + corrector hidratante + sellado suave. ¿Lo quieres para diario o para evento?`;
+  }
+
   if (top.length > 0) {
     const p = top[0];
     if (!p) {
@@ -267,6 +282,10 @@ function buildHeuristicFallbackResponse(params: {
     }
     const price = formatCOP(Number(p.precio_venta || 0));
     return `${greeting}. Según lo que me cuentas, una muy buena opción es ${p.nombre || "este producto"} (${price}). ${p.descripcion ? String(p.descripcion).slice(0, 110) : "Te da muy buen resultado y buena relación calidad-precio."} ${closeByIntent}`;
+  }
+
+  if (isGreeting || isShortQuestion) {
+    return `${greeting}. Aquí estoy para ayudarte de verdad con belleza: piel, cabello, maquillaje, uñas y barba. Cuéntame tu necesidad puntual (ej: acné, resequedad, frizz, caída o presupuesto) y te respondo con pasos concretos.`;
   }
 
   return `${greeting}. Claro que sí, te asesoro en belleza para mujer u hombre: piel, cabello, maquillaje, barba, uñas y rutinas. Cuéntame qué te preocupa (por ejemplo acné, manchas, frizz, caída o resequedad) y te doy opciones concretas.`;
