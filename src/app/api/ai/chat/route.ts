@@ -442,10 +442,11 @@ export async function POST(request: NextRequest) {
           "Este es un cliente nuevo. Sé acogedor, intenta identificar sus necesidades, presenta opciones concretas.";
       }
 
-      // Construir historial de conversación previo en formato legible
+      // Construir historial de conversación previo en orden cronológico consistente
       const historialPrevio = customerContext?.historialReciente ?? [];
-      // Los mensajes vienen ordenados DESC desde la BD → invertir para orden cronológico
-      const historialOrdenado = [...historialPrevio].reverse().slice(-8);
+      const historialOrdenado = [...historialPrevio]
+        .sort((a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime())
+        .slice(-8);
       const customerMemoryContext = historialOrdenado.length > 0
           ? `--- Historial REAL de esta conversación con ${customerName || "el cliente"} ---\n${historialOrdenado
               .map((m: { rol: string; mensaje: string }) =>

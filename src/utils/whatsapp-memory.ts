@@ -41,6 +41,35 @@ export interface CustomerContext {
   totalMensajes?: number;
 }
 
+function normalizeTrustLevel(value: unknown): "nuevo" | "conocido" | "leal" {
+  const v = String(value || "nuevo").toLowerCase();
+  if (v === "leal") return "leal";
+  if (v === "conocido") return "conocido";
+  return "nuevo";
+}
+
+function trustByVolume(totalMessages: number, fallback: unknown = "nuevo"): "nuevo" | "conocido" | "leal" {
+  if (totalMessages >= 20) return "leal";
+  if (totalMessages >= 5) return "conocido";
+  return normalizeTrustLevel(fallback);
+}
+
+function normalizeHistoryRows(
+  rows: Array<{ rol?: unknown; mensaje?: unknown; hora?: unknown; created_at?: unknown }>
+): Array<{ rol: "cliente" | "agente"; mensaje: string; hora: string }> {
+  return rows
+    .map((row) => {
+      const roleRaw = String(row.rol || "").toLowerCase();
+      const rol: "cliente" | "agente" = roleRaw === "cliente" ? "cliente" : "agente";
+      return {
+        rol,
+        mensaje: String(row.mensaje || "").trim(),
+        hora: String(row.hora || row.created_at || new Date().toISOString()),
+      };
+    })
+    .filter((row) => row.mensaje.length > 0);
+}
+
 /**
  * Obtiene el contexto del cliente desde Supabase
  */
@@ -48,40 +77,87 @@ export async function getCustomerContext(
   supabase: any,
   telefono: string
 ): Promise<CustomerContext | null> {
+  const phone = normalizePhone(telefono);
+
+  // 1) Camino principal: RPC
   try {
     const { data, error } = await supabase.rpc("get_whatsapp_context", {
-      p_telefono: telefono,
+      p_telefono: phone,
       p_limit: 10,
     });
 
     if (error) {
-      console.error("[Memory] Error obteniendo contexto:", error);
-      return null;
+      console.error("[Memory] Error obteniendo contexto por RPC, usando fallback:", error);
+    } else if (data && data.length > 0) {
+      const row = data[0];
+      const parsed = safeParseJsonb(row.historial_reciente, []) as Array<{
+        rol: unknown; mensaje: unknown; hora: unknown;
+      }>;
+      const historial = normalizeHistoryRows(parsed);
+      const total = historial.length;
+
+      return {
+        nombre: row.nombre || undefined,
+        nivelConfianza: trustByVolume(total, row.nivel_confianza),
+        historialReciente: historial,
+        preferencias: (safeParseJsonb(row.preferencias, {}) as Record<string, unknown>),
+        ultimoTema: row.ultimo_tema || undefined,
+        totalMensajes: total,
+      };
     }
 
-    if (!data || data.length === 0) {
+    if (data && data.length === 0) {
+      // Continúa a fallback porque puede existir historial aunque falte fila en whatsapp_customer_memory
+    }
+  } catch (err) {
+    console.error("[Memory] Exception RPC, usando fallback:", err);
+  }
+
+  // 2) Fallback robusto: lectura directa de tablas
+  try {
+    const [memoryRes, historyRes] = await Promise.all([
+      supabase
+        .from("whatsapp_customer_memory")
+        .select("nombre,nivel_confianza,preferencias,último_tema_tratado,total_mensajes")
+        .eq("telefono", phone)
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("whatsapp_conversation_history")
+        .select("rol,mensaje,created_at")
+        .eq("telefono", phone)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
+
+    const fallbackHistory = normalizeHistoryRows(
+      (historyRes.data || []).map((row: { rol: unknown; mensaje: unknown; created_at: unknown }) => ({
+        rol: row.rol,
+        mensaje: row.mensaje,
+        created_at: row.created_at,
+      }))
+    ).sort((a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime());
+
+    const total = Number(memoryRes.data?.total_mensajes || fallbackHistory.length || 0);
+    const nombre = memoryRes.data?.nombre || undefined;
+    const nivel = trustByVolume(total, memoryRes.data?.nivel_confianza);
+    const preferencias = safeParseJsonb(memoryRes.data?.preferencias, {}) as Record<string, unknown>;
+    const ultimoTema = memoryRes.data?.["último_tema_tratado"] || undefined;
+
+    if (!nombre && fallbackHistory.length === 0) {
       return null;
     }
-
-    const row = data[0];
-    const historial = safeParseJsonb(row.historial_reciente, []) as Array<{
-      rol: "cliente" | "agente"; mensaje: string; hora: string;
-    }>;
-    const total = historial.length;
-    // Calcular nivel de confianza por volumen de mensajes
-    const nivel: "nuevo" | "conocido" | "leal" =
-      total >= 20 ? "leal" : total >= 5 ? "conocido" : (row.nivel_confianza ?? "nuevo");
 
     return {
-      nombre: row.nombre,
+      nombre,
       nivelConfianza: nivel,
-      historialReciente: historial,
-      preferencias: (safeParseJsonb(row.preferencias, {}) as Record<string, unknown>),
-      ultimoTema: row.ultimo_tema,
+      historialReciente: fallbackHistory,
+      preferencias,
+      ultimoTema,
       totalMensajes: total,
     };
-  } catch (err) {
-    console.error("[Memory] Exception:", err);
+  } catch (fallbackErr) {
+    console.error("[Memory] Fallback exception:", fallbackErr);
     return null;
   }
 }
@@ -96,19 +172,77 @@ export async function updateCustomerMemory(
   nombre?: string,
   temaTratado?: string
 ): Promise<void> {
+  const phone = normalizePhone(telefono);
+
   try {
     const { error } = await supabase.rpc("update_whatsapp_memory", {
-      p_telefono: telefono,
+      p_telefono: phone,
       p_perfil_id: perfilId || null,
       p_nombre: nombre || null,
       p_tema_tratado: temaTratado || null,
     });
 
     if (error) {
-      console.error("[Memory] Error actualizando memoria:", error);
+      console.error("[Memory] Error RPC actualizando memoria, usando fallback:", error);
+      throw error;
     }
   } catch (err) {
-    console.error("[Memory] Exception:", err);
+    console.error("[Memory] Exception RPC, usando fallback:", err);
+
+    // Fallback robusto: upsert manual en tabla de memoria
+    try {
+      const now = new Date().toISOString();
+
+      const { data: existing } = await supabase
+        .from("whatsapp_customer_memory")
+        .select("id,total_mensajes,nivel_confianza,nombre")
+        .eq("telefono", phone)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const totalMensajes = Number(existing.total_mensajes || 0) + 1;
+        const nivelConfianza = trustByVolume(totalMensajes, existing.nivel_confianza);
+
+        const { error: updateError } = await supabase
+          .from("whatsapp_customer_memory")
+          .update({
+            perfil_id: perfilId || null,
+            nombre: nombre || existing.nombre || null,
+            total_mensajes: totalMensajes,
+            nivel_confianza: nivelConfianza,
+            ultima_interaccion: now,
+            ["último_tema_tratado"]: temaTratado || null,
+            updated_at: now,
+          })
+          .eq("id", existing.id);
+
+        if (updateError) {
+          console.error("[Memory] Fallback update error:", updateError);
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from("whatsapp_customer_memory")
+          .insert({
+            perfil_id: perfilId || null,
+            telefono: phone,
+            nombre: nombre || null,
+            primer_contacto: now,
+            ultima_interaccion: now,
+            total_mensajes: 1,
+            nivel_confianza: "nuevo",
+            ["último_tema_tratado"]: temaTratado || null,
+            preferencias: {},
+            updated_at: now,
+          });
+
+        if (insertError) {
+          console.error("[Memory] Fallback insert error:", insertError);
+        }
+      }
+    } catch (fallbackErr) {
+      console.error("[Memory] Fallback exception:", fallbackErr);
+    }
   }
 }
 
@@ -123,10 +257,12 @@ export async function logConversationMessage(
   mensaje: string,
   tipo: string = "text"
 ): Promise<void> {
+  const phone = normalizePhone(telefono);
+
   try {
     const { error } = await supabase.from("whatsapp_conversation_history").insert({
       perfil_id: perfilId || null,
-      telefono,
+      telefono: phone,
       rol,
       mensaje,
       tipo_mensaje: tipo,
