@@ -25,12 +25,18 @@ function normalize(value: unknown): string {
 
 function detectIntent(message: string): AgentIntent {
   const m = normalize(message);
-  if (/precio|cuanto|valor|costo|vale|promocion|oferta/.test(m)) return "precio";
-  if (/hora|horario|cuando|dia|fecha|agenda/.test(m)) return "horario";
-  if (/temario|contenido|modulo|modulos|incluye/.test(m)) return "temario";
-  if (/material|kit|insumo|herramienta/.test(m)) return "materiales";
-  if (/inscripcion|matricula|registr|cupo|reserv/.test(m)) return "inscripcion";
-  if (/requisito|necesito|debo llevar|condicion/.test(m)) return "requisitos";
+  if (/precio|cuanto|valor|costo|vale|promocion|oferta|descuento|economico|barato/.test(m)) return "precio";
+  if (/hora|horario|cuando|dia|fecha|agenda|atienden|abren|cierran/.test(m)) return "horario";
+  if (/rutina|pasos|orden|como usar|aplicar|primero|despues|protocolo/.test(m)) return "temario";
+  if (/material|kit|insumo|herramienta|ingrediente|composicion|formula/.test(m)) return "materiales";
+  if (/inscripcion|matricula|registr|cupo|reserv|agendar|cita/.test(m)) return "inscripcion";
+  if (/requisito|necesito|debo llevar|condicion|contraindicacion|alergia/.test(m)) return "requisitos";
+
+  // Consultas comunes de belleza (mujeres y hombres)
+  if (/acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(m)) return "general";
+  if (/caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion|barba/.test(m)) return "general";
+  if (/maquillaje|base|corrector|labial|pestanas|cejas|uñas|esmalte|perfume|fragancia/.test(m)) return "general";
+
   return "general";
 }
 
@@ -209,6 +215,63 @@ function buildSalesAdvisoryContext(
     .join("\n");
 }
 
+function buildHeuristicFallbackResponse(params: {
+  customerName: string;
+  message: string;
+  intent: AgentIntent;
+  articles: CatalogArticle[];
+}): string {
+  const { customerName, message, intent, articles } = params;
+  const greeting = customerName ? `Hola ${customerName}` : "Hola";
+  const top = rankArticles(articles, getSearchTokens(message), intent).slice(0, 2);
+  const normalizedMessage = normalize(message);
+
+  const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedMessage);
+  const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedMessage);
+  const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|uñas|esmalte/.test(normalizedMessage);
+
+  const closeByIntent =
+    hasSkinConcern
+      ? "¿Tu piel es grasa, seca o mixta para afinarte la recomendación?"
+      : hasHairConcern
+      ? "¿Tu cabello es liso, ondulado o rizado para recomendarte mejor?"
+      : hasMakeupConcern
+      ? "¿Lo quieres para uso diario o para ocasión especial?"
+      : "¿Te gustaría que te recomiende 2 opciones según tu necesidad exacta?";
+
+  if (intent === "precio" && top.length > 0) {
+    const lines = top.map((p) => {
+      const price = formatCOP(Number(p.precio_venta || 0));
+      const discount = Number(p.descuento_porcentaje || 0) > 0 ? ` (${p.descuento_porcentaje}% OFF)` : "";
+      return `• ${p.nombre || "Producto"}: ${price}${discount}`;
+    });
+    return `${greeting}. Te comparto opciones reales:\n${lines.join("\n")}\n${closeByIntent}`;
+  }
+
+  if ((intent === "materiales" || intent === "temario") && top.length > 0) {
+    const p = top[0];
+    if (!p) {
+      return `${greeting}. Entiendo tu consulta y te puedo recomendar opciones concretas. ${closeByIntent}`;
+    }
+    return `${greeting}. Para eso te recomiendo ${p.nombre || "esta opción"}, porque ${p.descripcion || "funciona muy bien para ese objetivo"}. ${closeByIntent}`;
+  }
+
+  if (intent === "horario") {
+    return `${greeting}. Te ayudo con el horario de atención enseguida. Si quieres, de una vez te dejo preseleccionados productos según tu necesidad para que compres más rápido.`;
+  }
+
+  if (top.length > 0) {
+    const p = top[0];
+    if (!p) {
+      return `${greeting}. Te puedo recomendar opciones concretas según tu necesidad. ${closeByIntent}`;
+    }
+    const price = formatCOP(Number(p.precio_venta || 0));
+    return `${greeting}. Según lo que me cuentas, una muy buena opción es ${p.nombre || "este producto"} (${price}). ${p.descripcion ? String(p.descripcion).slice(0, 110) : "Te da muy buen resultado y buena relación calidad-precio."} ${closeByIntent}`;
+  }
+
+  return `${greeting}. Claro que sí, te asesoro en belleza para mujer u hombre: piel, cabello, maquillaje, barba, uñas y rutinas. Cuéntame qué te preocupa (por ejemplo acné, manchas, frizz, caída o resequedad) y te doy opciones concretas.`;
+}
+
 function isAuthorized(req: NextRequest): boolean {
   const received = req.headers.get("x-api-key") || "";
   const expected = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY || "";
@@ -238,7 +301,12 @@ async function generateWithModelFallback(
   for (const candidate of candidates) {
     try {
       const model = genAI.getGenerativeModel({ model: candidate });
-      const result = await model.generateContent(prompt);
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`timeout-${candidate}`)), 7000),
+        ),
+      ]);
       const text = result.response.text().trim();
       if (text) return text;
     } catch (err) {
@@ -251,7 +319,8 @@ async function generateWithModelFallback(
         message.includes("429") ||
         message.includes("quota") ||
         message.includes("rate limit") ||
-        message.includes("resource exhausted")
+        message.includes("resource exhausted") ||
+        message.includes("timeout-")
       ) {
         continue;
       }
@@ -386,19 +455,22 @@ export async function POST(request: NextRequest) {
           : `(primera vez que escribe este número)\nNivel: ${trustLevel}`;
 
       const prompt = [
-        "Eres Dany, asesora virtual experta en cosméticos de La Cosmetikera (WhatsApp).",
+        "Eres Dany, asesora virtual experta en belleza integral de La Cosmetikera (WhatsApp).",
         toneInstruction,
         "Reglas OBLIGATORIAS:",
-        "- Responde en español colombiano natural, máximo 4-5 líneas.",
+        "- Responde en español colombiano natural, cálido y conversacional, máximo 4-6 líneas.",
+        "- Atiende tanto a mujeres como a hombres con lenguaje inclusivo y cercano.",
+        "- Asesora por necesidad real: piel, cabello, maquillaje, uñas, barba, rutina y fragancias.",
+        "- Si detectas problema (acné, manchas, frizz, caída, resequedad, sensibilidad), primero valida necesidad y luego recomienda.",
         "- USA el historial de conversación para dar continuidad REAL (no repitas saludos si ya conversaron).",
         "- Si el cliente ya preguntó algo antes, recuérdalo y conecta la respuesta.",
         "- No inventes precios ni stock; usa SOLO el contexto de productos dado.",
         "- Si hay precio disponible, SIEMPRE dilo en formato $X.XXX COP.",
         "- Si hay descuento, menciónalo siempre (genera urgencia).",
-        "- Al dar precio: agrega 1 beneficio clave del producto + una recomendación de uso breve.",
-        "- Cierra siempre con una pregunta para concretar: '¿Te lo reservo?', '¿Cuántos necesitas?', '¿Lo recogería en tienda o envío?'.",
+        "- Al dar precio: agrega 1 beneficio clave del producto + recomendación breve de uso.",
+        "- Cierra siempre con una pregunta útil para seguir asesorando o concretar compra.",
         "- Si no tienes el producto, di exactamente qué tienes similar y ofrece alternativas.",
-        "- Nunca hagas afirmaciones médicas absolutas.",
+        "- Nunca hagas afirmaciones médicas absolutas ni prometas resultados imposibles.",
         "",
         customerName ? `[CLIENTE: ${customerName}]` : "[CLIENTE: nuevo]",
         customerMemoryContext,
@@ -427,8 +499,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!responseText) {
-      const greeting = customerName ? `¡Hola ${customerName}!` : "¡Hola!";
-      responseText = `${greeting} Gracias por escribir a La Cosmetikera. Te ayudo con precios, productos y promociones activas. ¿Qué producto buscas hoy?`;
+      responseText = buildHeuristicFallbackResponse({
+        customerName,
+        message,
+        intent,
+        articles: articulos,
+      });
     }
 
     // ===== REGISTRAR MENSAJES EN MEMORIA =====
