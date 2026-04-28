@@ -53,6 +53,7 @@ const { useBreakpoint } = Grid;
 
 const BRAND_FUCHSIA = "#d81b87";
 const BRAND_FUCHSIA_SOFT = "#ff4fa3";
+const WHATSAPP_BOT_NUMBER = "573104239494";
 
 const sectionCardStyle: React.CSSProperties = {
   borderRadius: 16,
@@ -61,6 +62,10 @@ const sectionCardStyle: React.CSSProperties = {
   border: "1px solid #ffd6e7",
   boxShadow: "0 6px 16px rgba(216,27,135,0.08)",
 };
+
+function buildWhatsAppLink(text: string): string {
+  return `https://wa.me/${WHATSAPP_BOT_NUMBER}?text=${encodeURIComponent(text)}`;
+}
 
 type Cliente = {
   id: string;
@@ -1022,16 +1027,42 @@ export default function ClubPage() {
                         </Space>
                       </Card>
 
-                      <Card style={{ ...sectionCardStyle, textAlign: "center", background: "linear-gradient(135deg,#fff0f8,#ffd6e7)" }}>
-                        <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 8 }}>¿Quieres ayuda para usar tu código o revisar tu club?</Text>
-                        <Button
-                          type="primary"
-                          icon={<PhoneOutlined />}
-                          style={{ background: "#25D366", borderColor: "#25D366" }}
-                          onClick={() => window.open("https://wa.me/57XXXXXXXXXX?text=Hola! Quiero consultar mis puntos del Club La Cosmetikera", "_blank")}
-                        >
-                          Contáctanos por WhatsApp
-                        </Button>
+                      <Card style={{ ...sectionCardStyle, background: "linear-gradient(135deg,#fff0f8,#ffd6e7)" }}>
+                        <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                          <Title level={5} style={{ margin: 0, color: BRAND_FUCHSIA }}>Habla con una asesora en WhatsApp</Title>
+                          <Text style={{ fontSize: 13 }}>
+                            ¿Notas caída del cabello, quiebre o poco crecimiento? Escríbenos y te orientamos con una recomendación cercana y profesional
+                            según tu necesidad, para que elijas con seguridad.
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Respuesta rápida, precios al día y opciones con oferta para ayudarte a tomar la mejor decisión hoy.
+                          </Text>
+                          <Space wrap>
+                            <Button
+                              type="primary"
+                              icon={<PhoneOutlined />}
+                              style={{ background: "#25D366", borderColor: "#25D366" }}
+                              onClick={() =>
+                                window.open(
+                                  buildWhatsAppLink("Hola, necesito una asesoria para caida del cabello. Quiero una recomendacion profesional segun mi tipo de cabello y presupuesto."),
+                                  "_blank",
+                                )
+                              }
+                            >
+                              Hablar con una asesora ahora
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                window.open(
+                                  buildWhatsAppLink("Hola, quiero consultar mis puntos del Club La Cosmetikera y recibir recomendaciones personalizadas."),
+                                  "_blank",
+                                )
+                              }
+                            >
+                              Consultar club y puntos
+                            </Button>
+                          </Space>
+                        </Space>
                       </Card>
                     </Col>
                   </Row>

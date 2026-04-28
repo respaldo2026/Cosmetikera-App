@@ -26,6 +26,181 @@ function detectIntent(message: string): AgentIntent {
   return "general";
 }
 
+type CatalogArticle = {
+  nombre?: string | null;
+  categoria?: string | null;
+  marca?: string | null;
+  referencia?: string | null;
+  codigo_barras?: string | null;
+  descripcion?: string | null;
+  precio_venta?: number | null;
+  stock?: number | null;
+  descuento_porcentaje?: number | null;
+  promocion_texto?: string | null;
+  activo?: boolean | null;
+  updated_at?: string | null;
+};
+
+const STOPWORDS = new Set([
+  "de",
+  "la",
+  "el",
+  "los",
+  "las",
+  "un",
+  "una",
+  "unos",
+  "unas",
+  "por",
+  "para",
+  "con",
+  "sin",
+  "que",
+  "cual",
+  "cuanto",
+  "cuesta",
+  "precio",
+  "vale",
+  "del",
+  "al",
+  "me",
+  "mi",
+  "quiero",
+  "tienen",
+  "tienes",
+  "hay",
+  "en",
+  "y",
+  "o",
+]);
+
+function getSearchTokens(message: string): string[] {
+  return normalize(message)
+    .split(/\s+/)
+    .map((token) => token.replace(/[^a-z0-9]/g, "").trim())
+    .filter((token) => token.length >= 3 && !STOPWORDS.has(token));
+}
+
+function formatCOP(value: number): string {
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function rankArticles(
+  articles: CatalogArticle[],
+  tokens: string[],
+  intent: AgentIntent,
+): CatalogArticle[] {
+  const scored = articles.map((article) => {
+    const searchable = normalize(
+      [
+        article.nombre,
+        article.marca,
+        article.categoria,
+        article.referencia,
+        article.codigo_barras,
+        article.descripcion,
+        article.promocion_texto,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    );
+
+    let score = 0;
+    for (const token of tokens) {
+      if (normalize(article.nombre).includes(token)) score += 10;
+      if (normalize(article.marca).includes(token)) score += 6;
+      if (normalize(article.categoria).includes(token)) score += 5;
+      if (normalize(article.referencia).includes(token)) score += 8;
+      if (searchable.includes(token)) score += 2;
+    }
+
+    if (Number(article.descuento_porcentaje || 0) > 0) score += 3;
+    if (intent === "precio") score += 2;
+    if (Number(article.stock || 0) > 0) score += 1;
+
+    return { article, score };
+  });
+
+  const matched = scored
+    .filter((item) => item.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (Number(b.article.descuento_porcentaje || 0) !== Number(a.article.descuento_porcentaje || 0)) {
+        return Number(b.article.descuento_porcentaje || 0) - Number(a.article.descuento_porcentaje || 0);
+      }
+      return new Date(String(b.article.updated_at || 0)).getTime() - new Date(String(a.article.updated_at || 0)).getTime();
+    })
+    .map((item) => item.article);
+
+  if (matched.length >= 20) return matched.slice(0, 40);
+
+  const offers = articles
+    .filter((a) => Number(a.descuento_porcentaje || 0) > 0)
+    .sort((a, b) => Number(b.descuento_porcentaje || 0) - Number(a.descuento_porcentaje || 0));
+
+  const recent = [...articles].sort(
+    (a, b) => new Date(String(b.updated_at || 0)).getTime() - new Date(String(a.updated_at || 0)).getTime(),
+  );
+
+  const result: CatalogArticle[] = [...matched];
+  for (const candidate of [...offers, ...recent]) {
+    if (result.length >= 40) break;
+    if (!result.includes(candidate)) result.push(candidate);
+  }
+
+  return result;
+}
+
+function buildProductContext(
+  articles: CatalogArticle[],
+  message: string,
+  intent: AgentIntent,
+): string {
+  const tokens = getSearchTokens(message);
+  const ranked = rankArticles(articles, tokens, intent).slice(0, 35);
+
+  return ranked
+    .map((p) => {
+      const precio = formatCOP(Number(p.precio_venta || 0));
+      const stock = Number(p.stock || 0);
+      const stockText = stock > 0 ? `stock: ${stock}` : "stock: agotado";
+      const descuento = Number(p.descuento_porcentaje || 0) > 0 ? ` | descuento: ${p.descuento_porcentaje}%` : "";
+      const promoText = p.promocion_texto ? ` | promo: ${String(p.promocion_texto)}` : "";
+
+      return `- ${p.nombre || "Artículo"} | marca: ${p.marca || "N/A"} | categoria: ${p.categoria || "general"} | precio: ${precio} | ${stockText}${descuento}${promoText}`;
+    })
+    .join("\n");
+}
+
+function buildSalesAdvisoryContext(
+  articles: CatalogArticle[],
+  message: string,
+  intent: AgentIntent,
+): string {
+  const tokens = getSearchTokens(message);
+  const top = rankArticles(articles, tokens, intent).slice(0, 3);
+
+  if (top.length === 0) {
+    return "(sin coincidencias claras para asesoria)";
+  }
+
+  return top
+    .map((p) => {
+      const beneficio = String(p.descripcion || p.promocion_texto || "").replace(/\s+/g, " ").trim();
+      const beneficioCorto = beneficio ? beneficio.slice(0, 140) : "Producto de alta rotacion en tienda.";
+      const recomendacion = p.categoria
+        ? `Sugerir segun necesidad en categoria ${p.categoria}.`
+        : "Validar objetivo del cliente para recomendar la opcion correcta.";
+
+      return `- ${p.nombre || "Articulo"} | beneficio: ${beneficioCorto}${beneficio.length > 140 ? "..." : ""} | recomendacion: ${recomendacion}`;
+    })
+    .join("\n");
+}
+
 function isAuthorized(req: NextRequest): boolean {
   const received = req.headers.get("x-api-key") || "";
   const expected = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY || "";
@@ -119,16 +294,16 @@ export async function POST(request: NextRequest) {
         .limit(80),
       supabase
         .from("articulos")
-        .select("nombre,categoria,marca,precio_venta,stock,descuento_porcentaje,promocion_texto")
-        .gt("stock", 0)
+        .select("nombre,categoria,marca,referencia,codigo_barras,descripcion,precio_venta,stock,descuento_porcentaje,promocion_texto,activo,updated_at")
+        .or("activo.is.null,activo.eq.true")
         .order("updated_at", { ascending: false })
-        .limit(80),
+        .limit(1500),
     ]);
 
     const intent = detectIntent(message);
 
     const assets = Array.isArray(assetsRes.data) ? assetsRes.data : [];
-    const articulos = Array.isArray(articulosRes.data) ? articulosRes.data : [];
+    const articulos = Array.isArray(articulosRes.data) ? (articulosRes.data as CatalogArticle[]) : [];
 
     const contextoAssets = assets
       .slice(0, 20)
@@ -138,13 +313,8 @@ export async function POST(request: NextRequest) {
       })
       .join("\n");
 
-    const contextoArticulos = articulos
-      .slice(0, 25)
-      .map((p) => {
-        const promo = Number(p.descuento_porcentaje || 0) > 0 ? ` | descuento: ${p.descuento_porcentaje}%` : "";
-        return `- ${p.nombre} | categoria: ${p.categoria || "general"} | marca: ${p.marca || "N/A"} | precio: ${p.precio_venta || 0}${promo}`;
-      })
-      .join("\n");
+    const contextoArticulos = buildProductContext(articulos, message, intent);
+    const contextoAsesoria = buildSalesAdvisoryContext(articulos, message, intent);
 
     let responseText = "";
 
@@ -153,16 +323,22 @@ export async function POST(request: NextRequest) {
 
       const prompt = [
         "Eres una asesora comercial de La Cosmetikera por WhatsApp.",
-        "Responde en español colombiano, máximo 4 líneas, tono cálido y directo.",
+        "Responde en español colombiano, maximo 5 lineas, tono calido y directo.",
         "No inventes precios ni stock; usa solo el contexto.",
         "Si falta data, dilo claramente y ofrece que un asesor confirme.",
         "Si el cliente pregunta por precio, sugiere 1-2 opciones concretas del catálogo.",
+        "Incluye precio con formato COP y menciona oferta/descuento solo si viene en contexto.",
+        "Cuando pregunten por precio/producto, agrega micro-asesoria para confianza: beneficio principal + recomendacion corta de uso/eleccion + cierre suave para concretar compra.",
+        "No uses promesas absolutas, ni afirmaciones medicas, ni inventes ingredientes.",
         "",
         `Intención detectada: ${intent}`,
         `Mensaje cliente: ${message}`,
         "",
         "Contexto de productos:",
         contextoArticulos || "(sin productos)",
+        "",
+        "Contexto para asesoria comercial:",
+        contextoAsesoria,
         "",
         "Contexto de materiales de marketing:",
         contextoAssets || "(sin materiales)",
