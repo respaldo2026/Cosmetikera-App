@@ -122,6 +122,37 @@ function groupMessagesByDate(messages: Message[]): Array<Message | { type: "sepa
   return result;
 }
 
+// ── Renderizador de formato WhatsApp (*negrita*, _cursiva_, ~tachado~, saltos) ─
+function renderWhatsApp(text: string): React.ReactNode {
+  if (!text) return null;
+  const parts: React.ReactNode[] = [];
+  // Captura: *negrita*, _cursiva_, ~tachado~ y saltos de línea
+  const regex = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|\n)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token === "\n") {
+      parts.push(<br key={key++} />);
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      parts.push(<strong key={key++} style={{ fontWeight: 700 }}>{token.slice(1, -1)}</strong>);
+    } else if (token.startsWith("_") && token.endsWith("_")) {
+      parts.push(<em key={key++}>{token.slice(1, -1)}</em>);
+    } else if (token.startsWith("~") && token.endsWith("~")) {
+      parts.push(<del key={key++}>{token.slice(1, -1)}</del>);
+    } else {
+      parts.push(token);
+    }
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return <>{parts}</>;
+}
+
 // ── Componente burbuja de mensaje ─────────────────────────────────────────────
 const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
   const isClient = msg.rol === "cliente";
@@ -164,7 +195,7 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
           </div>
         )}
         <Text style={{ fontSize: 14, color: "#111", lineHeight: "20px", display: "block" }}>
-          {msg.mensaje}
+          {renderWhatsApp(msg.mensaje)}
         </Text>
         <div
           style={{
@@ -453,7 +484,7 @@ export default function WhatsAppMonitorPage() {
                             <RobotOutlined style={{ marginRight: 3 }} />
                           </span>
                         ) : null}
-                        {conv.ultimo_mensaje}
+                        {conv.ultimo_mensaje.replace(/\*([^*\n]+)\*/g, "$1").replace(/_([^_\n]+)_/g, "$1").replace(/~([^~\n]+)~/g, "$1").slice(0, 60)}
                       </Text>
                       {conv.total > 0 && (
                         <Badge

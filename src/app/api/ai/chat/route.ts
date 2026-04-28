@@ -248,6 +248,7 @@ function buildHeuristicFallbackResponse(params: {
   message: string;
   intent: AgentIntent;
   articles: CatalogArticle[];
+  lastBotMessage?: string;
 }): string {
   const { customerName, message, intent, articles } = params;
   const greeting = customerName ? `Hola ${customerName}` : "Hola";
@@ -256,12 +257,41 @@ function buildHeuristicFallbackResponse(params: {
 
   const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedMessage);
   const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedMessage);
-  const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|uñas|esmalte/.test(normalizedMessage);
+  const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|esmalte/.test(normalizedMessage);
   const asksPoints = /puntos|club|fidelizacion|canje|beneficio/.test(normalizedMessage);
   const asksName = /sabes\s+mi\s+nombre|cual\s+es\s+mi\s+nombre|mi\s+nombre\??/.test(normalizedMessage);
-  const asksNails = /uñas|unas|esmalte|semipermanente|acrilicas|gel/.test(normalizedMessage);
+  const asksNails = /uñas|unas|nail|semipermanente|acrilicas/.test(normalizedMessage);
   const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
   const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
+
+  // --- Detección de continuidad conversacional ---
+  const lastBot = normalize(params.lastBotMessage || "");
+  const isFollowUpHair = /cabello|pelo|shampoo|mascarilla|frizz|caida|rizado|ondulado/.test(lastBot);
+  const isFollowUpSkin = /piel|acne|manchas|serum|hidratante|poro|grasa|seca|mixta/.test(lastBot);
+  const isFollowUpNails = /unas|esmalte|semipermanente|gel|acrilica|nail/.test(lastBot);
+  const isFollowUpMakeup = /maquillaje|base|corrector|evento|diario/.test(lastBot);
+  const msgWords = normalizedMessage.split(/\s+/).filter(Boolean).length;
+  const isShortFollowUp = msgWords <= 5 && lastBot.length > 10;
+
+  // --- Respuesta inteligente a mensajes de seguimiento (sin necesidad de Gemini) ---
+  if (isShortFollowUp && isFollowUpHair && !hasHairConcern) {
+    const hairType = message.trim();
+    return `💇 ¡Perfecto! Para cabello *${hairType}* te recomiendo:\n1) *Shampoo sin sulfatos* suave para ese tipo de cabello\n2) *Mascarilla hidratante* 2 veces por semana 💧\n3) *Sérum o aceite vegetal* en las puntas\n¿Tienes más preocupación: frizz, caída o resequedad?`;
+  }
+
+  if (isShortFollowUp && isFollowUpSkin && !hasSkinConcern) {
+    const skinType = message.trim();
+    return `✨ ¡Entendido! Para piel *${skinType}* la rutina ideal es:\n1) *Limpieza suave* mañana y noche\n2) *Hidratante ligera* no comedogénica\n3) *Protector solar* diario ☀️\n¿Te preocupa más el acné, las manchas o la resequedad?`;
+  }
+
+  if (isShortFollowUp && isFollowUpNails && !asksNails) {
+    const nailDetail = message.trim();
+    return `💅 ¡Entendido! Para uñas *${nailDetail}* te sugiero:\n1) *Base nutritiva* protege la lámina\n2) *Esmalte de larga duración* con color definido\n3) *Top coat* brillo y sellado final\n¿Quieres acabado natural, elegante o llamativo?`;
+  }
+
+  if (isShortFollowUp && isFollowUpMakeup && !hasMakeupConcern) {
+    return `💄 ¡Listo! Para *${message.trim()}* te recomiendo:\n1) *Base ligera* de larga duración\n2) *Corrector hidratante* que nivela el tono\n3) *Polvo fijador* para sellado suave\n¿Lo quieres para uso diario o para un evento especial?`;
+  }
 
   const closeByIntent =
     hasSkinConcern
@@ -304,7 +334,13 @@ function buildHeuristicFallbackResponse(params: {
     return `🎁 Te ayudo con tus *puntos del Club*. Para validarlos sin error, compárteme tu *cédula* y te indico saldo, nivel y opciones de canje.`;
   }
 
-  if (asksNails && top.length === 0) {
+  if (asksNails) {
+    if (top.length > 0) {
+      const p = top[0];
+      const price = p ? formatCOP(Number(p.precio_venta || 0)) : "";
+      const priceText = price && Number(p?.precio_venta || 0) > 0 ? ` a *${price}*` : "";
+      return `💅 ¡Claro! Para *uñas* tenemos *${p?.nombre || "opciones disponibles"}*${priceText}. ${p?.descripcion ? String(p.descripcion).slice(0, 100) : "Excelente para fortalecer y dar duración."}\nTambién podemos asesorarte en:\n1) *Fortalecer*: base vitaminada\n2) *Duración*: semipermanente\n3) *Acabado*: top coat gel\n¿Quieres acabado natural, elegante o llamativo?`;
+    }
     return `💅 ¡Claro! Para *uñas* te recomiendo según objetivo:\n1) *Fortalecer*: base vitaminada\n2) *Duración*: esmalte semipermanente\n3) *Acabado profesional*: top coat gel\n¿Quieres acabado natural, elegante o llamativo?`;
   }
 
@@ -578,19 +614,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Último mensaje del agente (para contexto de continuidad)
+    const lastAgentMessage = [...(customerContext?.historialReciente || [])]
+      .reverse()
+      .find((m: { rol: string; mensaje: string }) => m.rol === "agente")?.mensaje ?? "";
+
     if (!responseText) {
       responseText = buildHeuristicFallbackResponse({
         customerName,
         message,
         intent,
         articles: articulos,
+        lastBotMessage: lastAgentMessage,
       });
     }
 
     // Evitar respuestas repetidas consecutivas cuando Gemini/fallback se estancan
-    const lastAgentMessage = [...(customerContext?.historialReciente || [])]
-      .reverse()
-      .find((m: { rol: string; mensaje: string }) => m.rol === "agente")?.mensaje;
 
     if (lastAgentMessage && looksRepeatedAnswer(responseText, lastAgentMessage)) {
       responseText = buildHeuristicFallbackResponse({
@@ -598,6 +637,7 @@ export async function POST(request: NextRequest) {
         message,
         intent,
         articles: articulos,
+        lastBotMessage: lastAgentMessage,
       });
     }
 
