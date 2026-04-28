@@ -1028,40 +1028,54 @@ export default function ClubPage() {
                       </Card>
 
                       <Card style={{ ...sectionCardStyle, background: "linear-gradient(135deg,#fff0f8,#ffd6e7)" }}>
-                        <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                          <Title level={5} style={{ margin: 0, color: BRAND_FUCHSIA }}>Habla con una asesora en WhatsApp</Title>
+                        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                          <Title level={5} style={{ margin: 0, color: BRAND_FUCHSIA }}>¿Qué necesitas hoy? Habla con una asesora 💬</Title>
                           <Text style={{ fontSize: 13 }}>
-                            ¿Notas caída del cabello, quiebre o poco crecimiento? Escríbenos y te orientamos con una recomendación cercana y profesional
-                            según tu necesidad, para que elijas con seguridad.
+                            Elige tu preocupación y recibe una recomendación profesional y personalizada por WhatsApp — rápido, sin citas y con precios al día.
                           </Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            Respuesta rápida, precios al día y opciones con oferta para ayudarte a tomar la mejor decisión hoy.
-                          </Text>
-                          <Space wrap>
+                          {[
+                            {
+                              emoji: "💆‍♀️",
+                              label: "Caída del cabello",
+                              msg: "Hola, tengo problema de caida del cabello y quiero una recomendacion profesional. Me puedes orientar con los mejores productos segun mi tipo de cabello y presupuesto?",
+                            },
+                            {
+                              emoji: "✨",
+                              label: "Alisado / Keratina",
+                              msg: "Hola, quiero alisar o hacer keratina en casa. Me puedes recomendar los mejores productos para alisado segun mi tipo de cabello? Cual es el mas efectivo y duradero?",
+                            },
+                            {
+                              emoji: "🎨",
+                              label: "Coloración / Tintes",
+                              msg: "Hola, quiero colorarme el cabello en casa. Me puedes orientar con tintes o decolorantes? Que necesito para un buen resultado y cuidar mi cabello?",
+                            },
+                            {
+                              emoji: "💧",
+                              label: "Hidratación y nutrición",
+                              msg: "Hola, mi cabello esta reseco y sin vida. Que tratamientos o productos me recomiendas para hidratar y nutrir profundamente mi cabello desde casa?",
+                            },
+                          ].map(({ emoji, label, msg }) => (
                             <Button
-                              type="primary"
+                              key={label}
+                              block
                               icon={<PhoneOutlined />}
-                              style={{ background: "#25D366", borderColor: "#25D366" }}
-                              onClick={() =>
-                                window.open(
-                                  buildWhatsAppLink("Hola, necesito una asesoria para caida del cabello. Quiero una recomendacion profesional segun mi tipo de cabello y presupuesto."),
-                                  "_blank",
-                                )
-                              }
+                              style={{ background: "#25D366", borderColor: "#25D366", color: "#fff", textAlign: "left", height: "auto", padding: "10px 16px" }}
+                              onClick={() => window.open(buildWhatsAppLink(msg), "_blank")}
                             >
-                              Hablar con una asesora ahora
+                              <span style={{ fontSize: 16, marginRight: 8 }}>{emoji}</span>{label}
                             </Button>
-                            <Button
-                              onClick={() =>
-                                window.open(
-                                  buildWhatsAppLink("Hola, quiero consultar mis puntos del Club La Cosmetikera y recibir recomendaciones personalizadas."),
-                                  "_blank",
-                                )
-                              }
-                            >
-                              Consultar club y puntos
-                            </Button>
-                          </Space>
+                          ))}
+                          <Button
+                            block
+                            onClick={() =>
+                              window.open(
+                                buildWhatsAppLink("Hola, quiero consultar mis puntos del Club La Cosmetikera y recibir recomendaciones personalizadas."),
+                                "_blank",
+                              )
+                            }
+                          >
+                            🏅 Consultar mis puntos del Club
+                          </Button>
                         </Space>
                       </Card>
                     </Col>
