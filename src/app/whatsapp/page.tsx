@@ -77,11 +77,13 @@ function formatListTime(iso: string): string {
 function getInitials(name: string, phone: string): string {
   if (name) {
     const parts = name.trim().split(" ");
+    const first = parts[0] ?? "";
+    const second = parts[1] ?? "";
     return parts.length >= 2
-      ? (parts[0][0] + parts[1][0]).toUpperCase()
-      : parts[0].slice(0, 2).toUpperCase();
+      ? ((first[0] ?? "") + (second[0] ?? "")).toUpperCase()
+      : first.slice(0, 2).toUpperCase();
   }
-  return phone.slice(-2);
+  return phone.slice(-2) || "?";
 }
 
 function getAvatarColor(phone: string): string {
@@ -91,7 +93,7 @@ function getAvatarColor(phone: string): string {
     "#3F51B5", "#009688",
   ];
   const hash = phone.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return colors[hash % colors.length];
+  return colors[hash % colors.length] ?? "#128C7E";
 }
 
 // Separador de fecha entre mensajes
