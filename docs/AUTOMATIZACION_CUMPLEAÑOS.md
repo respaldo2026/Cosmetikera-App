@@ -178,9 +178,9 @@ curl -X POST http://localhost:3000/api/whatsapp/send-birthday-reminder \
 - Rol `cliente` (o NULL)
 
 ✅ Plantillas creadas en Meta Business Manager:
-- `cumpleaños_recordatorio_2d_es`
-- `cumpleaños_recordatorio_1d_es`
-- `cumpleaños_celebracion_es`
+- `cumpleanos_recordatorio_2d_es`
+- `cumpleanos_recordatorio_1d_es`
+- `cumpleanos_celebracion_es`
 
 ---
 

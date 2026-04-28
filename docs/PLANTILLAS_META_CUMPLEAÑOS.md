@@ -8,7 +8,7 @@ Estas plantillas **DEBEN ser 100% transaccionales** (sin beneficios, descuentos 
 
 ## 📋 Plantilla 1: Cumpleaños en 2 Días
 
-**Template Name:** `cumpleaños_recordatorio_2d_es`
+**Template Name:** `cumpleanos_recordatorio_2d_es`
 **Category:** TRANSACTIONAL ← (Critical!)
 **Language:** Spanish (es)
 
@@ -26,7 +26,7 @@ https://app.cosmetikera.com/club
 
 ## 📋 Plantilla 2: Cumpleaños Mañana
 
-**Template Name:** `cumpleaños_recordatorio_1d_es`
+**Template Name:** `cumpleanos_recordatorio_1d_es`
 **Category:** TRANSACTIONAL ← (Critical!)
 **Language:** Spanish (es)
 
@@ -44,7 +44,7 @@ https://app.cosmetikera.com/club
 
 ## 📋 Plantilla 3: ¡Feliz Cumpleaños Hoy!
 
-**Template Name:** `cumpleaños_celebracion_es`
+**Template Name:** `cumpleanos_celebracion_es`
 **Category:** TRANSACTIONAL ← (Critical!)
 **Language:** Spanish (es)
 
@@ -95,7 +95,7 @@ https://app.cosmetikera.com/club
 1. Ir a **https://business.facebook.com**
 2. Buscar **"Message Templates"** o **WhatsApp > Settings > Message Templates**
 3. Click **Create Template**
-4. **Template Name**: Copiar exacto (ej. `cumpleaños_recordatorio_2d_es`)
+4. **Template Name**: Copiar exacto (ej. `cumpleanos_recordatorio_2d_es`)
 5. **Category**: Seleccionar **TRANSACTIONAL** (no Marketing)
 6. **Language**: **Spanish (Español)**
 7. **Message Content**: Pegar el contenido de arriba **EXACTO**
@@ -115,6 +115,7 @@ Si rechaza, típicamente es porque:
 - Menciona descuentos/beneficios → Quita esa palabra
 - Parece marketing → Hazlo más simple
 - URL incorrecta → Verifica que sea `/club`
+- **Caracteres especiales** → Meta rechaza ñ, acentos en nombres. Solo usa a-z, 0-9, guion bajo
 
 ---
 

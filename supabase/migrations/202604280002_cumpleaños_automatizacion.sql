@@ -6,8 +6,8 @@
 -- 1. Plantilla: 2 días ANTES del cumpleaños
 INSERT INTO public.plantillas_whatsapp (nombre, descripcion, plantilla, variables, activa)
 VALUES (
-  'Cumpleaños -2 Días',
-  'Plantilla transaccional: cumpleaños_recordatorio_2d_es - Se envía 2 días antes del cumpleaños',
+  'Cumpleanos -2 Dias',
+  'Plantilla transaccional: cumpleanos_recordatorio_2d_es - Se envía 2 días antes del cumpleaños',
   'Tu cumpleaños es en 2 días 🎂
 
 Accede a tu cuenta en el Club La Cosmetikera:
@@ -21,8 +21,8 @@ https://app.cosmetikera.com/club
 -- 2. Plantilla: 1 día ANTES del cumpleaños
 INSERT INTO public.plantillas_whatsapp (nombre, descripcion, plantilla, variables, activa)
 VALUES (
-  'Cumpleaños -1 Día',
-  'Plantilla transaccional: cumpleaños_recordatorio_1d_es - Se envía 1 día antes del cumpleaños',
+  'Cumpleanos -1 Dia',
+  'Plantilla transaccional: cumpleanos_recordatorio_1d_es - Se envía 1 día antes del cumpleaños',
   '¡Mañana es tu cumpleaños! 🎂
 
 Entra a tu cuenta en el Club La Cosmetikera:
@@ -36,8 +36,8 @@ https://app.cosmetikera.com/club
 -- 3. Plantilla: EL DÍA del cumpleaños
 INSERT INTO public.plantillas_whatsapp (nombre, descripcion, plantilla, variables, activa)
 VALUES (
-  'Cumpleaños +0 Días',
-  'Plantilla transaccional: cumpleaños_celebracion_es - Se envía el día del cumpleaños',
+  'Cumpleanos +0 Dias',
+  'Plantilla transaccional: cumpleanos_celebracion_es - Se envía el día del cumpleaños',
   '¡Feliz cumpleaños! 🎂🎉
 
 Entra a tu cuenta en el Club La Cosmetikera:

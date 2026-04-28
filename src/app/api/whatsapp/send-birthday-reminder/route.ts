@@ -74,11 +74,11 @@ async function validateRequest(request: NextRequest): Promise<boolean> {
 function getTemplateName(diasOffset: -2 | -1 | 0): string {
   switch (diasOffset) {
     case -2:
-      return "cumpleaños_recordatorio_2d_es";
+      return "cumpleanos_recordatorio_2d_es";
     case -1:
-      return "cumpleaños_recordatorio_1d_es";
+      return "cumpleanos_recordatorio_1d_es";
     case 0:
-      return "cumpleaños_celebracion_es";
+      return "cumpleanos_celebracion_es";
     default:
       return "";
   }
