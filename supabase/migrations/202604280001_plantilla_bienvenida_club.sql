@@ -6,19 +6,19 @@
 INSERT INTO public.plantillas_whatsapp (nombre, descripcion, plantilla, variables, activa)
 VALUES (
   'Bienvenida al Club',
-  'Se envía cuando un cliente se inscribe o fideliza en el Club La Cosmetikera',
+  'Plantilla transaccional de Meta: club_welcome_es - Se envía cuando un cliente se inscribe al club',
   '¡Bienvenido a Club La Cosmetikera! 🎀
 
-Ahora puedes acceder a beneficios exclusivos:
-✨ Acumula puntos en cada compra
-🎁 Canjes especiales cada mes
-🎂 Bonificaciones en tu cumpleaños
-🤝 Ganancias extra por referidas
+Tu inscripción ha sido completada.
 
-📱 Accede a la app con tu número de cédula: {{cedula}}
+📲 ACCEDE A TU CUENTA:
+App: https://app.cosmetikera.com
 
-Tu asesor personal está aquí para orientarte.
-¡Que disfrutes siendo parte de nuestro club! 💕',
+🔑 MÉTODO DE INGRESO:
+Usuario: Tu número de cédula
+Contraseña: La que registraste
+
+Si necesitas ayuda, contacta a nuestro equipo.',
   ARRAY['cedula'],
   true
 );
