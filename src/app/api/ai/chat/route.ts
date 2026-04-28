@@ -284,7 +284,14 @@ export async function POST(request: NextRequest) {
 
     // Extraer ID del cliente y número de teléfono
     const perfil_id = body?.perfil_id || body?.customer_id || "";
-    const rawTelefono = String(body?.telefono || body?.phone || body?.numero_whatsapp || body?.wa_id || "");
+    const rawTelefono = String(
+      body?.telefono ||
+        body?.phone ||
+        body?.numero_whatsapp ||
+        body?.telefono_whatsapp ||
+        body?.wa_id ||
+        ""
+    );
     const telefono = rawTelefono ? normalizePhone(rawTelefono) : "";
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -435,6 +442,18 @@ export async function POST(request: NextRequest) {
           // SIEMPRE actualizar memoria (incrementa contador → sube nivel de confianza)
           updateCustomerMemory(supabase, telefono, perfil_id || undefined, customerName || undefined, detectedTheme || undefined),
         ]);
+
+        // Compatibilidad con despliegues que aún usan tabla legacy de conversaciones
+        const legacyInsert = await supabase.from("agent_conversations").insert({
+          phone_number: telefono,
+          user_message: message,
+          agent_response: responseText,
+          created_at: new Date().toISOString(),
+        });
+
+        if (legacyInsert.error) {
+          console.warn("[ai/chat] Legacy agent_conversations no disponible:", legacyInsert.error.message);
+        }
       } catch (logError) {
         console.warn("[ai/chat] Error registrando mensajes en memoria", logError);
       }
