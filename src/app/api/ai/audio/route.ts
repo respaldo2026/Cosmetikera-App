@@ -128,6 +128,22 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const audioInfo = extractAudioInfo(body);
+    const rawPhone =
+      getString(body?.telefono_whatsapp) ||
+      getString(body?.telefono) ||
+      getString(body?.phone) ||
+      getString(body?.wa_id) ||
+      getString(body?.from) ||
+      getString(audioInfo.from);
+    const rawProfileId =
+      getString(body?.perfil_id) ||
+      getString(body?.customer_id) ||
+      getString(body?.profile_id);
+    const rawContactName =
+      getString(body?.nombre) ||
+      getString(body?.contact_name) ||
+      getString(body?.profile_name);
     const messageText =
       getString(body?.mensaje_whatsapp) ||
       getString(body?.message_body) ||
@@ -137,7 +153,7 @@ export async function POST(request: NextRequest) {
     let transcript = messageText;
 
     if (!transcript) {
-      const { audioId } = extractAudioInfo(body);
+      const { audioId } = audioInfo;
       if (audioId) {
         const audio = await fetchWhatsAppAudio(audioId);
         if (audio) {
@@ -166,6 +182,17 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         mensaje_whatsapp: transcript,
+        telefono_whatsapp: rawPhone,
+        telefono: rawPhone,
+        phone: rawPhone,
+        wa_id: rawPhone,
+        perfil_id: rawProfileId || undefined,
+        customer_id: rawProfileId || undefined,
+        nombre: rawContactName || undefined,
+        contact_name: rawContactName || undefined,
+        message_id: getString(body?.message_id) || audioInfo.messageId,
+        session_id: getString(body?.session_id) || audioInfo.messageId,
+        source_channel: "audio",
       }),
       cache: "no-store",
     });
