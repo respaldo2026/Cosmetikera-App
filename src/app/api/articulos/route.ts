@@ -13,10 +13,9 @@ type ArticuloInputRow = Record<string, unknown>;
 const normalizeText = (value: unknown) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 
-const fieldLabels: Record<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia" | "codigo_secundario">, string> = {
+const fieldLabels: Record<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia">, string> = {
   nombre: "nombre",
   referencia: "código principal",
-  codigo_secundario: "código secundario",
 };
 
 async function getArticuloIdentityRows(supabase: ReturnType<typeof getAdminClient>) {
@@ -35,7 +34,6 @@ function findPayloadDuplicate(rows: ArticuloInputRow[]) {
   const seen = {
     nombre: new Set<string>(),
     referencia: new Set<string>(),
-    codigo_secundario: new Set<string>(),
   };
 
   for (const row of rows) {
@@ -54,14 +52,6 @@ function findPayloadDuplicate(rows: ArticuloInputRow[]) {
       }
       seen.referencia.add(referencia);
     }
-
-    const codigoSecundario = normalizeText(row.codigo_secundario);
-    if (codigoSecundario) {
-      if (seen.codigo_secundario.has(codigoSecundario)) {
-        return { field: "codigo_secundario" as const, value: String(row.codigo_secundario).trim() };
-      }
-      seen.codigo_secundario.add(codigoSecundario);
-    }
   }
 
   return null;
@@ -70,24 +60,21 @@ function findPayloadDuplicate(rows: ArticuloInputRow[]) {
 function findDatabaseDuplicate(
   rows: ArticuloInputRow[],
   existingRows: ArticuloIdentityRow[],
-  changedFields?: Array<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia" | "codigo_secundario">>
+  changedFields?: Array<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia">>
 ) {
-  const fieldsToCheck = changedFields ?? ["nombre", "referencia", "codigo_secundario"];
+  const fieldsToCheck = changedFields ?? ["nombre", "referencia"];
 
   const indexes = {
     nombre: new Map<string, ArticuloIdentityRow>(),
     referencia: new Map<string, ArticuloIdentityRow>(),
-    codigo_secundario: new Map<string, ArticuloIdentityRow>(),
   };
 
   for (const row of existingRows) {
     const nombre = normalizeText(row.nombre);
     const referencia = normalizeText(row.referencia);
-    const codigoSecundario = normalizeText(row.codigo_secundario);
 
     if (nombre) indexes.nombre.set(nombre, row);
     if (referencia) indexes.referencia.set(referencia, row);
-    if (codigoSecundario) indexes.codigo_secundario.set(codigoSecundario, row);
   }
 
   for (const row of rows) {
@@ -217,7 +204,7 @@ export async function PATCH(request: Request) {
         ...body,
       };
 
-      const fieldsToCheck = (["nombre", "referencia", "codigo_secundario"] as const).filter(
+      const fieldsToCheck = (["nombre", "referencia"] as const).filter(
         (field) =>
           Object.prototype.hasOwnProperty.call(body, field) &&
           normalizeText(mergedRow[field]) !== normalizeText(currentRow[field])
