@@ -33,6 +33,7 @@ export interface PosTicketTemplateConfig {
 type ConfiguracionTicketRow = {
   nombre_academia?: string | null;
   ruc?: string | null;
+  nit?: string | null;
   direccion?: string | null;
   telefono?: string | null;
   email?: string | null;
@@ -92,7 +93,7 @@ function limpiarLineas(lineas: LineaTicket[]): LineaTicket[] {
 function construirTemplateDesdeFila(data?: ConfiguracionTicketRow | null): PosTicketTemplateConfig {
   return {
     nombreNegocio: normalizarTexto(data?.nombre_academia, process.env.NEXT_PUBLIC_TIENDA_NOMBRE ?? "La Cosmetikera"),
-    ruc: normalizarTexto(data?.ruc, process.env.NEXT_PUBLIC_TIENDA_NIT ?? ""),
+    ruc: normalizarTexto(data?.ruc ?? data?.nit, process.env.NEXT_PUBLIC_TIENDA_NIT ?? ""),
     direccion: normalizarTexto(data?.direccion, process.env.NEXT_PUBLIC_TIENDA_DIRECCION ?? ""),
     telefono: normalizarTexto(data?.telefono, process.env.NEXT_PUBLIC_TIENDA_TELEFONO ?? ""),
     email: normalizarTexto(data?.email, ""),
@@ -110,28 +111,12 @@ export async function cargarConfigTicketPOS(): Promise<PosTicketTemplateConfig> 
   try {
     const { data, error } = await supabaseBrowserClient
       .from("configuracion")
-      .select("nombre_academia, ruc, direccion, telefono, email, logo_url, ticket_titulo, ticket_pie, ticket_nota, ticket_campos")
+      .select("*")
       .limit(1)
       .maybeSingle();
 
-    if (error) {
-      const mensaje = String(error.message || "").toLowerCase();
-      const detalle = String((error as any).details || "").toLowerCase();
-      const columnaFaltante = mensaje.includes("ticket_campos") || detalle.includes("ticket_campos");
-
-      if (columnaFaltante) {
-        const { data: dataSinCampos } = await supabaseBrowserClient
-          .from("configuracion")
-          .select("nombre_academia, ruc, direccion, telefono, email, logo_url, ticket_titulo, ticket_pie, ticket_nota")
-          .limit(1)
-          .maybeSingle();
-        cachedTicketTemplate = construirTemplateDesdeFila((dataSinCampos as ConfiguracionTicketRow | null) ?? null);
-      } else {
-        throw error;
-      }
-    } else {
-      cachedTicketTemplate = construirTemplateDesdeFila((data as ConfiguracionTicketRow | null) ?? null);
-    }
+    if (error) throw error;
+    cachedTicketTemplate = construirTemplateDesdeFila((data as ConfiguracionTicketRow | null) ?? null);
   } catch {
     cachedTicketTemplate = construirTemplateDesdeFila(null);
   }
