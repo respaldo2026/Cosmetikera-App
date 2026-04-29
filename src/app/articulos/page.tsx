@@ -589,12 +589,13 @@ export default function ArticulosPage() {
       .from("articulos")
       .select("id,nombre")
       .eq("codigo_barras", cleaned)
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
-    const { data } = editing?.id
-      ? await query.neq("id", editing.id)
-      : await query;
+    const filteredQuery = editing?.id
+      ? query.neq("id", editing.id)
+      : query;
+
+    const { data } = await filteredQuery.maybeSingle();
 
     if (data?.nombre) {
       message.warning(`Código ya existe en "${data.nombre}"`);
