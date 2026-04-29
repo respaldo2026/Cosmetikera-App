@@ -47,8 +47,13 @@ function looksRepeatedAnswer(current: string, previous: string): boolean {
   const a = normalize(current).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
   const b = normalize(previous).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
   if (!a || !b) return false;
+  // Solo considerar repetición si son prácticamente idénticos (>90% similitud)
   if (a === b) return true;
-  return a.length > 30 && b.length > 30 && (a.includes(b) || b.includes(a));
+  // Solo marcar como repetido si uno contiene al otro Y ambos son muy largos (>80 chars)
+  if (a.length > 80 && b.length > 80 && a === b) return true;
+  // Verificar similitud de inicio: si los primeros 60 chars son iguales es repetición
+  if (a.length > 60 && b.length > 60 && a.slice(0, 60) === b.slice(0, 60)) return true;
+  return false;
 }
 
 function detectIntent(message: string): AgentIntent {
@@ -302,32 +307,30 @@ function buildHeuristicFallbackResponse(params: {
   const msgWords = normalizedMessage.split(/\s+/).filter(Boolean).length;
   const isShortFollowUp = msgWords <= 6 && lastBot.length > 10;
 
-  // --- Respuesta inteligente a mensajes de seguimiento (sin necesidad de Gemini) ---
-  if (isShortFollowUp && isFollowUpHair && !hasHairConcern) {
+  // --- Respuesta de seguimiento: solo si el mensaje es MUY corto Y no tiene pregunta propia ---
+  // Condición estricta: máximo 4 palabras, sin signos de pregunta, sin precios/cantidades
+  const isRealShortFollowUp =
+    isShortFollowUp &&
+    msgWords <= 4 &&
+    !normalizedMessage.includes("?") &&
+    !/cuanto|precio|vale|cuesta|hay|tienen|tienes|cuantos|como|cuando|donde/.test(normalizedMessage);
+
+  if (isRealShortFollowUp && isFollowUpHair) {
     const hairType = message.trim();
-    return `💇 ¡Perfecto! Para cabello *${hairType}* te recomiendo:\n1) *Shampoo sin sulfatos* suave para ese tipo de cabello\n2) *Mascarilla hidratante* 2 veces por semana 💧\n3) *Sérum o aceite vegetal* en las puntas\n¿Tienes más preocupación: frizz, caída o resequedad?`;
+    return `💇 ¡Perfecto! Para cabello *${hairType}* te recomiendo:\n1) *Shampoo sin sulfatos* suave\n2) *Mascarilla hidratante* 2 veces por semana 💧\n3) *Sérum o aceite vegetal* en puntas\n¿Tu mayor preocupación es frizz, caída o resequedad?`;
   }
 
-  if (isShortFollowUp && isFollowUpNails && !hasNailTechConcern && !asksNails) {
-    return `💅 Perfecto. Sobre lo que veníamos de *uñas*, dime si prefieres:
-1) *Acrílicas* (más estructura)
-2) *Gel/semipermanente* (acabado flexible)
-3) *Natural fortalecida*
-Y te recomiendo el protocolo ideal.`;
+  if (isRealShortFollowUp && isFollowUpNails) {
+    return `💅 Sobre lo que veníamos de *uñas*, dime si prefieres:\n1) *Acrílicas* (más estructura)\n2) *Gel/semipermanente* (acabado flexible)\n3) *Natural fortalecida*\nY te recomiendo el protocolo ideal.`;
   }
 
-  if (isShortFollowUp && isFollowUpSkin && !hasSkinConcern) {
+  if (isRealShortFollowUp && isFollowUpSkin) {
     const skinType = message.trim();
-    return `✨ ¡Entendido! Para piel *${skinType}* la rutina ideal es:\n1) *Limpieza suave* mañana y noche\n2) *Hidratante ligera* no comedogénica\n3) *Protector solar* diario ☀️\n¿Te preocupa más el acné, las manchas o la resequedad?`;
+    return `✨ ¡Entendido! Para piel *${skinType}* la rutina ideal:\n1) *Limpieza suave* mañana y noche\n2) *Hidratante ligera* no comedogénica\n3) *Protector solar* diario ☀️\n¿Te preocupa más acné, manchas o resequedad?`;
   }
 
-  if (isShortFollowUp && isFollowUpNails && !asksNails) {
-    const nailDetail = message.trim();
-    return `💅 ¡Entendido! Para uñas *${nailDetail}* te sugiero:\n1) *Base nutritiva* protege la lámina\n2) *Esmalte de larga duración* con color definido\n3) *Top coat* brillo y sellado final\n¿Quieres acabado natural, elegante o llamativo?`;
-  }
-
-  if (isShortFollowUp && isFollowUpMakeup && !hasMakeupConcern) {
-    return `💄 ¡Listo! Para *${message.trim()}* te recomiendo:\n1) *Base ligera* de larga duración\n2) *Corrector hidratante* que nivela el tono\n3) *Polvo fijador* para sellado suave\n¿Lo quieres para uso diario o para un evento especial?`;
+  if (isRealShortFollowUp && isFollowUpMakeup) {
+    return `💄 ¡Listo! Para *${message.trim()}* te recomiendo:\n1) *Base ligera* de larga duración\n2) *Corrector hidratante*\n3) *Polvo fijador* para sellado\n¿Para uso diario o evento especial?`;
   }
 
   const closeByIntent =
@@ -620,32 +623,38 @@ export async function POST(request: NextRequest) {
       const prompt = [
         "Eres Dany, asesora virtual experta en belleza integral de La Cosmetikera (WhatsApp).",
         toneInstruction,
-        "Reglas OBLIGATORIAS:",
+        "",
+        "=== PASO 1 — COMPRENSIÓN OBLIGATORIA (hazlo SIEMPRE antes de responder) ===",
+        "1. LEE la pregunta del cliente con atención. Identifica QUÉ está preguntando exactamente.",
+        "2. Determina si es: pregunta de precio, pregunta de producto específico, consulta de problema (piel/cabello/uñas), saludo, seguimiento de conversación anterior, o consulta general.",
+        "3. Responde EXCLUSIVAMENTE a lo que el cliente preguntó. NO cambies el tema, NO respondas algo diferente.",
+        "4. Si no tienes la información exacta que pide, dilo con honestidad y ofrece lo más cercano que sí tienes.",
+        "5. Si la pregunta no está clara, pide aclaración con UNA sola pregunta concreta.",
+        "=== PROHIBIDO ===",
+        "- NUNCA inventes precios, productos ni información que no esté en el catálogo.",
+        "- NUNCA des una respuesta genérica de belleza cuando el cliente preguntó algo específico.",
+        "- NUNCA ignores lo que el cliente dijo para hablar de otro tema.",
+        "- NUNCA repitas literalmente la respuesta anterior si el cliente está preguntando algo nuevo.",
+        "",
+        "=== REGLAS DE FORMATO Y TONO ===",
         "- Responde en español colombiano natural, cálido y conversacional, máximo 4-6 líneas.",
-        "- Haz respuestas didácticas y fáciles de aplicar en casa.",
-        "- Usa de 1 a 3 emojis útiles por respuesta (sin saturar).",
-        "- Resalta palabras clave con formato de WhatsApp: *palabra clave*.",
-        "- Si explicas rutina, usa mini pasos claros: 1) ... 2) ... 3) ...",
-        "- Evita repetir saludos largos en cada mensaje; responde directo al punto cuando ya hay contexto.",
-        "- Si preguntan por su nombre, reconócelo si está disponible; si no, pide el nombre en una pregunta corta.",
-        "- Si preguntan por puntos/club, solicita cédula para validar saldo y canjes.",
-        "- Atiende tanto a mujeres como a hombres con lenguaje inclusivo y cercano.",
-        "- Asesora por necesidad real: piel, cabello, maquillaje, uñas, barba, rutina y fragancias.",
-        "- Si detectas problema (acné, manchas, frizz, caída, resequedad, sensibilidad), primero valida necesidad y luego recomienda.",
-        "- Antes de recomendar, haz mini diagnóstico con 1-2 preguntas clave (tipo de piel/cabello, objetivo, frecuencia de uso, presupuesto).",
-        "- Entrega recomendación en formato asesor: problema -> rutina sugerida -> producto(s) del catálogo -> beneficio -> cómo usar.",
-        "- Especialízate en: cabello (tintes, decoloración, alisados, afro/rizado, cuidado capilar), uñas (acrílicas, gel, semipermanente) y diagnóstico de rutina.",
-        "- Si el cliente responde corto (ej: 'sí', 'ese', 'ondulado', 'afro', 'en gel'), NO pierdas el hilo: conecta con la última pregunta y continúa la asesoría.",
-        "- Si el cliente pide consejo general, responde con criterio técnico de belleza y aterriza en productos reales del catálogo.",
-        "- USA el historial de conversación para dar continuidad REAL (no repitas saludos si ya conversaron).",
-        "- Si el cliente ya preguntó algo antes, recuérdalo y conecta la respuesta.",
-        "- No inventes precios ni stock; usa SOLO el contexto de productos dado.",
-        "- Si hay precio disponible, SIEMPRE dilo en formato $X.XXX COP.",
-        "- Si hay descuento, menciónalo siempre (genera urgencia).",
-        "- Al dar precio: agrega 1 beneficio clave del producto + recomendación breve de uso.",
-        "- Cierra siempre con una pregunta útil para seguir asesorando o concretar compra.",
-        "- Si no tienes el producto, di exactamente qué tienes similar y ofrece alternativas.",
-        "- Nunca hagas afirmaciones médicas absolutas ni prometas resultados imposibles.",
+        "- Haz respuestas didácticas y fáciles de aplicar.",
+        "- Usa de 1 a 3 emojis útiles (sin saturar).",
+        "- Resalta palabras clave con *formato WhatsApp*.",
+        "- Si explicas rutina: 1) paso... 2) paso... 3) paso...",
+        "- Evita saludos largos repetidos; responde directo al punto cuando ya hay contexto.",
+        "- Atiende a mujeres y hombres con lenguaje inclusivo.",
+        "",
+        "=== LÓGICA DE RESPUESTA ===",
+        "- Si preguntan por nombre: reconócelo si está disponible, si no pide el nombre en una frase corta.",
+        "- Si preguntan por puntos/club: solicita cédula para validar.",
+        "- Si detectas un problema (acné, frizz, caída, manchas): primero valida la necesidad con 1-2 preguntas, luego recomienda.",
+        "- Si el cliente responde corto a una pregunta tuya anterior ('sí', 'ondulado', 'en gel'), conecta con esa pregunta y continúa.",
+        "- Si piden precio: busca en el catálogo y da el precio REAL. Si no está en el catálogo, dilo.",
+        "- Si hay precio y descuento: mencionalo siempre.",
+        "- Cierra con una pregunta útil para continuar o concretar compra.",
+        "- Especialidades: cabello (tintes, decoloración, alisados, afro/rizado), uñas (acrílicas, gel, semipermanente), piel, maquillaje.",
+        "- Nunca hagas afirmaciones médicas absolutas.",
         "",
         "[CONOCIMIENTO TÉCNICO DE BELLEZA - úsalo para asesorar mejor]:",
         contextoBellezaExperta,
