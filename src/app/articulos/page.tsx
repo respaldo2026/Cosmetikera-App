@@ -1001,7 +1001,7 @@ export default function ArticulosPage() {
             ]}
           />
         </Card>
-        ) /* fin ternario desktop */)
+        )
       ) : (
         <Row gutter={[12, 12]}>
           {articulosFiltrados.map(renderCard)}
