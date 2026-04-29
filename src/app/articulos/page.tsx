@@ -1297,6 +1297,7 @@ export default function ArticulosPage() {
       </Modal>
 
       {/* ── MODAL EDICIÓN ── */}
+      {/* ── MODAL EDICIÓN ── */}
       <Modal
         title={editing ? "Editar artículo" : "Nuevo artículo"}
         open={modalOpen}
@@ -1309,46 +1310,81 @@ export default function ArticulosPage() {
         style={isMobile ? { top: 8 } : undefined}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
-          <Row gutter={16}>
-            <Col xs={24} md={16}>
-              <Form.Item name="nombre" label="Nombre del artículo" rules={[{ required: true, message: "Requerido" }]}>
-                <Input placeholder="Ej: Esmalte Base Coat 15ml" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="codigo_barras" label="Código de barras">
-                <EscanerCodigo
-                  value={codigoBarrasValue}
-                  onChange={(value) => form.setFieldValue("codigo_barras", value)}
-                  onCodigo={(codigo) => form.setFieldValue("codigo_barras", codigo)}
-                  placeholder="Escanear o escribir código"
-                  conCamara
-                  submitOnEnter={false}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+
+          {/* 1. Escáner primero */}
+          <Form.Item
+            name="codigo_barras"
+            label="Código de barras"
+            validateTrigger={["onChange", "onBlur"]}
+            rules={[{
+              validator: async (_, value) => {
+                if (!value) return;
+                const existe = articulos.find(
+                  (a) => a.codigo_barras === value && a.id !== editing?.id
+                );
+                if (existe) return Promise.reject(`Ya existe: "${existe.nombre}"`);
+              },
+            }]}
+          >
+            <EscanerCodigo
+              value={codigoBarrasValue}
+              onChange={(value) => {
+                form.setFieldValue("codigo_barras", value);
+                form.validateFields(["codigo_barras"]);
+              }}
+              onCodigo={(codigo) => {
+                form.setFieldValue("codigo_barras", codigo);
+                form.validateFields(["codigo_barras"]);
+              }}
+              placeholder="Escanear o escribir código de barras"
+              conCamara
+              submitOnEnter={false}
+            />
+          </Form.Item>
+
+          {/* 2. Referencia interna */}
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="referencia" label="Código principal">
+              <Form.Item
+                name="referencia"
+                label="Referencia / código interno"
+                validateTrigger={["onChange", "onBlur"]}
+                rules={[{
+                  validator: async (_, value) => {
+                    if (!value) return;
+                    const existe = articulos.find(
+                      (a) => a.referencia === value && a.id !== editing?.id
+                    );
+                    if (existe) return Promise.reject(`Referencia ya usada: "${existe.nombre}"`);
+                  },
+                }]}
+              >
                 <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="codigo_secundario" label="Referencia / 2° código">
+              <Form.Item name="codigo_secundario" label="2° código (opcional)">
                 <Input placeholder="REF-001" prefix={<BarcodeOutlined />} />
               </Form.Item>
             </Col>
           </Row>
+
+          {/* 3. Nombre + precio venta (esenciales) */}
+          <Form.Item name="nombre" label="Nombre del artículo" rules={[{ required: true, message: "Requerido" }]}>
+            <Input placeholder="Ej: Esmalte Base Coat 15ml" />
+          </Form.Item>
+
           <Row gutter={16}>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={12}>
+              <Form.Item name="precio_venta" label="Precio venta ($)" rules={[{ required: true, message: "Requerido" }]}>
+                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
               <Form.Item name="categoria" label="Categoría">
                 <Select
-                  showSearch
-                  allowClear
-                  mode="tags"
-                  maxCount={1}
-                  placeholder="Seleccionar o escribir nueva categoría..."
+                  showSearch allowClear mode="tags" maxCount={1}
+                  placeholder="Seleccionar o escribir..."
                   options={[
                     ...CATEGORIAS_DEFAULT,
                     ...categorias.filter((c) => c && !CATEGORIAS_DEFAULT.includes(c)),
@@ -1356,17 +1392,42 @@ export default function ArticulosPage() {
                 />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
               <Form.Item name="marca" label="Marca">
-                <Input placeholder="Ej: OPI, Essie, Sally Hansen..." />
+                <Input placeholder="Ej: OPI, Essie..." />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="proveedor" label="Proveedor">
-                <Input placeholder="Ej: Distribuidor XYZ" />
+            <Col xs={24} md={12}>
+              <Form.Item name="imagen_url" label="URL imagen">
+                <Input placeholder="https://..." prefix={<CameraOutlined />} />
               </Form.Item>
             </Col>
           </Row>
+
+          {/* 4. Datos opcionales al final */}
+          <Divider style={{ margin: "8px 0", fontSize: 12, color: "#999" }}>Datos opcionales</Divider>
+
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
+              <Form.Item name="precio_costo" label="Precio costo ($)">
+                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item name="stock" label="Stock inicial">
+                <InputNumber min={0} style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item name="stock_minimo" label="Stock mínimo">
+                <InputNumber min={0} style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Row gutter={16}>
             <Col xs={24} md={8}>
               <Form.Item name="tamano" label="Tamaño">
@@ -1379,32 +1440,16 @@ export default function ArticulosPage() {
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name="stock" label="Stock inicial">
-                <InputNumber min={0} style={{ width: "100%" }} />
+              <Form.Item name="proveedor" label="Proveedor">
+                <Input placeholder="Ej: Distribuidor XYZ" />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={16}>
-            <Col xs={24} md={8}>
-              <Form.Item name="precio_venta" label="Precio venta ($)" rules={[{ required: true }]}>
-                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="precio_costo" label="Precio costo ($)">
-                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={8}>
-              <Form.Item name="stock_minimo" label="Stock mínimo">
-                <InputNumber min={0} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-          </Row>
+
           <Row gutter={16}>
             <Col xs={24} md={16}>
-              <Form.Item name="imagen_url" label="URL imagen">
-                <Input placeholder="https://..." prefix={<CameraOutlined />} />
+              <Form.Item name="descripcion" label="Descripción">
+                <Input.TextArea rows={2} placeholder="Notas del producto..." />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
@@ -1413,9 +1458,7 @@ export default function ArticulosPage() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="descripcion" label="Descripción">
-            <Input.TextArea rows={2} placeholder="Notas del producto..." />
-          </Form.Item>
+
         </Form>
       </Modal>
 
