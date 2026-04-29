@@ -16,9 +16,9 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import dayjs from "dayjs";
 import EscanerCodigo from "@/components/EscanerCodigo";
-import { imprimirTicketTermico, imprimirTicketNavegador, abrirCajon, cargarConfigPOS, DatosTicket } from "@utils/pos-hardware";
+import { imprimirTicketTermico, abrirCajon, cargarConfigPOS, DatosTicket } from "@utils/pos-hardware";
 import { aplicarPlantillaTicketPOS, cargarConfigTicketPOS } from "@utils/pos-ticket-template";
-import { PrinterOutlined, GoldOutlined, BarcodeOutlined } from "@ant-design/icons";
+import { BarcodeOutlined } from "@ant-design/icons";
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { isBirthdayMonth } from "@/constants/clubRewards";
@@ -140,10 +140,6 @@ export default function VentasPage() {
   const [codigoVoucherClub, setCodigoVoucherClub] = useState("");
   const [voucherClub, setVoucherClub] = useState<ClubVoucher | null>(null);
   const [validandoVoucher, setValidandoVoucher] = useState(false);
-  const [ultimaVentaId, setUltimaVentaId] = useState<string | null>(null);
-  const [ultimaVentaNumero, setUltimaVentaNumero] = useState<string | null>(null);
-  const [ultimoTicket, setUltimoTicket] = useState<DatosTicket | null>(null);
-  const [imprimiendo, setImprimiendo] = useState(false);
   const [pagoMixto, setPagoMixto] = useState<PagoMixto>({ efectivo: 0, tarjeta: 0, transferencia: 0 });
 
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
@@ -396,18 +392,9 @@ export default function VentasPage() {
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
 
   const agregarAlCarrito = (art: Articulo) => {
-    if (Number(art.stock || 0) <= 0) {
-      antdMessage.warning("Este artículo está agotado");
-      return;
-    }
-
     setCarrito((prev) => {
       const existe = prev.find((i) => i.id === art.id);
       if (existe) {
-        if (existe.cantidad >= art.stock) {
-          antdMessage.warning("No hay más stock disponible");
-          return prev;
-        }
         return prev.map((i) =>
           i.id === art.id
             ? { ...i, cantidad: i.cantidad + 1, subtotal: (i.cantidad + 1) * i.precio_venta }
@@ -422,7 +409,7 @@ export default function VentasPage() {
     setCarrito((prev) =>
       prev.map((i) => {
         if (i.id !== id) return i;
-        const nuevaCant = Math.max(1, Math.min(i.cantidad + delta, i.stock));
+        const nuevaCant = Math.max(1, i.cantidad + delta);
         return { ...i, cantidad: nuevaCant, subtotal: nuevaCant * i.precio_venta };
       })
     );
@@ -627,9 +614,6 @@ export default function VentasPage() {
       const ticketTemplate = await cargarConfigTicketPOS();
       const ticketDatos = aplicarPlantillaTicketPOS(ticketBase, ticketTemplate);
 
-      setUltimaVentaId(venta?.id ?? null);
-      setUltimaVentaNumero(numeroVenta);
-      setUltimoTicket(ticketDatos);
       lanzarProcesosPOS(ticketDatos, metodoPago === "efectivo");
       setModalPagoOpen(false);
       limpiarVenta();
@@ -656,11 +640,6 @@ export default function VentasPage() {
         normalizar(a.id) === normalizedCodigo
     );
     if (art) {
-      if (Number(art.stock || 0) <= 0) {
-        setSearch(art.nombre);
-        message.warning(`${art.nombre} está agotado`);
-        return;
-      }
       agregarAlCarrito(art);
       message.success(`${art.nombre} agregado al carrito`);
     } else {
@@ -669,37 +648,6 @@ export default function VentasPage() {
       message.info(`Código: ${codigo} — no encontrado, mostrando búsqueda`);
     }
   }, [articulos, message]); // eslint-disable-line
-
-  const imprimirUltimaVenta = async () => {
-    if (!ultimoTicket && !ultimaVentaId) return;
-    setImprimiendo(true);
-
-    const ticketBase = ultimoTicket || {
-      nombreTienda: "La Cosmetikera",
-      numeroVenta: ultimaVentaNumero ?? (ultimaVentaId ? String(ultimaVentaId).slice(-6).toUpperCase() : "------"),
-      fecha: dayjs().format("DD/MM/YYYY HH:mm"),
-      metodoPago,
-      mensaje: "¡Gracias por tu compra en La Cosmetikera!",
-      lineas: [{ tipo: "total" as const, etiqueta: "TOTAL", valor: totalFinal }],
-    };
-    const ticketParaImprimir = ultimoTicket
-      ? ultimoTicket
-      : aplicarPlantillaTicketPOS(ticketBase, await cargarConfigTicketPOS());
-
-    // En modo navegador abre el diálogo nativo; en modo QZ usa impresora térmica
-    const result = await imprimirTicketTermico(ticketParaImprimir);
-
-    if (!result.ok) {
-      // Fallback: impresión por navegador
-      try {
-        imprimirTicketNavegador(ticketParaImprimir);
-      } catch (e) {
-        message.warning("No se pudo imprimir. Verifica la impresora o permite ventanas emergentes.");
-      }
-    }
-
-    setImprimiendo(false);
-  };
 
   const handleCobrar = () => {
     if (!clienteId && carrito.length > 0) {
@@ -782,7 +730,7 @@ export default function VentasPage() {
                       ${Number(art.precio_venta).toLocaleString()}
                     </Text>
                     <Text style={{ fontSize: 11, color: Number(art.stock || 0) > 0 ? "#aaa" : "#ff4d4f" }}>
-                      {Number(art.stock || 0) > 0 ? `${art.stock} en stock` : "Agotado"}
+                      Stock: {Number(art.stock || 0)}
                     </Text>
                   </div>
                   {enCarrito ? (
@@ -1344,29 +1292,6 @@ export default function VentasPage() {
           >
             Confirmar venta
           </Button>
-          <Row gutter={8} style={{ marginTop: 8 }}>
-            <Col span={12}>
-              <Button
-                block
-                icon={<PrinterOutlined />}
-                loading={imprimiendo}
-                onClick={imprimirUltimaVenta}
-                disabled={!ultimaVentaId && !ultimoTicket}
-              >
-                Imprimir ticket
-              </Button>
-            </Col>
-            <Col span={12}>
-              <Button
-                block
-                icon={<GoldOutlined />}
-                disabled={!permiteCajon}
-                onClick={() => abrirCajon().then(r => !r.ok && message.warning("No se pudo abrir el cajón: " + r.error))}
-              >
-                Abrir cajón
-              </Button>
-            </Col>
-          </Row>
         </div>
       </Modal>
 
