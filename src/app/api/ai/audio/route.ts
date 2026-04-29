@@ -176,21 +176,47 @@ export async function POST(request: NextRequest) {
 
     if (!transcript) {
       const { audioId } = audioInfo;
-      if (audioId) {
-        const audio = await fetchWhatsAppAudio(audioId, providedAccessToken);
-        if (audio) {
-          transcript = await transcribeWithGemini(audio.base64, audio.mimeType);
-        }
+      if (!audioId) {
+        return NextResponse.json({
+          response:
+            "Recibi tu audio, pero no llego el identificador del archivo. Revisa el mapeo de media_id en Make.",
+          intent: "general",
+          audio_transcript: "",
+          error_code: "missing_audio_id",
+        });
       }
-    }
 
-    if (!transcript) {
-      return NextResponse.json({
-        response:
-          "Te escucho. En este momento no pude transcribir tu audio. ¿Me lo envías por texto o un audio más corto?",
-        intent: "general",
-        audio_transcript: "",
-      });
+      if (!providedAccessToken) {
+        return NextResponse.json({
+          response:
+            "Recibi tu audio, pero falta el token de acceso de WhatsApp para descargarlo. Revisa x-whatsapp-access-token.",
+          intent: "general",
+          audio_transcript: "",
+          error_code: "missing_whatsapp_access_token",
+        });
+      }
+
+      const audio = await fetchWhatsAppAudio(audioId, providedAccessToken);
+      if (!audio) {
+        return NextResponse.json({
+          response:
+            "Recibi tu audio, pero no pude descargarlo desde Meta. Verifica el token, permisos y vigencia del media_id.",
+          intent: "general",
+          audio_transcript: "",
+          error_code: "meta_media_fetch_failed",
+        });
+      }
+
+      transcript = await transcribeWithGemini(audio.base64, audio.mimeType);
+      if (!transcript) {
+        return NextResponse.json({
+          response:
+            "Te escucho. En este momento no pude transcribir tu audio. Intenta un audio mas corto o con menos ruido.",
+          intent: "general",
+          audio_transcript: "",
+          error_code: "gemini_transcription_empty",
+        });
+      }
     }
 
     const apiKey = request.headers.get("x-api-key") || "";
