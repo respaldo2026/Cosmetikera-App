@@ -893,7 +893,43 @@ export default function ArticulosPage() {
           </Button>
         </Empty>
       ) : vista === "lista" ? (
-        <Card style={{ borderRadius: 10 }} bodyStyle={{ padding: 0 }}>
+        isMobile ? (
+          /* ── LISTA MOBILE: tarjetas compactas ── */
+          <Row gutter={[8, 8]}>
+            {articulosFiltrados.map((a) => (
+              <Col xs={24} key={a.id}>
+                <Card
+                  size="small"
+                  style={{ borderRadius: 10, cursor: "pointer" }}
+                  onClick={() => irADetalle(a.id)}
+                  bodyStyle={{ padding: "10px 12px" }}
+                >
+                  <Row align="middle" gutter={8}>
+                    <Col flex="auto">
+                      <Text strong style={{ fontSize: 13, color: "#1677ff", display: "block" }}>{a.nombre}</Text>
+                      <Space size={4} wrap style={{ marginTop: 4 }}>
+                        {a.marca && <Text type="secondary" style={{ fontSize: 11 }}>{a.marca}</Text>}
+                        {a.referencia && <Tag color="blue" style={{ fontSize: 10 }}>{a.referencia}</Tag>}
+                        {a.categoria && <Tag color="purple" style={{ fontSize: 10 }}>{a.categoria}</Tag>}
+                        {getStockTag(a)}
+                      </Space>
+                    </Col>
+                    <Col>
+                      <Text strong style={{ color: "#d81b87", fontSize: 15 }}>${Number(a.precio_venta).toLocaleString()}</Text>
+                    </Col>
+                    <Col>
+                      <Space size={4}>
+                        <Button size="small" icon={<EditOutlined />} onClick={(e) => { detenerEvento(e); openModal(a); }} />
+                        <Button size="small" danger icon={<DeleteOutlined />} onClick={(e) => { detenerEvento(e); handleEliminar(a); }} />
+                      </Space>
+                    </Col>
+                  </Row>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <Card style={{ borderRadius: 10 }} bodyStyle={{ padding: 0 }}>
           <Table
             dataSource={articulosFiltrados}
             rowKey="id"
@@ -965,6 +1001,7 @@ export default function ArticulosPage() {
             ]}
           />
         </Card>
+        ) /* fin ternario desktop */)
       ) : (
         <Row gutter={[12, 12]}>
           {articulosFiltrados.map(renderCard)}
