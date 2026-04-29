@@ -24,6 +24,8 @@ const POS_PRINT_MODE = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowe
 const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.1:17891").replace(/\/$/, "");
 const POS_AGENT_TIMEOUT_MS = 2500;
 const POS_AGENT_TOKEN = process.env.NEXT_PUBLIC_POS_AGENT_TOKEN ?? "";
+const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.cosmetikera.com";
+const APP_REGISTER_URL = process.env.NEXT_PUBLIC_APP_REGISTER_URL ?? `${APP_BASE_URL.replace(/\/$/, "")}/register`;
 
 function usarQZTray(): boolean {
   return POS_PRINT_MODE === "qz";
@@ -314,6 +316,25 @@ function lineaTotalEscpos(etiqueta: string, valor: number, ancho = 32): string {
   return etiqueta + " ".repeat(Math.max(1, espacio)) + valStr;
 }
 
+function construirComandoQREscpos(url: string, moduleSize = 4): string {
+  const GS = "\x1D";
+  const data = (url || "").trim();
+  if (!data) return "";
+
+  const storeLen = data.length + 3;
+  const pL = String.fromCharCode(storeLen % 256);
+  const pH = String.fromCharCode(Math.floor(storeLen / 256));
+  const module = String.fromCharCode(Math.max(3, Math.min(8, moduleSize)));
+
+  return [
+    `${GS}(k\x04\x001A2\x00`, // Modelo 2
+    `${GS}(k\x03\x001C${module}`, // Tamaño de módulo
+    `${GS}(k\x03\x001E0`, // Corrección de error (M)
+    `${GS}(k${pL}${pH}1P0${data}`, // Guardar datos
+    `${GS}(k\x03\x001Q0`, // Imprimir QR
+  ].join("");
+}
+
 /**
  * Construye el array de comandos ESC/POS para el ticket.
  * Compatible con impresoras de 58mm (32 chars) y 80mm (48 chars).
@@ -420,6 +441,15 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   cmds.push(`${ESC}a\x01`);
   if (datos.mensaje) cmds.push(datos.mensaje + LF);
   if (datos.nota) cmds.push(datos.nota + LF);
+  const qrUrl = APP_REGISTER_URL;
+  if (qrUrl) {
+    cmds.push("Escanea para abrir la app" + LF);
+    if (!datos.cliente) {
+      cmds.push("No estas inscrito? Registrate aqui" + LF);
+    }
+    cmds.push(construirComandoQREscpos(qrUrl, 4));
+    cmds.push(LF);
+  }
   cmds.push((datos.pie || "¡Gracias por tu compra!") + LF);
   cmds.push(`${ESC}a\x00`);
 
@@ -655,6 +685,16 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
     ? `<p class="cambio">Cambio: <strong>${fmtPrecio(datos.cambio)}</strong></p>` : "";
 
   const notaHtml = datos.nota ? `<p style="margin-top:8px">${esc(datos.nota)}</p>` : "";
+  const qrUrl = APP_REGISTER_URL;
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=96x96&data=${encodeURIComponent(qrUrl)}`;
+  const qrHtml = qrUrl
+    ? `
+    <div class="qr-box">
+      <img src="${qrSrc}" alt="QR app" width="84" height="84" />
+      <p class="qr-caption">Escanea para abrir la app</p>
+      ${!datos.cliente ? `<p class="qr-caption strong">¿No estás inscrito? Regístrate aquí</p>` : ""}
+    </div>`
+    : "";
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -699,6 +739,9 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
     }
     .star { color: #f5a623; font-size: 14px; }
     .footer { text-align: center; margin-top: 10px; font-size: 10px; color: #555; }
+    .qr-box { text-align: center; margin-top: 8px; }
+    .qr-caption { margin-top: 4px; font-size: 10px; color: #444; }
+    .qr-caption.strong { font-weight: 700; color: #111; }
     @media print {
       body { width: 80mm; }
       @page { margin: 0; size: 80mm auto; }
@@ -730,6 +773,7 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
     <hr class="sep" />
     ${datos.mensaje ? `<p>${esc(datos.mensaje)}</p>` : ""}
     ${notaHtml}
+    ${qrHtml}
     <p style="margin-top:4px;font-weight:bold;">${esc(datos.pie || "¡Gracias por tu compra!")}</p>
   </div>
 </body>
