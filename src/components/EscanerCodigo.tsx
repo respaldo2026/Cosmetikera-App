@@ -21,13 +21,19 @@ const { Text } = Typography;
 
 export type EscanerCodigoProps = {
   /** Callback cuando se detecta un código */
-  onCodigo: (codigo: string) => void;
+  onCodigo?: (codigo: string) => void;
   /** Placeholder del campo de input manual */
   placeholder?: string;
   /** Si mostrar botón de cámara */
   conCamara?: boolean;
   /** Disabled */
   disabled?: boolean;
+  /** Valor controlado del input */
+  value?: string;
+  /** Cambio manual del input */
+  onChange?: (value: string) => void;
+  /** Si Enter debe disparar onCodigo */
+  submitOnEnter?: boolean;
 };
 
 // ID único para el div de la cámara
@@ -38,13 +44,38 @@ export default function EscanerCodigo({
   placeholder = "Escanear o escribir código...",
   conCamara = true,
   disabled = false,
+  value,
+  onChange,
+  submitOnEnter = true,
 }: EscanerCodigoProps) {
-  const [valor, setValor] = useState("");
+  const [internalValor, setInternalValor] = useState("");
   const [camaraAbierta, setCamaraAbierta] = useState(false);
   const [escanerActivo, setEscanerActivo] = useState(false);
   const [errorCamara, setErrorCamara] = useState<string | null>(null);
   const inputRef = useRef<any>(null);
   const html5QrRef = useRef<any>(null);
+  const isControlled = typeof value === "string";
+  const valorActual = isControlled ? value : internalValor;
+
+  const actualizarValor = useCallback(
+    (nextValue: string) => {
+      if (!isControlled) {
+        setInternalValor(nextValue);
+      }
+      onChange?.(nextValue);
+    },
+    [isControlled, onChange]
+  );
+
+  const procesarCodigo = useCallback(
+    (codigo: string) => {
+      const limpio = codigo.trim();
+      if (!limpio) return;
+      actualizarValor(limpio);
+      onCodigo?.(limpio);
+    },
+    [actualizarValor, onCodigo]
+  );
 
   // ── Foco automático para lectores USB HID ──────────────────────────────────
   useEffect(() => {
@@ -69,13 +100,15 @@ export default function EscanerCodigo({
   // ── Detección de código por teclado (lector USB/BT) ──────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" && valor.trim()) {
+      if (submitOnEnter && e.key === "Enter" && valorActual.trim()) {
         e.preventDefault();
-        onCodigo(valor.trim());
-        setValor("");
+        procesarCodigo(valorActual);
+        if (!isControlled) {
+          setInternalValor("");
+        }
       }
     },
-    [valor, onCodigo]
+    [submitOnEnter, valorActual, procesarCodigo, isControlled]
   );
 
   // ── Cámara: abrir / cerrar ────────────────────────────────────────────────
@@ -117,7 +150,7 @@ export default function EscanerCodigo({
           },
           (decodedText: string) => {
             if (mounted) {
-              onCodigo(decodedText.trim());
+              procesarCodigo(decodedText);
               cerrarCamara();
             }
           },
@@ -147,8 +180,8 @@ export default function EscanerCodigo({
         <Input
           ref={inputRef}
           prefix={<BarcodeOutlined style={{ color: "#d81b87" }} />}
-          value={valor}
-          onChange={(e) => setValor(e.target.value)}
+          value={valorActual}
+          onChange={(e) => actualizarValor(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}

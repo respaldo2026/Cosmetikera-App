@@ -17,6 +17,7 @@ import {
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { useRouter } from "next/navigation";
+import EscanerCodigo from "@/components/EscanerCodigo";
 
 let xlsxModulePromise: Promise<typeof import("xlsx")> | null = null;
 
@@ -242,6 +243,7 @@ export default function ArticulosPage() {
     () => importRows.map((row) => mapImportRowToArticulo(row)),
     [importRows],
   );
+  const codigoBarrasValue = Form.useWatch("codigo_barras", form);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -451,6 +453,7 @@ export default function ArticulosPage() {
     setEditing(null); // es nuevo, no edición
     form.setFieldsValue({
       nombre: `${art.nombre} (copia)`,
+      codigo_barras: undefined,
       categoria: art.categoria,
       marca: art.marca,
       proveedor: art.proveedor,
@@ -1265,28 +1268,43 @@ export default function ArticulosPage() {
         confirmLoading={saving}
         okText={editing ? "Guardar cambios" : "Crear artículo"}
         cancelText="Cancelar"
-        width={600}
+        width={isMobile ? "calc(100vw - 16px)" : 600}
+        style={isMobile ? { top: 8 } : undefined}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
           <Row gutter={16}>
-            <Col span={16}>
+            <Col xs={24} md={16}>
               <Form.Item name="nombre" label="Nombre del artículo" rules={[{ required: true, message: "Requerido" }]}>
                 <Input placeholder="Ej: Esmalte Base Coat 15ml" />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item name="referencia" label="Código principal">
-                <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
+            <Col xs={24} md={8}>
+              <Form.Item name="codigo_barras" label="Código de barras">
+                <EscanerCodigo
+                  value={codigoBarrasValue}
+                  onChange={(value) => form.setFieldValue("codigo_barras", value)}
+                  onCodigo={(codigo) => form.setFieldValue("codigo_barras", codigo)}
+                  placeholder="Escanear o escribir código"
+                  conCamara
+                  submitOnEnter={false}
+                />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={12}>
+              <Form.Item name="referencia" label="Código principal">
+                <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
               <Form.Item name="codigo_secundario" label="Referencia / 2° código">
                 <Input placeholder="REF-001" prefix={<BarcodeOutlined />} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
               <Form.Item name="categoria" label="Categoría">
                 <Select
                   showSearch
@@ -1302,53 +1320,53 @@ export default function ArticulosPage() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="marca" label="Marca">
+            <Col xs={24} md={8}>
                 <Input placeholder="Ej: OPI, Essie, Sally Hansen..." />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="proveedor" label="Proveedor">
                 <Input placeholder="Ej: Distribuidor XYZ" />
               </Form.Item>
             </Col>
+          <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="tamano" label="Tamaño">
+            <Col xs={24} md={8}>
                 <Input placeholder="Ej: 15 ml" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="empaque" label="Empaque">
+            <Col xs={24} md={8}>
                 <Input placeholder="Ej: Frasco" />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item name="precio_venta" label="Precio venta ($)" rules={[{ required: true }]}>
-                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="precio_costo" label="Precio costo ($)">
-                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="stock" label="Stock actual" rules={[{ required: true }]}>
+            <Col xs={24} md={8}>
+              <Form.Item name="stock" label="Stock inicial">
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
-          </Row>
           <Row gutter={16}>
             <Col span={8}>
+            <Col xs={24} md={8}>
+                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+            <Col xs={24} md={8}>
+                <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="stock_minimo" label="Stock mínimo">
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
-            <Col span={16}>
-              <Form.Item name="imagen_url" label="URL imagen (opcional)">
+          <Row gutter={16}>
+            <Col span={8}>
+            <Col xs={24}>
                 <Input placeholder="https://..." prefix={<CameraOutlined />} />
               </Form.Item>
             </Col>

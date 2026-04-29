@@ -15,12 +15,14 @@ import {
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
 import Link from "next/link";
+import EscanerCodigo from "@/components/EscanerCodigo";
 
 const { Title, Text } = Typography;
 
 type Articulo = {
   id: string;
   nombre: string;
+  codigo_barras?: string;
   referencia?: string;
   codigo_secundario?: string;
   categoria?: string;
@@ -63,6 +65,7 @@ export default function ArticuloDetallePage() {
   const [savingFicha, setSavingFicha] = useState(false);
   const [formPromo] = Form.useForm();
   const [formFicha] = Form.useForm();
+  const codigoBarrasValue = Form.useWatch("codigo_barras", formFicha);
 
   const cargarArticulo = useCallback(async () => {
     const { data, error } = await supabaseBrowserClient
@@ -356,12 +359,24 @@ export default function ArticuloDetallePage() {
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={8}>
-                        <Form.Item name="referencia" label="Código principal">
-                          <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
+                        <Form.Item name="codigo_barras" label="Código de barras">
+                          <EscanerCodigo
+                            value={codigoBarrasValue}
+                            onChange={(value) => formFicha.setFieldValue("codigo_barras", value)}
+                            onCodigo={(codigo) => formFicha.setFieldValue("codigo_barras", codigo)}
+                            placeholder="Escanear o escribir código"
+                            conCamara
+                            submitOnEnter={false}
+                          />
                         </Form.Item>
                       </Col>
                     </Row>
                     <Row gutter={16}>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="referencia" label="Código principal">
+                          <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
+                        </Form.Item>
+                      </Col>
                       <Col xs={24} md={8}>
                         <Form.Item name="codigo_secundario" label="Referencia / 2° código">
                           <Input placeholder="REF-001" prefix={<BarcodeOutlined />} />
@@ -427,6 +442,9 @@ export default function ArticuloDetallePage() {
                 ) : (
                   <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
                     <Descriptions.Item label="Nombre">{articulo.nombre}</Descriptions.Item>
+                    <Descriptions.Item label="Código de barras">
+                      {articulo.codigo_barras || <Text type="secondary">—</Text>}
+                    </Descriptions.Item>
                     <Descriptions.Item label="Referencia / SKU">
                       {articulo.referencia || <Text type="secondary">—</Text>}
                     </Descriptions.Item>
