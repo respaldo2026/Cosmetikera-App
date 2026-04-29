@@ -25,7 +25,7 @@ const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.
 const POS_AGENT_TIMEOUT_MS = 2500;
 const POS_AGENT_TOKEN = process.env.NEXT_PUBLIC_POS_AGENT_TOKEN ?? "";
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.cosmetikera.com";
-const APP_REGISTER_URL = process.env.NEXT_PUBLIC_APP_REGISTER_URL ?? `${APP_BASE_URL.replace(/\/$/, "")}/register`;
+const APP_CLUB_URL = process.env.NEXT_PUBLIC_APP_CLUB_URL ?? `${APP_BASE_URL.replace(/\/$/, "")}/club`;
 
 function usarQZTray(): boolean {
   return POS_PRINT_MODE === "qz";
@@ -441,7 +441,7 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   cmds.push(`${ESC}a\x01`);
   if (datos.mensaje) cmds.push(datos.mensaje + LF);
   if (datos.nota) cmds.push(datos.nota + LF);
-  const qrUrl = APP_REGISTER_URL;
+  const qrUrl = APP_CLUB_URL;
   if (qrUrl) {
     cmds.push("Escanea para abrir la app" + LF);
     if (!datos.cliente) {
@@ -685,7 +685,7 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
     ? `<p class="cambio">Cambio: <strong>${fmtPrecio(datos.cambio)}</strong></p>` : "";
 
   const notaHtml = datos.nota ? `<p style="margin-top:8px">${esc(datos.nota)}</p>` : "";
-  const qrUrl = APP_REGISTER_URL;
+  const qrUrl = APP_CLUB_URL;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=96x96&data=${encodeURIComponent(qrUrl)}`;
   const qrHtml = qrUrl
     ? `
