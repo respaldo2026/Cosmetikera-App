@@ -60,7 +60,7 @@ function extractAudioInfo(body: any): AudioExtraction {
   };
 }
 
-async function fetchWhatsAppAudio(audioId: string, accessToken: string): Promise<AudioFetchResult | null> {
+async function fetchWhatsAppAudio(audioId: string, accessToken: string): Promise<AudioFetchResult | { error: string } | null> {
   if (!accessToken || !audioId) return null;
 
   const metaRes = await fetch(`https://graph.facebook.com/v21.0/${audioId}`, {
@@ -68,18 +68,21 @@ async function fetchWhatsAppAudio(audioId: string, accessToken: string): Promise
     cache: "no-store",
   });
 
-  if (!metaRes.ok) return null;
+  if (!metaRes.ok) {
+    const errBody = await metaRes.json().catch(() => ({}));
+    return { error: `Meta media info failed (${metaRes.status}): ${JSON.stringify(errBody)}` };
+  }
   const meta = await metaRes.json();
   const mediaUrl = getString(meta?.url);
   const mimeType = normalizeMimeType(getString(meta?.mime_type));
-  if (!mediaUrl) return null;
+  if (!mediaUrl) return { error: `Meta returned no URL. Response: ${JSON.stringify(meta)}` };
 
   const mediaRes = await fetch(mediaUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
   });
 
-  if (!mediaRes.ok) return null;
+  if (!mediaRes.ok) return { error: `Media download failed (${mediaRes.status})` };
   const audioBuffer = Buffer.from(await mediaRes.arrayBuffer());
 
   return {
@@ -198,13 +201,14 @@ export async function POST(request: NextRequest) {
       }
 
       const audio = await fetchWhatsAppAudio(audioId, providedAccessToken);
-      if (!audio) {
+      if (!audio || "error" in audio) {
         return NextResponse.json({
           response:
             "Recibi tu audio, pero no pude descargarlo desde Meta. Verifica el token, permisos y vigencia del media_id.",
           intent: "general",
           audio_transcript: "",
           error_code: "meta_media_fetch_failed",
+          error_detail: audio && "error" in audio ? audio.error : "null_response",
         });
       }
 
