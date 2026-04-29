@@ -110,7 +110,8 @@ async function transcribeWithOpenAI(audioBuffer: Buffer, mimeType: string): Prom
   };
 
   const ext = extensionByMime[mimeType] || "ogg";
-  const file = new File([audioBuffer], `whatsapp-audio.${ext}`, {
+  const fileBytes = Uint8Array.from(audioBuffer);
+  const file = new File([fileBytes], `whatsapp-audio.${ext}`, {
     type: mimeType || "audio/ogg",
   });
 
