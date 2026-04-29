@@ -28,7 +28,8 @@ function normalizeMimeType(input: string): string {
   const raw = getString(input).toLowerCase();
   if (!raw) return "audio/ogg";
 
-  const withoutParams = raw.split(";")[0].trim();
+  const parts = raw.split(";");
+  const withoutParams = (parts[0] ?? raw).trim();
 
   if (withoutParams === "audio/opus") return "audio/ogg";
   if (withoutParams === "application/octet-stream") return "audio/ogg";
