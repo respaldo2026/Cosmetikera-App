@@ -13,8 +13,7 @@ type ArticuloInputRow = Record<string, unknown>;
 const normalizeText = (value: unknown) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 
-const fieldLabels: Record<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia">, string> = {
-  nombre: "nombre",
+const fieldLabels: Record<keyof Pick<ArticuloIdentityRow, "referencia">, string> = {
   referencia: "código principal",
 };
 
@@ -32,19 +31,10 @@ function buildDuplicateError(field: keyof typeof fieldLabels, value: string, sco
 
 function findPayloadDuplicate(rows: ArticuloInputRow[]) {
   const seen = {
-    nombre: new Set<string>(),
     referencia: new Set<string>(),
   };
 
   for (const row of rows) {
-    const nombre = normalizeText(row.nombre);
-    if (nombre) {
-      if (seen.nombre.has(nombre)) {
-        return { field: "nombre" as const, value: String(row.nombre).trim() };
-      }
-      seen.nombre.add(nombre);
-    }
-
     const referencia = normalizeText(row.referencia);
     if (referencia) {
       if (seen.referencia.has(referencia)) {
@@ -60,20 +50,17 @@ function findPayloadDuplicate(rows: ArticuloInputRow[]) {
 function findDatabaseDuplicate(
   rows: ArticuloInputRow[],
   existingRows: ArticuloIdentityRow[],
-  changedFields?: Array<keyof Pick<ArticuloIdentityRow, "nombre" | "referencia">>
+  changedFields?: Array<keyof Pick<ArticuloIdentityRow, "referencia">>
 ) {
-  const fieldsToCheck = changedFields ?? ["nombre", "referencia"];
+  const fieldsToCheck = changedFields ?? ["referencia"];
 
   const indexes = {
-    nombre: new Map<string, ArticuloIdentityRow>(),
     referencia: new Map<string, ArticuloIdentityRow>(),
   };
 
   for (const row of existingRows) {
-    const nombre = normalizeText(row.nombre);
     const referencia = normalizeText(row.referencia);
 
-    if (nombre) indexes.nombre.set(nombre, row);
     if (referencia) indexes.referencia.set(referencia, row);
   }
 
@@ -204,7 +191,7 @@ export async function PATCH(request: Request) {
         ...body,
       };
 
-      const fieldsToCheck = (["nombre", "referencia"] as const).filter(
+      const fieldsToCheck = (["referencia"] as const).filter(
         (field) =>
           Object.prototype.hasOwnProperty.call(body, field) &&
           normalizeText(mergedRow[field]) !== normalizeText(currentRow[field])
