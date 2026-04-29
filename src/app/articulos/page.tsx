@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef } from "react";
 import {
   Card, Button, Typography, Space, Modal, Form, Input, InputNumber,
   Select, Tag, App, Spin, Tooltip, Row, Col, Statistic, Badge, Upload,
@@ -16,7 +16,7 @@ import {
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import EscanerCodigo from "@/components/EscanerCodigo";
 import { getCatalogosArticulosLocal, mergeCatalogos, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 
@@ -205,6 +205,8 @@ export default function ArticulosPage() {
   const { message, modal } = App.useApp();
   const [form] = Form.useForm();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const processedQuickCodeRef = useRef<string | null>(null);
 
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,6 +252,7 @@ export default function ArticulosPage() {
     marcas: [],
     fabricantes: [],
   });
+  const [gridVisibleCount, setGridVisibleCount] = useState(120);
   const deferredSearch = useDeferredValue(search);
 
   const cargar = useCallback(async () => {
@@ -288,6 +291,24 @@ export default function ArticulosPage() {
   useEffect(() => {
     setCatalogosCustom(getCatalogosArticulosLocal());
   }, []);
+
+  useEffect(() => {
+    const quickCode = searchParams.get("quickCode")?.trim();
+    if (!quickCode) return;
+    if (processedQuickCodeRef.current === quickCode) return;
+
+    processedQuickCodeRef.current = quickCode;
+    setEditing(null);
+    form.setFieldsValue({
+      activo: true,
+      stock: 0,
+      stock_minimo: 3,
+      codigo_barras: quickCode,
+      referencia: quickCode,
+    });
+    setModalOpen(true);
+    message.info(`Creación rápida iniciada para código ${quickCode}`);
+  }, [searchParams, form, message]);
 
   const articulosIndex = useMemo(() => articulos.map((a) => {
     const proveedor = getArticuloProveedor(a);
@@ -387,7 +408,16 @@ export default function ArticulosPage() {
     ),
     [categorias, marcas, fabricantes, catalogosCustom],
   );
+  const articulosGridVisibles = useMemo(
+    () => articulosFiltrados.slice(0, gridVisibleCount),
+    [articulosFiltrados, gridVisibleCount],
+  );
+  const faltanGrid = Math.max(0, articulosFiltrados.length - articulosGridVisibles.length);
   const selectedCount = selectedIds.length;
+
+  useEffect(() => {
+    setGridVisibleCount(120);
+  }, [search, filtroCategoria, filtroMarca, filtroProveedor, filtroTamano, filtroEmpaque, vista]);
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -1097,9 +1127,18 @@ export default function ArticulosPage() {
         </Card>
         )
       ) : (
-        <Row gutter={[12, 12]}>
-          {articulosFiltrados.map(renderCard)}
-        </Row>
+        <>
+          <Row gutter={[12, 12]}>
+            {articulosGridVisibles.map(renderCard)}
+          </Row>
+          {faltanGrid > 0 && (
+            <div style={{ marginTop: 12, textAlign: "center" }}>
+              <Button onClick={() => setGridVisibleCount((prev) => prev + 120)}>
+                Cargar más ({faltanGrid} restantes)
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* ── MODAL AJUSTE MASIVO DE PRECIOS ── */}

@@ -23,6 +23,7 @@ import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { isBirthdayMonth } from "@/constants/clubRewards";
 import { useClubConfig, getNivelDinamico, getMultiplicadorCumple, calcularPuntosVenta } from "@/hooks/useClubConfig";
+import { useRouter } from "next/navigation";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -116,6 +117,7 @@ function formatDiaMesInput(value: string): string {
 }
 
 export default function VentasPage() {
+  const router = useRouter();
   const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
   const permiteCajon = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
   const permiteImpresionSilenciosa = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
@@ -389,6 +391,25 @@ export default function VentasPage() {
     [articulos, deferredSearch, filtroCategoria]
   );
 
+  const codigoArticuloIndex = useMemo(() => {
+    const index = new Map<string, Articulo>();
+    const normalize = (value?: string | null) => String(value || "").trim().toLowerCase();
+
+    for (const art of articulos) {
+      const keys = [art.id, art.referencia, art.codigo_barras, art.codigo_secundario]
+        .map((value) => normalize(value))
+        .filter(Boolean);
+
+      for (const key of keys) {
+        if (!index.has(key)) {
+          index.set(key, art);
+        }
+      }
+    }
+
+    return index;
+  }, [articulos]);
+
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
 
   const agregarAlCarrito = (art: Articulo) => {
@@ -631,23 +652,27 @@ export default function VentasPage() {
   // Buscar artículo por código al escanear
   const buscarPorCodigo = useCallback((codigo: string) => {
     const normalizar = (value?: string | null) => String(value || "").trim().toLowerCase();
-    const normalizedCodigo = normalizar(codigo);
-    const art = articulos.find(
-      (a) =>
-        normalizar(a.referencia) === normalizedCodigo ||
-        normalizar(a.codigo_barras) === normalizedCodigo ||
-        normalizar(a.codigo_secundario) === normalizedCodigo ||
-        normalizar(a.id) === normalizedCodigo
-    );
+    const cleanedCodigo = codigo.trim();
+    const normalizedCodigo = normalizar(cleanedCodigo);
+    const art = codigoArticuloIndex.get(normalizedCodigo);
     if (art) {
       agregarAlCarrito(art);
       message.success(`${art.nombre} agregado al carrito`);
     } else {
       // Si no se encuentra, poner el código en el buscador
-      setSearch(codigo.trim());
-      message.info(`Código: ${codigo} — no encontrado, mostrando búsqueda`);
+      setSearch(cleanedCodigo);
+      modal.confirm({
+        title: "Producto no encontrado",
+        icon: <ExclamationCircleOutlined style={{ color: "#faad14" }} />,
+        content: `No existe un artículo con código ${cleanedCodigo}.`,
+        okText: "Crear artículo rápido",
+        cancelText: "Cancelar",
+        onOk: () => {
+          router.push(`/articulos?quickCode=${encodeURIComponent(cleanedCodigo)}`);
+        },
+      });
     }
-  }, [articulos, message]); // eslint-disable-line
+  }, [codigoArticuloIndex, message, modal, router]);
 
   const handleCobrar = () => {
     if (!clienteId && carrito.length > 0) {
