@@ -318,8 +318,8 @@ export default function ArticulosPage() {
 
   const stockBajo = articulos.filter((a) => a.stock <= (a.stock_minimo ?? 3));
   const valorInventario = articulos.reduce((s, a) => s + a.stock * (a.precio_costo || 0), 0);
-  const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
-  const marcas = [...new Set(articulos.map((a) => a.marca).filter(Boolean))];
+  const categorias: string[] = [...new Set(articulos.map((a) => a.categoria).filter((v): v is string => Boolean(v)))];
+  const marcas: string[] = [...new Set(articulos.map((a) => a.marca).filter((v): v is string => Boolean(v)))];
   const fabricantes = [...new Set(articulos
     .map((a) =>
       String(
