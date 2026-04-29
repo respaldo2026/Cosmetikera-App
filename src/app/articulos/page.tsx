@@ -58,6 +58,24 @@ type Articulo = {
   imagen_url?: string;
 };
 
+type ImportArticuloDraft = {
+  nombre: string;
+  referencia?: string;
+  codigo_barras?: string;
+  codigo_secundario?: string;
+  categoria?: string;
+  marca?: string;
+  proveedor?: string;
+  tamano?: string;
+  empaque?: string;
+  precio_venta: number;
+  precio_costo?: number;
+  stock: number;
+  stock_minimo?: number;
+  descripcion?: string;
+  activo: boolean;
+};
+
 const normalizeText = (value: unknown) =>
   typeof value === "string" ? value.toLowerCase().trim() : "";
 
@@ -75,6 +93,109 @@ const getArticuloEmpaque = (articulo: Articulo) =>
   normalizeText((articulo as Articulo & { presentacion?: string; tipo_empaque?: string }).empaque)
   || normalizeText((articulo as Articulo & { presentacion?: string; tipo_empaque?: string }).presentacion)
   || normalizeText((articulo as Articulo & { presentacion?: string; tipo_empaque?: string }).tipo_empaque);
+
+const normalizeImportHeader = (value: unknown) =>
+  String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+
+const getImportCell = (row: Record<string, unknown>, aliases: string[]) => {
+  const aliasSet = new Set(aliases.map(normalizeImportHeader));
+  for (const [rawKey, value] of Object.entries(row)) {
+    if (aliasSet.has(normalizeImportHeader(rawKey))) {
+      return value;
+    }
+  }
+  return "";
+};
+
+const toImportText = (value: unknown) => String(value ?? "").trim();
+
+const toImportNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+
+  let cleaned = raw
+    .replace(/\$/g, "")
+    .replace(/cop/gi, "")
+    .replace(/\s+/g, "")
+    .replace(/[^0-9,.-]/g, "");
+
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+
+  if (hasComma && hasDot) {
+    const lastComma = cleaned.lastIndexOf(",");
+    const lastDot = cleaned.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    const parts = cleaned.split(",");
+    const last = parts[parts.length - 1] ?? "";
+    if (parts.length === 2 && last.length === 3) {
+      cleaned = cleaned.replace(/,/g, "");
+    } else {
+      cleaned = cleaned.replace(/,/g, ".");
+    }
+  } else if (hasDot) {
+    const parts = cleaned.split(".");
+    const last = parts[parts.length - 1] ?? "";
+    if (parts.length === 2 && last.length === 3) {
+      cleaned = cleaned.replace(/\./g, "");
+    }
+  }
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const mapImportRowToArticulo = (row: Record<string, unknown>): ImportArticuloDraft => {
+  const nombre = toImportText(getImportCell(row, ["nombre", "producto", "articulo", "ítem", "item"]));
+  const referencia = toImportText(getImportCell(row, ["referencia", "ref"])) || undefined;
+  const codigoBarras = toImportText(getImportCell(row, ["codigo", "código", "codigo_barras", "codigobarras", "barra", "ean", "sku"])) || undefined;
+  const codigoSecundario = toImportText(getImportCell(row, ["codigo_secundario", "codigosecundario", "cod_secundario"])) || undefined;
+
+  const precioVenta = toImportNumber(
+    getImportCell(row, ["precio_venta", "precioventa", "precio venta", "precio", "valor", "pvp"]),
+    0,
+  );
+
+  const precioCosto = toImportNumber(
+    getImportCell(row, ["precio_costo", "preciocosto", "precio costo", "costo"]),
+    0,
+  );
+
+  const stock = toImportNumber(getImportCell(row, ["stock", "cantidad", "existencia", "inventario"]), 0);
+  const stockMinimo = toImportNumber(getImportCell(row, ["stock_minimo", "stock minimo", "minimo", "min"]), 3);
+
+  return {
+    nombre,
+    referencia,
+    codigo_barras: codigoBarras,
+    codigo_secundario: codigoSecundario,
+    categoria: toImportText(getImportCell(row, ["categoria", "categoría", "linea", "línea"])) || undefined,
+    marca: toImportText(getImportCell(row, ["marca"])) || undefined,
+    proveedor: toImportText(getImportCell(row, ["proveedor", "distribuidor"])) || undefined,
+    tamano: toImportText(getImportCell(row, ["tamano", "tamaño", "presentacion", "presentación", "size"])) || undefined,
+    empaque: toImportText(getImportCell(row, ["empaque", "envase", "tipo_empaque"])) || undefined,
+    precio_venta: precioVenta,
+    precio_costo: precioCosto > 0 ? precioCosto : undefined,
+    stock,
+    stock_minimo: stockMinimo > 0 ? stockMinimo : undefined,
+    descripcion: toImportText(getImportCell(row, ["descripcion", "descripción", "detalle"])) || undefined,
+    activo: true,
+  };
+};
 
 export default function ArticulosPage() {
   const screens = useBreakpoint();
@@ -116,6 +237,11 @@ export default function ArticulosPage() {
   const [importRows, setImportRows] = useState<Record<string, unknown>[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importFileName, setImportFileName] = useState("");
+
+  const importRowsParsed = useMemo(
+    () => importRows.map((row) => mapImportRowToArticulo(row)),
+    [importRows],
+  );
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -258,6 +384,7 @@ export default function ArticulosPage() {
 
   const COLUMNAS_IMPORT = [
     { key: "nombre",            label: "nombre (requerido)" },
+    { key: "codigo_barras",     label: "codigo (código de barras / sku)" },
     { key: "referencia",        label: "referencia" },
     { key: "codigo_secundario", label: "codigo_secundario" },
     { key: "categoria",         label: "categoria" },
@@ -276,22 +403,7 @@ export default function ArticulosPage() {
     if (importRows.length === 0) { message.warning("No hay filas para importar"); return; }
     setImportLoading(true);
     try {
-      const articulos_nuevos = importRows.map((row) => ({
-        nombre:            String(row["nombre"] || row["Nombre"] || "").trim(),
-        referencia:        String(row["referencia"] || row["Referencia"] || row["Código"] || row["Codigo"] || "").trim() || undefined,
-        codigo_secundario: String(row["codigo_secundario"] || row["Codigo_secundario"] || "").trim() || undefined,
-        categoria:         String(row["categoria"] || row["Categoria"] || row["Categoría"] || "").trim() || undefined,
-        marca:             String(row["marca"] || row["Marca"] || "").trim() || undefined,
-        proveedor:         String(row["proveedor"] || row["Proveedor"] || "").trim() || undefined,
-        tamano:            String(row["tamano"] || row["tamaño"] || row["Tamano"] || row["Tamaño"] || "").trim() || undefined,
-        empaque:           String(row["empaque"] || row["Empaque"] || "").trim() || undefined,
-        precio_venta:      Number(row["precio_venta"] || row["Precio_venta"] || row["Precio venta"] || row["PrecioVenta"] || 0),
-        precio_costo:      Number(row["precio_costo"] || row["Precio_costo"] || row["Precio costo"] || row["PrecioCosto"] || 0) || undefined,
-        stock:             Number(row["stock"] || row["Stock"] || 0),
-        stock_minimo:      Number(row["stock_minimo"] || row["Stock_minimo"] || row["Stock minimo"] || 3) || undefined,
-        descripcion:       String(row["descripcion"] || row["Descripcion"] || row["Descripción"] || "").trim() || undefined,
-        activo:            true,
-      })).filter((a) => a.nombre);
+      const articulos_nuevos = importRowsParsed.filter((a) => a.nombre);
 
       if (articulos_nuevos.length === 0) {
         message.error("Ninguna fila tiene columna 'nombre' válida");
@@ -1095,18 +1207,28 @@ export default function ArticulosPage() {
               title={<Text strong>Vista previa — {importRows.length} fila(s) detectadas</Text>}
             >
               <Table
-                dataSource={importRows.slice(0, 10)}
+                dataSource={importRowsParsed.slice(0, 10)}
                 rowKey={(_, i) => String(i)}
                 size="small"
                 pagination={false}
                 scroll={{ x: 600 }}
-                columns={Object.keys(importRows[0] || {}).slice(0, 8).map((k) => ({
-                  title: k,
-                  dataIndex: k,
-                  width: 120,
-                  ellipsis: true,
-                  render: (v: unknown) => String(v ?? ""),
-                }))}
+                columns={[
+                  { title: "nombre", dataIndex: "nombre", width: 220, ellipsis: true },
+                  { title: "codigo_barras", dataIndex: "codigo_barras", width: 140, ellipsis: true },
+                  { title: "referencia", dataIndex: "referencia", width: 140, ellipsis: true },
+                  {
+                    title: "precio_venta",
+                    dataIndex: "precio_venta",
+                    width: 120,
+                    render: (v: unknown) => Number(v || 0).toLocaleString("es-CO"),
+                  },
+                  {
+                    title: "stock",
+                    dataIndex: "stock",
+                    width: 90,
+                    render: (v: unknown) => Number(v || 0),
+                  },
+                ]}
               />
               {importRows.length > 10 && (
                 <Text type="secondary" style={{ fontSize: 11 }}>...y {importRows.length - 10} filas más</Text>
