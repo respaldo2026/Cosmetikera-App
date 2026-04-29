@@ -1319,30 +1319,30 @@ export default function ArticulosPage() {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
             <Col xs={24} md={8}>
+              <Form.Item name="marca" label="Marca">
                 <Input placeholder="Ej: OPI, Essie, Sally Hansen..." />
               </Form.Item>
             </Col>
-          </Row>
             <Col xs={24} md={8}>
               <Form.Item name="proveedor" label="Proveedor">
                 <Input placeholder="Ej: Distribuidor XYZ" />
               </Form.Item>
             </Col>
+          </Row>
           <Row gutter={16}>
-            <Col span={8}>
             <Col xs={24} md={8}>
+              <Form.Item name="tamano" label="Tamaño">
                 <Input placeholder="Ej: 15 ml" />
               </Form.Item>
             </Col>
-            <Col span={8}>
             <Col xs={24} md={8}>
+              <Form.Item name="empaque" label="Empaque">
                 <Input placeholder="Ej: Frasco" />
               </Form.Item>
             </Col>
-          </Row>
             <Col xs={24} md={8}>
+              <Form.Item name="stock" label="Stock inicial">
               <Form.Item name="stock" label="Stock inicial">
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>
