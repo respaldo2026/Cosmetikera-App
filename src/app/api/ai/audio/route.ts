@@ -7,6 +7,11 @@ type AudioExtraction = {
   messageId?: string;
 };
 
+type AudioFetchResult = {
+  base64: string;
+  mimeType: string;
+};
+
 function isAuthorized(req: NextRequest): boolean {
   const received = req.headers.get("x-api-key") || "";
   const expected = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY || "";
@@ -17,6 +22,18 @@ function isAuthorized(req: NextRequest): boolean {
 
 function getString(value: unknown): string {
   return String(value || "").trim();
+}
+
+function normalizeMimeType(input: string): string {
+  const raw = getString(input).toLowerCase();
+  if (!raw) return "audio/ogg";
+
+  const withoutParams = raw.split(";")[0].trim();
+
+  if (withoutParams === "audio/opus") return "audio/ogg";
+  if (withoutParams === "application/octet-stream") return "audio/ogg";
+
+  return withoutParams || "audio/ogg";
 }
 
 function extractAudioInfo(body: any): AudioExtraction {
@@ -42,8 +59,7 @@ function extractAudioInfo(body: any): AudioExtraction {
   };
 }
 
-async function fetchWhatsAppAudio(audioId: string): Promise<{ base64: string; mimeType: string } | null> {
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+async function fetchWhatsAppAudio(audioId: string, accessToken: string): Promise<AudioFetchResult | null> {
   if (!accessToken || !audioId) return null;
 
   const metaRes = await fetch(`https://graph.facebook.com/v21.0/${audioId}`, {
@@ -54,7 +70,7 @@ async function fetchWhatsAppAudio(audioId: string): Promise<{ base64: string; mi
   if (!metaRes.ok) return null;
   const meta = await metaRes.json();
   const mediaUrl = getString(meta?.url);
-  const mimeType = getString(meta?.mime_type) || "audio/ogg";
+  const mimeType = normalizeMimeType(getString(meta?.mime_type));
   if (!mediaUrl) return null;
 
   const mediaRes = await fetch(mediaUrl, {
@@ -129,6 +145,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const audioInfo = extractAudioInfo(body);
+    const providedAccessToken =
+      getString(request.headers.get("x-whatsapp-access-token")) ||
+      getString(body?.whatsapp_access_token) ||
+      getString(body?.meta_access_token) ||
+      getString(process.env.WHATSAPP_ACCESS_TOKEN);
+
     const rawPhone =
       getString(body?.telefono_whatsapp) ||
       getString(body?.telefono) ||
@@ -155,7 +177,7 @@ export async function POST(request: NextRequest) {
     if (!transcript) {
       const { audioId } = audioInfo;
       if (audioId) {
-        const audio = await fetchWhatsAppAudio(audioId);
+        const audio = await fetchWhatsAppAudio(audioId, providedAccessToken);
         if (audio) {
           transcript = await transcribeWithGemini(audio.base64, audio.mimeType);
         }
