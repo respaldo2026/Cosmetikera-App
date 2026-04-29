@@ -61,11 +61,36 @@ function detectIntent(message: string): AgentIntent {
   if (/requisito|necesito|debo llevar|condicion|contraindicacion|alergia/.test(m)) return "requisitos";
 
   // Consultas comunes de belleza (mujeres y hombres)
-  if (/acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(m)) return "general";
-  if (/caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion|barba/.test(m)) return "general";
-  if (/maquillaje|base|corrector|labial|pestanas|cejas|uñas|esmalte|perfume|fragancia/.test(m)) return "general";
+  if (/acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo|rosacea|sensibilidad|dermatitis/.test(m)) return "general";
+  if (/caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|keratina|botox capilar|tinte|decoloracion|matiz|tonalizar|barba|cuero cabelludo|porosidad|afro/.test(m)) return "general";
+  if (/maquillaje|base|corrector|labial|pestanas|cejas|uñas|unas|acrilicas|acrilico|gel|semipermanente|esmalte|perfume|fragancia|duracion|transferencia|oxidacion/.test(m)) return "general";
 
   return "general";
+}
+
+function buildBeautyKnowledgeContext(): string {
+  return [
+    "- Marco de asesoria profesional: Diagnosticar -> Recomendar -> Explicar uso -> Confirmar preferencia/presupuesto.",
+    "- Piel grasa/acne: limpieza suave, niacinamida, acido salicilico, hidratante ligera no comedogenica, protector solar diario.",
+    "- Piel seca/sensible: limpiador cremoso, ceramidas, acido hialuronico, pantenol, protector solar hidratante.",
+    "- Manchas/melasma: vitamina C de dia + protector solar de amplio espectro; de noche despigmentantes suaves segun tolerancia.",
+    "- Anti-edad: retinoides nocturnos progresivos + antioxidantes de dia + fotoproteccion estricta.",
+    "- Cabello con frizz/resequedad: shampoo suave, mascarilla nutritiva 2-3 veces/semana, sellado con leave-in/aceite ligero.",
+    "- Tintes: evaluar base natural/teñida, historial químico y objetivo de tono; recomendar cuidado de color y mantenimiento.",
+    "- Decoloracion: priorizar salud capilar, evaluar elasticidad/porosidad, recomendar protección de enlaces, matizante e hidratación intensiva.",
+    "- Alisados/keratina: validar estado del cabello antes del proceso, recomendar shampoo sin sal/sulfatos y protector térmico para prolongar resultado.",
+    "- Cabello afro/rizado: enfoque en hidratación + nutrición + definición; sugerir técnicas de bajo calor, leave-in y sellado para evitar quiebre.",
+    "- Caida capilar: identificar si es quiebre o caida de raiz; sugerir rutina fortalecedora y recomendar consulta profesional si es persistente.",
+    "- Cuero cabelludo graso/caspa: limpieza regular, activos anticaspa, evitar exceso de calor y acumulacion de residuos.",
+    "- Maquillaje larga duracion: preparar piel, base por tipo de piel, sellar por zonas, fijador para eventos.",
+    "- Uñas acrílicas: evaluar estado de uña natural, recomendar preparación correcta, control de grosor y mantenimiento/relleno.",
+    "- Uñas en gel/semipermanente: preparación suave, curado correcto, sellado y retiro seguro para evitar daño de lámina ungueal.",
+    "- Unas: base tratante segun necesidad (fortalecer/hidratar/proteger), color, top coat para duracion.",
+    "- Fragancias: recomendar por ocasion (dia/noche), intensidad deseada y clima (calido/fresco).",
+    "- Regla de seguridad: no dar diagnosticos medicos ni promesas absolutas; ante irritacion importante sugerir evaluacion dermatologica.",
+    "- Regla de combinacion: si recomiendas activos potentes, sugiere introducirlos gradualmente y vigilar tolerancia.",
+    "- Cierre comercial consultivo: ofrecer 2-3 opciones, mencionar beneficio principal, precio y siguiente paso de compra.",
+  ].join("\n");
 }
 
 type CatalogArticle = {
@@ -258,6 +283,10 @@ function buildHeuristicFallbackResponse(params: {
   const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedMessage);
   const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedMessage);
   const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|esmalte/.test(normalizedMessage);
+  const hasColorConcern = /tinte|coloracion|decoloracion|mechas|balayage|matiz|tonalizar|rubio|castano|negro|rojizo/.test(normalizedMessage);
+  const hasStraighteningConcern = /alisado|keratina|botox capilar|planchado|repolarizacion/.test(normalizedMessage);
+  const hasAfroConcern = /afro|rizo tipo 3|rizo tipo 4|coily|crespo/.test(normalizedMessage);
+  const hasNailTechConcern = /acrilicas|acrilico|uñas en gel|unas en gel|semipermanente|polygel|gel x/.test(normalizedMessage);
   const asksPoints = /puntos|club|fidelizacion|canje|beneficio/.test(normalizedMessage);
   const asksName = /sabes\s+mi\s+nombre|cual\s+es\s+mi\s+nombre|mi\s+nombre\??/.test(normalizedMessage);
   const asksNails = /uñas|unas|nail|semipermanente|acrilicas/.test(normalizedMessage);
@@ -266,17 +295,25 @@ function buildHeuristicFallbackResponse(params: {
 
   // --- Detección de continuidad conversacional ---
   const lastBot = normalize(params.lastBotMessage || "");
-  const isFollowUpHair = /cabello|pelo|shampoo|mascarilla|frizz|caida|rizado|ondulado/.test(lastBot);
+  const isFollowUpHair = /cabello|pelo|shampoo|mascarilla|frizz|caida|rizado|ondulado|tinte|decoloracion|alisado|keratina|afro/.test(lastBot);
   const isFollowUpSkin = /piel|acne|manchas|serum|hidratante|poro|grasa|seca|mixta/.test(lastBot);
-  const isFollowUpNails = /unas|esmalte|semipermanente|gel|acrilica|nail/.test(lastBot);
+  const isFollowUpNails = /unas|esmalte|semipermanente|gel|acrilica|acrilicas|polygel|gel x|nail/.test(lastBot);
   const isFollowUpMakeup = /maquillaje|base|corrector|evento|diario/.test(lastBot);
   const msgWords = normalizedMessage.split(/\s+/).filter(Boolean).length;
-  const isShortFollowUp = msgWords <= 5 && lastBot.length > 10;
+  const isShortFollowUp = msgWords <= 6 && lastBot.length > 10;
 
   // --- Respuesta inteligente a mensajes de seguimiento (sin necesidad de Gemini) ---
   if (isShortFollowUp && isFollowUpHair && !hasHairConcern) {
     const hairType = message.trim();
     return `💇 ¡Perfecto! Para cabello *${hairType}* te recomiendo:\n1) *Shampoo sin sulfatos* suave para ese tipo de cabello\n2) *Mascarilla hidratante* 2 veces por semana 💧\n3) *Sérum o aceite vegetal* en las puntas\n¿Tienes más preocupación: frizz, caída o resequedad?`;
+  }
+
+  if (isShortFollowUp && isFollowUpNails && !hasNailTechConcern && !asksNails) {
+    return `💅 Perfecto. Sobre lo que veníamos de *uñas*, dime si prefieres:
+1) *Acrílicas* (más estructura)
+2) *Gel/semipermanente* (acabado flexible)
+3) *Natural fortalecida*
+Y te recomiendo el protocolo ideal.`;
   }
 
   if (isShortFollowUp && isFollowUpSkin && !hasSkinConcern) {
@@ -351,6 +388,22 @@ function buildHeuristicFallbackResponse(params: {
 
   if (hasHairConcern && top.length === 0) {
      return `💇 ${greeting}. Para *frizz/caída/resequedad* del cabello te sirve:\n1) *Shampoo suave*\n2) *Mascarilla hidratante* 2-3 veces/semana\n3) *Protector térmico* antes de calor 🔥\n¿Tu cabello es liso, ondulado o rizado?`;
+  }
+
+  if (hasColorConcern && top.length === 0) {
+    return `🎨 ${greeting}. Para *tinte/decoloración* te recomiendo este plan base:\n1) Evaluar historial químico y estado actual\n2) Usar *tratamiento reparador* post proceso\n3) Mantener color con *shampoo para color* + matizante según tono\n¿Buscas cubrir canas, cambio total o corrección de color?`;
+  }
+
+  if (hasStraighteningConcern && top.length === 0) {
+    return `✨ ${greeting}. Para *alisados/keratina* lo ideal es:\n1) Revisar porosidad y resistencia del cabello\n2) Elegir proceso según objetivo (control frizz vs alisado profundo)\n3) Mantener con *shampoo sin sal/sulfatos* y protector térmico\n¿Quieres resultado natural o efecto liso intenso?`;
+  }
+
+  if (hasAfroConcern && top.length === 0) {
+    return `🌀 ${greeting}. Para *cabello afro/rizado* te funciona:\n1) Hidratación por capas (leave-in + crema)\n2) Sellado ligero para retener humedad\n3) Definición sin calor excesivo\n¿Tu objetivo principal es definición, crecimiento o menos quiebre?`;
+  }
+
+  if (hasNailTechConcern && top.length === 0) {
+    return `💅 ${greeting}. Para *uñas acrílicas/gel* te sugiero:\n1) Preparación correcta de uña natural\n2) Producto según durabilidad deseada\n3) Retiro técnico para evitar daño\n¿Prefieres duración máxima, acabado natural o diseño artístico?`;
   }
 
   if (hasMakeupConcern && top.length === 0) {
@@ -508,6 +561,7 @@ export async function POST(request: NextRequest) {
 
     const contextoArticulos = buildProductContext(articulos, message, intent);
     const contextoAsesoria = buildSalesAdvisoryContext(articulos, message, intent);
+    const contextoBellezaExperta = buildBeautyKnowledgeContext();
 
     // ===== INTEGRACIÓN DE MEMORIA =====
     let customerContext = null;
@@ -578,6 +632,11 @@ export async function POST(request: NextRequest) {
         "- Atiende tanto a mujeres como a hombres con lenguaje inclusivo y cercano.",
         "- Asesora por necesidad real: piel, cabello, maquillaje, uñas, barba, rutina y fragancias.",
         "- Si detectas problema (acné, manchas, frizz, caída, resequedad, sensibilidad), primero valida necesidad y luego recomienda.",
+        "- Antes de recomendar, haz mini diagnóstico con 1-2 preguntas clave (tipo de piel/cabello, objetivo, frecuencia de uso, presupuesto).",
+        "- Entrega recomendación en formato asesor: problema -> rutina sugerida -> producto(s) del catálogo -> beneficio -> cómo usar.",
+        "- Especialízate en: cabello (tintes, decoloración, alisados, afro/rizado, cuidado capilar), uñas (acrílicas, gel, semipermanente) y diagnóstico de rutina.",
+        "- Si el cliente responde corto (ej: 'sí', 'ese', 'ondulado', 'afro', 'en gel'), NO pierdas el hilo: conecta con la última pregunta y continúa la asesoría.",
+        "- Si el cliente pide consejo general, responde con criterio técnico de belleza y aterriza en productos reales del catálogo.",
         "- USA el historial de conversación para dar continuidad REAL (no repitas saludos si ya conversaron).",
         "- Si el cliente ya preguntó algo antes, recuérdalo y conecta la respuesta.",
         "- No inventes precios ni stock; usa SOLO el contexto de productos dado.",
@@ -587,6 +646,9 @@ export async function POST(request: NextRequest) {
         "- Cierra siempre con una pregunta útil para seguir asesorando o concretar compra.",
         "- Si no tienes el producto, di exactamente qué tienes similar y ofrece alternativas.",
         "- Nunca hagas afirmaciones médicas absolutas ni prometas resultados imposibles.",
+        "",
+        "[CONOCIMIENTO TÉCNICO DE BELLEZA - úsalo para asesorar mejor]:",
+        contextoBellezaExperta,
         "",
         customerName ? `[CLIENTE: ${customerName}]` : "[CLIENTE: nuevo]",
         customerMemoryContext,
