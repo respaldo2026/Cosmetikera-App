@@ -433,8 +433,8 @@ export default function ArticulosPage() {
   const descargarPlantilla = async () => {
     const XLSX = await loadXlsx();
     const ws = XLSX.utils.aoa_to_sheet([
-      ["nombre", "referencia", "codigo_secundario", "categoria", "marca", "proveedor", "tamano", "empaque", "precio_venta", "precio_costo", "stock", "stock_minimo", "descripcion"],
-      ["Esmalte Ejemplo", "COD-001", "REF-A", "Esmaltes", "OPI", "Distribuidor ABC", "15 ml", "Frasco", 15000, 8000, 20, 3, "Esmalte de ejemplo"],
+      ["nombre", "codigo_barras", "referencia", "codigo_secundario", "categoria", "marca", "proveedor", "tamano", "empaque", "precio_venta", "precio_costo", "stock", "stock_minimo", "descripcion"],
+      ["Esmalte Ejemplo", "7701234567890", "COD-001", "REF-A", "Esmaltes", "OPI", "Distribuidor ABC", "15 ml", "Frasco", 15000, 8000, 20, 3, "Esmalte de ejemplo"],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Artículos");
