@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from "react";
 import {
   Card, Button, Typography, Space, Modal, Form, Input, InputNumber,
   Select, Tag, App, Spin, Tooltip, Row, Col, Statistic, Badge, Upload,
@@ -250,6 +250,7 @@ export default function ArticulosPage() {
     marcas: [],
     fabricantes: [],
   });
+  const deferredSearch = useDeferredValue(search);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -288,49 +289,93 @@ export default function ArticulosPage() {
     setCatalogosCustom(getCatalogosArticulosLocal());
   }, []);
 
-  const articulosFiltrados = useMemo(() => articulos.filter((a) => {
-    const normalizedSearch = normalizeText(search);
-    const searchableText = [
-      a.nombre,
-      a.referencia,
-      a.codigo_secundario,
-      a.codigo_barras,
-      a.marca,
-      a.categoria,
-      a.descripcion,
-      getArticuloProveedor(a),
-      getArticuloTamano(a),
-      getArticuloEmpaque(a),
-    ].map(normalizeText).join(" ");
+  const articulosIndex = useMemo(() => articulos.map((a) => {
+    const proveedor = getArticuloProveedor(a);
+    const tamano = getArticuloTamano(a);
+    const empaque = getArticuloEmpaque(a);
 
-    const matchSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
-    const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
-    const proveedorSource = [getArticuloProveedor(a), a.descripcion, a.nombre, a.marca].map(normalizeText).join(" ");
-    const tamanoSource = [getArticuloTamano(a), a.descripcion, a.nombre].map(normalizeText).join(" ");
-    const empaqueSource = [getArticuloEmpaque(a), a.descripcion, a.nombre].map(normalizeText).join(" ");
+    return {
+      articulo: a,
+      searchableText: [
+        a.nombre,
+        a.referencia,
+        a.codigo_secundario,
+        a.codigo_barras,
+        a.marca,
+        a.categoria,
+        a.descripcion,
+        proveedor,
+        tamano,
+        empaque,
+      ].map(normalizeText).join(" "),
+      proveedorSource: [proveedor, a.descripcion, a.nombre, a.marca].map(normalizeText).join(" "),
+      tamanoSource: [tamano, a.descripcion, a.nombre].map(normalizeText).join(" "),
+      empaqueSource: [empaque, a.descripcion, a.nombre].map(normalizeText).join(" "),
+    };
+  }), [articulos]);
 
-    const matchMarca = filtroMarca.length === 0 || filtroMarca.includes(a.marca || "");
-    const matchProveedor = !normalizeText(filtroProveedor) || proveedorSource.includes(normalizeText(filtroProveedor));
-    const matchTamano = !normalizeText(filtroTamano) || tamanoSource.includes(normalizeText(filtroTamano));
-    const matchEmpaque = !normalizeText(filtroEmpaque) || empaqueSource.includes(normalizeText(filtroEmpaque));
-    return matchSearch && matchCat && matchMarca && matchProveedor && matchTamano && matchEmpaque;
-  }), [articulos, search, filtroCategoria, filtroMarca, filtroProveedor, filtroTamano, filtroEmpaque]);
+  const articulosFiltrados = useMemo(() => {
+    const normalizedSearch = normalizeText(deferredSearch);
+    const normalizedProveedor = normalizeText(filtroProveedor);
+    const normalizedTamano = normalizeText(filtroTamano);
+    const normalizedEmpaque = normalizeText(filtroEmpaque);
 
-  const stockBajo = articulos.filter((a) => a.stock <= (a.stock_minimo ?? 3));
-  const valorInventario = articulos.reduce((s, a) => s + a.stock * (a.precio_costo || 0), 0);
-  const categorias: string[] = [...new Set(articulos.map((a) => a.categoria).filter((v): v is string => Boolean(v)))];
-  const marcas: string[] = [...new Set(articulos.map((a) => a.marca).filter((v): v is string => Boolean(v)))];
-  const fabricantes = [...new Set(articulos
-    .map((a) =>
-      String(
-        a.proveedor
-        || (a as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_nombre
-        || (a as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_label
-        || ""
-      ).trim()
-    )
-    .filter(Boolean)
-  )];
+    return articulosIndex
+      .filter((item) => {
+        const a = item.articulo;
+        const matchSearch = !normalizedSearch || item.searchableText.includes(normalizedSearch);
+        const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
+        const matchMarca = filtroMarca.length === 0 || filtroMarca.includes(a.marca || "");
+        const matchProveedor = !normalizedProveedor || item.proveedorSource.includes(normalizedProveedor);
+        const matchTamano = !normalizedTamano || item.tamanoSource.includes(normalizedTamano);
+        const matchEmpaque = !normalizedEmpaque || item.empaqueSource.includes(normalizedEmpaque);
+        return matchSearch && matchCat && matchMarca && matchProveedor && matchTamano && matchEmpaque;
+      })
+      .map((item) => item.articulo);
+  }, [articulosIndex, deferredSearch, filtroCategoria, filtroMarca, filtroProveedor, filtroTamano, filtroEmpaque]);
+
+  const stockBajo = useMemo(() => articulos.filter((a) => a.stock <= (a.stock_minimo ?? 3)), [articulos]);
+  const valorInventario = useMemo(() => articulos.reduce((s, a) => s + a.stock * (a.precio_costo || 0), 0), [articulos]);
+  const categorias: string[] = useMemo(
+    () => [...new Set(articulos.map((a) => a.categoria).filter((v): v is string => Boolean(v)))],
+    [articulos],
+  );
+  const marcas: string[] = useMemo(
+    () => [...new Set(articulos.map((a) => a.marca).filter((v): v is string => Boolean(v)))],
+    [articulos],
+  );
+  const fabricantes: string[] = useMemo(
+    () => [...new Set(articulos
+      .map((a) =>
+        String(
+          a.proveedor
+          || (a as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_nombre
+          || (a as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_label
+          || ""
+        ).trim()
+      )
+      .filter(Boolean)
+    )],
+    [articulos],
+  );
+  const codigoBarrasIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of articulos) {
+      const code = normalizeText(a.codigo_barras);
+      if (!code || a.id === editing?.id) continue;
+      map.set(code, a.nombre);
+    }
+    return map;
+  }, [articulos, editing?.id]);
+  const referenciaIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of articulos) {
+      const ref = normalizeText(a.referencia);
+      if (!ref || a.id === editing?.id) continue;
+      map.set(ref, a.nombre);
+    }
+    return map;
+  }, [articulos, editing?.id]);
   const catalogosDisponibles = useMemo(
     () => mergeCatalogos(
       {
@@ -1364,14 +1409,12 @@ export default function ArticulosPage() {
           <Form.Item
             name="codigo_barras"
             label="Código de barras"
-            validateTrigger={["onChange", "onBlur"]}
+            validateTrigger={["onBlur"]}
             rules={[{
               validator: async (_, value) => {
                 if (!value) return;
-                const existe = articulos.find(
-                  (a) => a.codigo_barras === value && a.id !== editing?.id
-                );
-                if (existe) return Promise.reject(`Ya existe: "${existe.nombre}"`);
+                const existeNombre = codigoBarrasIndex.get(normalizeText(value));
+                if (existeNombre) return Promise.reject(`Ya existe: "${existeNombre}"`);
               },
             }]}
           >
@@ -1379,7 +1422,6 @@ export default function ArticulosPage() {
               value={codigoBarrasValue}
               onChange={(value) => {
                 form.setFieldValue("codigo_barras", value);
-                form.validateFields(["codigo_barras"]);
               }}
               onCodigo={(codigo) => {
                 form.setFieldValue("codigo_barras", codigo);
@@ -1397,14 +1439,12 @@ export default function ArticulosPage() {
               <Form.Item
                 name="referencia"
                 label="Referencia / código interno"
-                validateTrigger={["onChange", "onBlur"]}
+                validateTrigger={["onBlur"]}
                 rules={[{
                   validator: async (_, value) => {
                     if (!value) return;
-                    const existe = articulos.find(
-                      (a) => a.referencia === value && a.id !== editing?.id
-                    );
-                    if (existe) return Promise.reject(`Referencia ya usada: "${existe.nombre}"`);
+                    const existeNombre = referenciaIndex.get(normalizeText(value));
+                    if (existeNombre) return Promise.reject(`Referencia ya usada: "${existeNombre}"`);
                   },
                 }]}
               >
