@@ -1343,31 +1343,36 @@ export default function ArticulosPage() {
             </Col>
             <Col xs={24} md={8}>
               <Form.Item name="stock" label="Stock inicial">
-              <Form.Item name="stock" label="Stock inicial">
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
+          </Row>
           <Row gutter={16}>
-            <Col span={8}>
             <Col xs={24} md={8}>
+              <Form.Item name="precio_venta" label="Precio venta ($)" rules={[{ required: true }]}>
                 <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
               </Form.Item>
             </Col>
-            <Col span={8}>
             <Col xs={24} md={8}>
+              <Form.Item name="precio_costo" label="Precio costo ($)">
                 <InputNumber min={0} style={{ width: "100%" }} formatter={formatPrecio} />
               </Form.Item>
             </Col>
-            <Col span={8}>
             <Col xs={24} md={8}>
               <Form.Item name="stock_minimo" label="Stock mínimo">
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
+          </Row>
           <Row gutter={16}>
-            <Col span={8}>
-            <Col xs={24}>
+            <Col xs={24} md={16}>
+              <Form.Item name="imagen_url" label="URL imagen">
                 <Input placeholder="https://..." prefix={<CameraOutlined />} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item name="activo" label="Activo" valuePropName="checked">
+                <Switch defaultChecked />
               </Form.Item>
             </Col>
           </Row>
