@@ -100,7 +100,8 @@ export default function EscanerCodigo({
   // ── Detección de código por teclado (lector USB/BT) ──────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (submitOnEnter && e.key === "Enter" && valorActual.trim()) {
+      const esTerminador = e.key === "Enter" || e.key === "NumpadEnter" || e.key === "Tab";
+      if (submitOnEnter && esTerminador && valorActual.trim()) {
         e.preventDefault();
         procesarCodigo(valorActual);
         if (!isControlled) {

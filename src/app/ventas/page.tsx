@@ -30,7 +30,7 @@ const { useBreakpoint } = Grid;
 type Articulo = {
   id: string; nombre: string; precio_venta: number;
   stock: number; categoria?: string; marca?: string; imagen_url?: string;
-  referencia?: string; codigo_barras?: string;
+  referencia?: string; codigo_barras?: string; codigo_secundario?: string;
 };
 type CarritoItem = Articulo & { cantidad: number; subtotal: number };
 type Cliente = { id: string; nombre_completo: string; cedula?: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; fecha_nacimiento?: string; total_compras?: number; rol?: string; activo?: boolean };
@@ -335,7 +335,7 @@ export default function VentasPage() {
       const [{ data: arts, error: artsError }, clientesRes] = await Promise.all([
         supabaseBrowserClient
           .from("articulos")
-          .select("id,nombre,precio_venta,stock,categoria,marca,imagen_url,referencia,codigo_barras,activo")
+          .select("id,nombre,precio_venta,stock,categoria,marca,imagen_url,referencia,codigo_barras,codigo_secundario,activo")
           .eq("activo", true)
           .order("nombre"),
         fetch("/api/perfiles?rol=cliente").then(async (r) => {
@@ -632,12 +632,14 @@ export default function VentasPage() {
 
   // Buscar artículo por código al escanear
   const buscarPorCodigo = useCallback((codigo: string) => {
-    const normalizedCodigo = codigo.trim().toLowerCase();
+    const normalizar = (value?: string | null) => String(value || "").trim().toLowerCase();
+    const normalizedCodigo = normalizar(codigo);
     const art = articulos.find(
       (a) =>
-        (a as Articulo & { codigo_barras?: string }).referencia?.trim().toLowerCase() === normalizedCodigo ||
-        (a as Articulo & { codigo_barras?: string }).codigo_barras?.trim().toLowerCase() === normalizedCodigo ||
-        a.id.trim().toLowerCase() === normalizedCodigo
+        normalizar(a.referencia) === normalizedCodigo ||
+        normalizar(a.codigo_barras) === normalizedCodigo ||
+        normalizar(a.codigo_secundario) === normalizedCodigo ||
+        normalizar(a.id) === normalizedCodigo
     );
     if (art) {
       if (Number(art.stock || 0) <= 0) {
@@ -649,7 +651,7 @@ export default function VentasPage() {
       message.success(`${art.nombre} agregado al carrito`);
     } else {
       // Si no se encuentra, poner el código en el buscador
-      setSearch(codigo);
+      setSearch(codigo.trim());
       message.info(`Código: ${codigo} — no encontrado, mostrando búsqueda`);
     }
   }, [articulos, message]); // eslint-disable-line
@@ -756,7 +758,7 @@ export default function VentasPage() {
                       {art.nombre}
                     </Text>
                     <Text style={{ fontSize: 11, color: "#aaa" }}>
-                      {[art.marca, art.referencia, (art as Articulo & { codigo_barras?: string }).codigo_barras]
+                      {[art.marca, art.referencia, art.codigo_secundario, art.codigo_barras]
                         .filter(Boolean)
                         .join(" · ") || "Sin código visible"}
                     </Text>

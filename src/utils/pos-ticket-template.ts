@@ -108,12 +108,30 @@ export async function cargarConfigTicketPOS(): Promise<PosTicketTemplateConfig> 
   if (cachedTicketTemplate) return cachedTicketTemplate;
 
   try {
-    const { data } = await supabaseBrowserClient
+    const { data, error } = await supabaseBrowserClient
       .from("configuracion")
       .select("nombre_academia, ruc, direccion, telefono, email, logo_url, ticket_titulo, ticket_pie, ticket_nota, ticket_campos")
       .limit(1)
       .maybeSingle();
-    cachedTicketTemplate = construirTemplateDesdeFila((data as ConfiguracionTicketRow | null) ?? null);
+
+    if (error) {
+      const mensaje = String(error.message || "").toLowerCase();
+      const detalle = String((error as any).details || "").toLowerCase();
+      const columnaFaltante = mensaje.includes("ticket_campos") || detalle.includes("ticket_campos");
+
+      if (columnaFaltante) {
+        const { data: dataSinCampos } = await supabaseBrowserClient
+          .from("configuracion")
+          .select("nombre_academia, ruc, direccion, telefono, email, logo_url, ticket_titulo, ticket_pie, ticket_nota")
+          .limit(1)
+          .maybeSingle();
+        cachedTicketTemplate = construirTemplateDesdeFila((dataSinCampos as ConfiguracionTicketRow | null) ?? null);
+      } else {
+        throw error;
+      }
+    } else {
+      cachedTicketTemplate = construirTemplateDesdeFila((data as ConfiguracionTicketRow | null) ?? null);
+    }
   } catch {
     cachedTicketTemplate = construirTemplateDesdeFila(null);
   }
