@@ -380,11 +380,11 @@ export default function ArticulosPage() {
     [articulos],
   );
   const codigoBarrasIndex = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, { id: string; nombre: string }>();
     for (const a of articulos) {
       const code = normalizeText(a.codigo_barras);
       if (!code || a.id === editing?.id) continue;
-      map.set(code, a.nombre);
+      map.set(code, { id: a.id, nombre: a.nombre });
     }
     return map;
   }, [articulos, editing?.id]);
@@ -572,6 +572,34 @@ export default function ArticulosPage() {
     form.setFieldsValue(art ? { ...art } : { activo: true, stock: 0, stock_minimo: 3 });
     setModalOpen(true);
   };
+
+  const verificarCodigoBarrasRapido = useCallback(async (codigo: string) => {
+    const cleaned = String(codigo || "").trim();
+    if (!cleaned) return;
+
+    const normalized = normalizeText(cleaned);
+    const existeLocal = codigoBarrasIndex.get(normalized);
+    if (existeLocal) {
+      message.warning(`Código ya existe en "${existeLocal.nombre}"`);
+      return;
+    }
+
+    // Fallback puntual: por si se creó en otro dispositivo y aún no está en memoria local.
+    const query = supabaseBrowserClient
+      .from("articulos")
+      .select("id,nombre")
+      .eq("codigo_barras", cleaned)
+      .limit(1)
+      .maybeSingle();
+
+    const { data } = editing?.id
+      ? await query.neq("id", editing.id)
+      : await query;
+
+    if (data?.nombre) {
+      message.warning(`Código ya existe en "${data.nombre}"`);
+    }
+  }, [codigoBarrasIndex, editing?.id, message]);
 
   const duplicarArticulo = (art: Articulo) => {
     setEditing(null); // es nuevo, no edición
@@ -1453,7 +1481,7 @@ export default function ArticulosPage() {
               validator: async (_, value) => {
                 if (!value) return;
                 const existeNombre = codigoBarrasIndex.get(normalizeText(value));
-                if (existeNombre) return Promise.reject(`Ya existe: "${existeNombre}"`);
+                if (existeNombre) return Promise.reject(`Ya existe: "${existeNombre.nombre}"`);
               },
             }]}
           >
@@ -1462,8 +1490,9 @@ export default function ArticulosPage() {
               onChange={(value) => {
                 form.setFieldValue("codigo_barras", value);
               }}
-              onCodigo={(codigo) => {
+              onCodigo={async (codigo) => {
                 form.setFieldValue("codigo_barras", codigo);
+                await verificarCodigoBarrasRapido(codigo);
                 form.validateFields(["codigo_barras"]);
               }}
               placeholder="Escanear o escribir código de barras"
