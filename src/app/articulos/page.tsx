@@ -253,16 +253,32 @@ export default function ArticulosPage() {
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabaseBrowserClient
-      .from("articulos")
-      .select("*")
-      .order("nombre");
-    if (error) {
-      // Tabla puede no existir aún
-      setArticulos([]);
-    } else {
-      setArticulos(data || []);
+    const pageSize = 1000;
+    let from = 0;
+    let allRows: Articulo[] = [];
+    let keepFetching = true;
+
+    while (keepFetching) {
+      const { data, error } = await supabaseBrowserClient
+        .from("articulos")
+        .select("*")
+        .order("nombre")
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        // Tabla puede no existir aún
+        setArticulos([]);
+        setLoading(false);
+        return;
+      }
+
+      const batch = (data || []) as Articulo[];
+      allRows = allRows.concat(batch);
+      keepFetching = batch.length === pageSize;
+      from += pageSize;
     }
+
+    setArticulos(allRows);
     setLoading(false);
   }, []);
 
