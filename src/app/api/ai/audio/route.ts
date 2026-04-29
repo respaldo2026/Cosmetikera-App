@@ -8,6 +8,7 @@ type AudioExtraction = {
 };
 
 type AudioFetchResult = {
+  buffer: Buffer;
   base64: string;
   mimeType: string;
 };
@@ -86,9 +87,54 @@ async function fetchWhatsAppAudio(audioId: string, accessToken: string): Promise
   const audioBuffer = Buffer.from(await mediaRes.arrayBuffer());
 
   return {
+    buffer: audioBuffer,
     base64: audioBuffer.toString("base64"),
     mimeType,
   };
+}
+
+async function transcribeWithOpenAI(audioBuffer: Buffer, mimeType: string): Promise<string> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return "";
+
+  const extensionByMime: Record<string, string> = {
+    "audio/ogg": "ogg",
+    "audio/opus": "ogg",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/webm": "webm",
+    "audio/mp4": "mp4",
+    "audio/aac": "aac",
+  };
+
+  const ext = extensionByMime[mimeType] || "ogg";
+  const file = new File([audioBuffer], `whatsapp-audio.${ext}`, {
+    type: mimeType || "audio/ogg",
+  });
+
+  const form = new FormData();
+  form.append("model", process.env.OPENAI_WHISPER_MODEL || "gpt-4o-mini-transcribe");
+  form.append("language", "es");
+  form.append("response_format", "text");
+  form.append("file", file);
+
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiKey}`,
+    },
+    body: form,
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return "";
+  }
+
+  const text = (await res.text()).trim();
+  return text;
 }
 
 async function transcribeWithGemini(base64Audio: string, mimeType: string): Promise<string> {
@@ -213,6 +259,9 @@ export async function POST(request: NextRequest) {
       }
 
       transcript = await transcribeWithGemini(audio.base64, audio.mimeType);
+      if (!transcript) {
+        transcript = await transcribeWithOpenAI(audio.buffer, audio.mimeType);
+      }
       if (!transcript) {
         return NextResponse.json({
           response:
