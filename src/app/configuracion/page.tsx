@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid, Alert, Badge, Radio } from "antd";
-import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined, CopyOutlined } from "@ant-design/icons";
+import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined, CopyOutlined, TagsOutlined, ShopOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd/es/_util/responsiveObserver";
@@ -10,6 +10,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
 import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
+import { getCatalogosArticulosLocal, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
 import { ROLES } from "@/constants/roles";
 
@@ -69,6 +70,14 @@ export default function ConfiguracionPage() {
   const [logoFileList, setLogoFileList] = useState<UploadFile[]>([]);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [configuracionId, setConfiguracionId] = useState<string | null>(null);
+  const [catalogosArticulos, setCatalogosArticulos] = useState<CatalogosArticulos>({
+    categorias: [],
+    marcas: [],
+    fabricantes: [],
+  });
+  const [nuevaCategoria, setNuevaCategoria] = useState("");
+  const [nuevaMarca, setNuevaMarca] = useState("");
+  const [nuevoFabricante, setNuevoFabricante] = useState("");
 
   const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
 
@@ -640,8 +649,33 @@ export default function ConfiguracionPage() {
     if (!initialized) {
       setInitialized(true);
       cargarConfiguracionAcademia();
+      setCatalogosArticulos(getCatalogosArticulosLocal());
     }
   }, [initialized, cargarConfiguracionAcademia]);
+
+  const guardarCatalogos = useCallback((next: CatalogosArticulos) => {
+    const saved = saveCatalogosArticulosLocal(next);
+    setCatalogosArticulos(saved);
+    return saved;
+  }, []);
+
+  const agregarCatalogoItem = useCallback((tipo: keyof CatalogosArticulos, value: string) => {
+    const item = value.trim();
+    if (!item) return;
+    const next: CatalogosArticulos = {
+      ...catalogosArticulos,
+      [tipo]: [...catalogosArticulos[tipo], item],
+    };
+    guardarCatalogos(next);
+  }, [catalogosArticulos, guardarCatalogos]);
+
+  const quitarCatalogoItem = useCallback((tipo: keyof CatalogosArticulos, value: string) => {
+    const next: CatalogosArticulos = {
+      ...catalogosArticulos,
+      [tipo]: catalogosArticulos[tipo].filter((item) => item.toLowerCase() !== value.toLowerCase()),
+    };
+    guardarCatalogos(next);
+  }, [catalogosArticulos, guardarCatalogos]);
 
   const generateUUID = (): string => {
     if (typeof crypto !== "undefined") {
@@ -1658,6 +1692,119 @@ export default function ConfiguracionPage() {
     </div>
   );
 
+  const catalogosArticulosTab = (
+    <div>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="Catálogos rápidos para Artículos"
+        description="Lo que crees aquí aparece en los selectores de creación de artículos: categoría, marca y fabricante/proveedor."
+      />
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
+          <Card title={<Space><TagsOutlined />Categorías</Space>} size="small">
+            <Space.Compact style={{ width: "100%", marginBottom: 10 }}>
+              <Input
+                placeholder="Ej: Capilar"
+                value={nuevaCategoria}
+                onChange={(e) => setNuevaCategoria(e.target.value)}
+                onPressEnter={() => {
+                  agregarCatalogoItem("categorias", nuevaCategoria);
+                  setNuevaCategoria("");
+                }}
+              />
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  agregarCatalogoItem("categorias", nuevaCategoria);
+                  setNuevaCategoria("");
+                }}
+              >
+                Agregar
+              </Button>
+            </Space.Compact>
+            <Space wrap>
+              {catalogosArticulos.categorias.map((item) => (
+                <Tag key={item} closable onClose={() => quitarCatalogoItem("categorias", item)}>
+                  {item}
+                </Tag>
+              ))}
+            </Space>
+          </Card>
+        </Col>
+
+        <Col xs={24} md={8}>
+          <Card title={<Space><ShopOutlined />Marcas</Space>} size="small">
+            <Space.Compact style={{ width: "100%", marginBottom: 10 }}>
+              <Input
+                placeholder="Ej: OPI"
+                value={nuevaMarca}
+                onChange={(e) => setNuevaMarca(e.target.value)}
+                onPressEnter={() => {
+                  agregarCatalogoItem("marcas", nuevaMarca);
+                  setNuevaMarca("");
+                }}
+              />
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  agregarCatalogoItem("marcas", nuevaMarca);
+                  setNuevaMarca("");
+                }}
+              >
+                Agregar
+              </Button>
+            </Space.Compact>
+            <Space wrap>
+              {catalogosArticulos.marcas.map((item) => (
+                <Tag key={item} color="geekblue" closable onClose={() => quitarCatalogoItem("marcas", item)}>
+                  {item}
+                </Tag>
+              ))}
+            </Space>
+          </Card>
+        </Col>
+
+        <Col xs={24} md={8}>
+          <Card title={<Space><UserOutlined />Fabricantes / Proveedores</Space>} size="small">
+            <Space.Compact style={{ width: "100%", marginBottom: 10 }}>
+              <Input
+                placeholder="Ej: Distribuidor XYZ"
+                value={nuevoFabricante}
+                onChange={(e) => setNuevoFabricante(e.target.value)}
+                onPressEnter={() => {
+                  agregarCatalogoItem("fabricantes", nuevoFabricante);
+                  setNuevoFabricante("");
+                }}
+              />
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  agregarCatalogoItem("fabricantes", nuevoFabricante);
+                  setNuevoFabricante("");
+                }}
+              >
+                Agregar
+              </Button>
+            </Space.Compact>
+            <Space wrap>
+              {catalogosArticulos.fabricantes.map((item) => (
+                <Tag key={item} color="purple" closable onClose={() => quitarCatalogoItem("fabricantes", item)}>
+                  {item}
+                </Tag>
+              ))}
+            </Space>
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+
   const tabsItems = [
     {
       key: "negocio",
@@ -1712,6 +1859,15 @@ export default function ConfiguracionPage() {
         </span>
       ),
       children: posTab,
+    },
+    {
+      key: "catalogos-articulos",
+      label: (
+        <span>
+          <TagsOutlined /> Catálogos Artículos
+        </span>
+      ),
+      children: catalogosArticulosTab,
     },
   ];
 

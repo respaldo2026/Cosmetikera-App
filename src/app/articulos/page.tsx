@@ -18,6 +18,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { useRouter } from "next/navigation";
 import EscanerCodigo from "@/components/EscanerCodigo";
+import { getCatalogosArticulosLocal, mergeCatalogos, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 
 let xlsxModulePromise: Promise<typeof import("xlsx")> | null = null;
 
@@ -244,6 +245,11 @@ export default function ArticulosPage() {
     [importRows],
   );
   const codigoBarrasValue = Form.useWatch("codigo_barras", form);
+  const [catalogosCustom, setCatalogosCustom] = useState<CatalogosArticulos>({
+    categorias: [],
+    marcas: [],
+    fabricantes: [],
+  });
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -261,6 +267,10 @@ export default function ArticulosPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  useEffect(() => {
+    setCatalogosCustom(getCatalogosArticulosLocal());
+  }, []);
 
   const articulosFiltrados = useMemo(() => articulos.filter((a) => {
     const normalizedSearch = normalizeText(search);
@@ -294,6 +304,28 @@ export default function ArticulosPage() {
   const valorInventario = articulos.reduce((s, a) => s + a.stock * (a.precio_costo || 0), 0);
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
   const marcas = [...new Set(articulos.map((a) => a.marca).filter(Boolean))];
+  const fabricantes = [...new Set(articulos
+    .map((a) =>
+      String(
+        a.proveedor
+        || (a as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_nombre
+        || (a as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor_label
+        || ""
+      ).trim()
+    )
+    .filter(Boolean)
+  )];
+  const catalogosDisponibles = useMemo(
+    () => mergeCatalogos(
+      {
+        categorias: [...CATEGORIAS_DEFAULT, ...categorias],
+        marcas,
+        fabricantes,
+      },
+      catalogosCustom,
+    ),
+    [categorias, marcas, fabricantes, catalogosCustom],
+  );
   const selectedCount = selectedIds.length;
 
   useEffect(() => {
@@ -445,6 +477,7 @@ export default function ArticulosPage() {
 
   const openModal = (art?: Articulo) => {
     setEditing(art || null);
+    setCatalogosCustom(getCatalogosArticulosLocal());
     form.setFieldsValue(art ? { ...art } : { activo: true, stock: 0, stock_minimo: 3 });
     setModalOpen(true);
   };
@@ -1385,24 +1418,8 @@ export default function ArticulosPage() {
                 <Select
                   showSearch allowClear mode="tags" maxCount={1}
                   placeholder="Seleccionar o escribir..."
-                  options={[
-                    ...CATEGORIAS_DEFAULT,
-                    ...categorias.filter((c) => c && !CATEGORIAS_DEFAULT.includes(c)),
-                  ].map((c) => ({ label: c, value: c }))}
+                  options={catalogosDisponibles.categorias.map((c) => ({ label: c, value: c }))}
                 />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
-              <Form.Item name="marca" label="Marca">
-                <Input placeholder="Ej: OPI, Essie..." />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="imagen_url" label="URL imagen">
-                <Input placeholder="https://..." prefix={<CameraOutlined />} />
               </Form.Item>
             </Col>
           </Row>
@@ -1440,8 +1457,29 @@ export default function ArticulosPage() {
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name="proveedor" label="Proveedor">
-                <Input placeholder="Ej: Distribuidor XYZ" />
+              <Form.Item name="marca" label="Marca">
+                <Select
+                  showSearch allowClear mode="tags" maxCount={1}
+                  placeholder="Seleccionar o escribir..."
+                  options={catalogosDisponibles.marcas.map((m) => ({ label: m, value: m }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item name="proveedor" label="Fabricante / Proveedor">
+                <Select
+                  showSearch allowClear mode="tags" maxCount={1}
+                  placeholder="Seleccionar o escribir..."
+                  options={catalogosDisponibles.fabricantes.map((f) => ({ label: f, value: f }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="imagen_url" label="URL imagen">
+                <Input placeholder="https://..." prefix={<CameraOutlined />} />
               </Form.Item>
             </Col>
           </Row>
