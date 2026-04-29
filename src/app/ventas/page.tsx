@@ -350,7 +350,7 @@ export default function VentasPage() {
         throw artsError;
       }
 
-      setArticulos(((arts as Articulo[]) || []).filter((a: Articulo) => Number(a.stock || 0) > 0));
+      setArticulos((arts as Articulo[]) || []);
       setClientes(((clientesRes.data as Cliente[]) || []).filter((c: Cliente) => c.activo !== false));
     } catch (error) {
       console.error("[Ventas] Error cargando datos iniciales:", error);
@@ -369,7 +369,9 @@ export default function VentasPage() {
       const query = deferredSearch.toLowerCase();
       const matchSearch = !query ||
         a.nombre.toLowerCase().includes(query) ||
-        (a.marca || "").toLowerCase().includes(query);
+        (a.marca || "").toLowerCase().includes(query) ||
+        (a.referencia || "").toLowerCase().includes(query) ||
+        ((a as Articulo & { codigo_barras?: string }).codigo_barras || "").toLowerCase().includes(query);
       const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
       return matchSearch && matchCat;
     }),
@@ -379,6 +381,11 @@ export default function VentasPage() {
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
 
   const agregarAlCarrito = (art: Articulo) => {
+    if (Number(art.stock || 0) <= 0) {
+      antdMessage.warning("Este artículo está agotado");
+      return;
+    }
+
     setCarrito((prev) => {
       const existe = prev.find((i) => i.id === art.id);
       if (existe) {
@@ -624,13 +631,19 @@ export default function VentasPage() {
 
   // Buscar artículo por código al escanear
   const buscarPorCodigo = useCallback((codigo: string) => {
+    const normalizedCodigo = codigo.trim().toLowerCase();
     const art = articulos.find(
       (a) =>
-        (a as any).referencia === codigo ||
-        (a as any).codigo_barras === codigo ||
-        a.id === codigo
+        (a as Articulo & { codigo_barras?: string }).referencia?.trim().toLowerCase() === normalizedCodigo ||
+        (a as Articulo & { codigo_barras?: string }).codigo_barras?.trim().toLowerCase() === normalizedCodigo ||
+        a.id.trim().toLowerCase() === normalizedCodigo
     );
     if (art) {
+      if (Number(art.stock || 0) <= 0) {
+        setSearch(art.nombre);
+        message.warning(`${art.nombre} está agotado`);
+        return;
+      }
       agregarAlCarrito(art);
       message.success(`${art.nombre} agregado al carrito`);
     } else {
@@ -638,7 +651,7 @@ export default function VentasPage() {
       setSearch(codigo);
       message.info(`Código: ${codigo} — no encontrado, mostrando búsqueda`);
     }
-  }, [articulos]); // eslint-disable-line
+  }, [articulos, message]); // eslint-disable-line
 
   const imprimirUltimaVenta = async () => {
     if (!ultimoTicket && !ultimaVentaId) return;
@@ -705,7 +718,7 @@ export default function VentasPage() {
 
       {/* Búsqueda manual por nombre o código */}
       <Input
-        placeholder="🔍 Buscar por nombre, marca o referencia..."
+        placeholder="🔍 Buscar por nombre, marca, referencia o código..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         allowClear
@@ -741,15 +754,19 @@ export default function VentasPage() {
                     <Text style={{ fontWeight: 600, fontSize: 13, display: "block" }} ellipsis>
                       {art.nombre}
                     </Text>
-                    {art.marca && (
-                      <Text style={{ fontSize: 11, color: "#aaa" }}>{art.marca}</Text>
-                    )}
+                    <Text style={{ fontSize: 11, color: "#aaa" }}>
+                      {[art.marca, art.referencia, (art as Articulo & { codigo_barras?: string }).codigo_barras]
+                        .filter(Boolean)
+                        .join(" · ") || "Sin código visible"}
+                    </Text>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <Text style={{ color: "#d81b87", fontWeight: 700, fontSize: 14, display: "block" }}>
                       ${Number(art.precio_venta).toLocaleString()}
                     </Text>
-                    <Text style={{ fontSize: 11, color: "#aaa" }}>{art.stock} en stock</Text>
+                    <Text style={{ fontSize: 11, color: Number(art.stock || 0) > 0 ? "#aaa" : "#ff4d4f" }}>
+                      {Number(art.stock || 0) > 0 ? `${art.stock} en stock` : "Agotado"}
+                    </Text>
                   </div>
                   {enCarrito ? (
                     <Badge count={enCarrito.cantidad} style={{ background: "#d81b87" }} />

@@ -216,7 +216,7 @@ export default function ArticulosPage() {
   const [filtroProveedor, setFiltroProveedor] = useState("");
   const [filtroTamano, setFiltroTamano] = useState("");
   const [filtroEmpaque, setFiltroEmpaque] = useState("");
-  const [vista, setVista] = useState<"grid" | "lista">("grid");
+  const [vista, setVista] = useState<"grid" | "lista">("lista");
   const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
