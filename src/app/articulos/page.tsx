@@ -719,8 +719,8 @@ export default function ArticulosPage() {
               </div>
             </Space>
           </Col>
-          <Col>
-            <Space>
+          <Col xs={24} sm="auto">
+            <Space wrap size={[6, 6]}>
               <Button
                 icon={vista === "grid" ? <UnorderedListOutlined /> : <AppstoreOutlined />}
                 onClick={() => setVista(vista === "grid" ? "lista" : "grid")}

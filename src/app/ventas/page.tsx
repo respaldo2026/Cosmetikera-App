@@ -30,6 +30,7 @@ const { useBreakpoint } = Grid;
 type Articulo = {
   id: string; nombre: string; precio_venta: number;
   stock: number; categoria?: string; marca?: string; imagen_url?: string;
+  referencia?: string; codigo_barras?: string;
 };
 type CarritoItem = Articulo & { cantidad: number; subtotal: number };
 type Cliente = { id: string; nombre_completo: string; cedula?: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; fecha_nacimiento?: string; total_compras?: number; rol?: string; activo?: boolean };
@@ -371,7 +372,7 @@ export default function VentasPage() {
         a.nombre.toLowerCase().includes(query) ||
         (a.marca || "").toLowerCase().includes(query) ||
         (a.referencia || "").toLowerCase().includes(query) ||
-        ((a as Articulo & { codigo_barras?: string }).codigo_barras || "").toLowerCase().includes(query);
+        (a.codigo_barras || "").toLowerCase().includes(query);
       const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
       return matchSearch && matchCat;
     }),
