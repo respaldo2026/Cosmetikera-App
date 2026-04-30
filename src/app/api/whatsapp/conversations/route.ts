@@ -13,18 +13,44 @@ type ConversationMessage = {
   perfil_id: string | null;
 };
 
-function isClubWelcomeNotification(row: {
+function isRelevantSentNotification(row: {
   tipo?: string | null;
+  estado?: string | null;
   mensaje?: string | null;
 }): boolean {
   const tipo = String(row.tipo || "").toLowerCase();
+  const estado = String(row.estado || "").toLowerCase();
   const mensaje = String(row.mensaje || "").toLowerCase();
-  if (tipo === "bienvenida_club") return true;
-  if (tipo.includes("bienvenida") && tipo.includes("club")) return true;
-  if (tipo.includes("club_welcome")) return true;
-  if (mensaje.includes("plantilla") && mensaje.includes("club")) return true;
-  if (mensaje.includes("bienvenida") && mensaje.includes("club")) return true;
+
+  const isWelcomeLike =
+    tipo === "bienvenida_club" ||
+    tipo.includes("bienvenida") ||
+    tipo.includes("welcome") ||
+    tipo.includes("registro") ||
+    tipo.includes("portal");
+
+  const messageLooksTemplate =
+    mensaje.includes("plantilla") ||
+    mensaje.includes("bienvenida") ||
+    mensaje.includes("registro");
+
+  if (estado === "enviado" && (isWelcomeLike || messageLooksTemplate)) return true;
+  if (isWelcomeLike || messageLooksTemplate) return true;
+
   return false;
+}
+
+function buildPhoneVariants(input: string): Set<string> {
+  const normalized = normalizePhone(input);
+  const variants = new Set<string>();
+  if (!normalized) return variants;
+  variants.add(normalized);
+  const last10 = normalized.slice(-10);
+  if (last10) variants.add(last10);
+  if (last10.length === 10) {
+    variants.add(`57${last10}`);
+  }
+  return variants;
 }
 
 async function getTemplateMessagesByPhone(
@@ -54,16 +80,26 @@ async function getTemplateMessagesByPhone(
       tipo?: string | null;
     }>;
 
-    const targetPhones = new Set([normalizePhone(normalizedPhone), normalizePhone(rawPhone)]);
+    const targetPhones = new Set<string>([
+      ...Array.from(buildPhoneVariants(normalizedPhone)),
+      ...Array.from(buildPhoneVariants(rawPhone)),
+    ]);
 
     return rows
-      .filter((row) => isClubWelcomeNotification(row))
-      .filter((row) => targetPhones.has(normalizePhone(String(row.telefono || ""))))
+      .filter((row) => isRelevantSentNotification(row))
+      .filter((row) => {
+        const rowPhone = normalizePhone(String(row.telefono || ""));
+        const rowVariants = buildPhoneVariants(rowPhone);
+        for (const candidate of rowVariants) {
+          if (targetPhones.has(candidate)) return true;
+        }
+        return false;
+      })
       .map((row) => ({
         id: `notif-${row.id}`,
         telefono: normalizePhone(String(row.telefono || normalizedPhone || rawPhone || "")),
         rol: "agente",
-        mensaje: row.mensaje || "🎉 Bienvenida al Club Fidelización",
+        mensaje: row.mensaje || "📩 Mensaje enviado al cliente",
         tipo_mensaje: "template",
         intento: null,
         created_at: row.created_at || new Date().toISOString(),
@@ -104,12 +140,12 @@ async function getTemplateMessagesRecent(
     }>;
 
     return rows
-      .filter((row) => isClubWelcomeNotification(row))
+      .filter((row) => isRelevantSentNotification(row))
       .map((row) => ({
         id: `notif-${row.id}`,
         telefono: normalizePhone(String(row.telefono || "")),
         rol: "agente",
-        mensaje: row.mensaje || "🎉 Bienvenida al Club Fidelización",
+        mensaje: row.mensaje || "📩 Mensaje enviado al cliente",
         tipo_mensaje: "template",
         intento: null,
         created_at: row.created_at || new Date().toISOString(),
@@ -248,7 +284,7 @@ export async function GET(request: NextRequest) {
   // Obtener último mensaje de cada teléfono
   let { data: rawMessages, error } = await supabase
     .from("whatsapp_conversation_history")
-    .select("id, telefono, rol, mensaje, created_at, perfil_id")
+    .select("id, telefono, rol, mensaje, tipo_mensaje, created_at, perfil_id")
     .order("created_at", { ascending: false })
     .limit(2000);
 

@@ -112,7 +112,12 @@ type CatalogArticle = {
   promocion_texto?: string | null;
   activo?: boolean | null;
   updated_at?: string | null;
+  created_at?: string | null;
 };
+
+function getArticleSortDate(article: CatalogArticle): number {
+  return new Date(String(article.updated_at || article.created_at || 0)).getTime();
+}
 
 const STOPWORDS = new Set([
   "de",
@@ -306,9 +311,9 @@ async function fetchCatalogArticles(supabase: any): Promise<CatalogArticle[]> {
 
     const { data, error } = await supabase
       .from("articulos")
-      .select("id,nombre,categoria,marca,referencia,codigo_barras,descripcion,precio_venta,stock,descuento_porcentaje,promocion_texto,activo,updated_at")
+      .select("id,nombre,categoria,marca,referencia,codigo_barras,descripcion,precio_venta,stock,descuento_porcentaje,promocion_texto,activo,created_at")
       .or("activo.is.null,activo.eq.true")
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .range(from, to);
 
     if (error || !data || data.length === 0) break;
@@ -362,7 +367,7 @@ function rankArticles(
       if (Number(b.article.descuento_porcentaje || 0) !== Number(a.article.descuento_porcentaje || 0)) {
         return Number(b.article.descuento_porcentaje || 0) - Number(a.article.descuento_porcentaje || 0);
       }
-      return new Date(String(b.article.updated_at || 0)).getTime() - new Date(String(a.article.updated_at || 0)).getTime();
+      return getArticleSortDate(b.article) - getArticleSortDate(a.article);
     })
     .map((item) => item.article);
 
@@ -372,9 +377,7 @@ function rankArticles(
     .filter((a) => Number(a.descuento_porcentaje || 0) > 0)
     .sort((a, b) => Number(b.descuento_porcentaje || 0) - Number(a.descuento_porcentaje || 0));
 
-  const recent = [...articles].sort(
-    (a, b) => new Date(String(b.updated_at || 0)).getTime() - new Date(String(a.updated_at || 0)).getTime(),
-  );
+  const recent = [...articles].sort((a, b) => getArticleSortDate(b) - getArticleSortDate(a));
 
   const result: CatalogArticle[] = [...matched];
   for (const candidate of [...offers, ...recent]) {
