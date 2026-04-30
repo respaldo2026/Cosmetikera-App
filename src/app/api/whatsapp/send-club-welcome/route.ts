@@ -24,6 +24,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
+import { normalizePhone } from "@/utils/whatsapp-memory";
 
 interface SendClubWelcomeRequest {
   perfil_id: string;
@@ -214,6 +216,25 @@ async function logClubInscription(
   }
 }
 
+async function logConversationTemplate(perfilId: string, phone: string, cedula: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return;
+
+  const service = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  await service.from("whatsapp_conversation_history").insert({
+    telefono: normalizePhone(phone),
+    perfil_id: perfilId,
+    rol: "agente",
+    mensaje: `Plantilla enviada: club_welcome_es | Cédula: ${cedula}`,
+    tipo_mensaje: "template",
+    intento: null,
+  });
+}
+
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<SendClubWelcomeResponse>> {
@@ -298,6 +319,14 @@ export async function POST(
 
     // 8. Registrar inscripción al club
     await logClubInscription(supabase, body.perfil_id, whatsappResult.success);
+
+    if (whatsappResult.success) {
+      try {
+        await logConversationTemplate(body.perfil_id, phone, body.cedula);
+      } catch (logError) {
+        console.warn("[Club Welcome] No se pudo registrar historial de conversación", logError);
+      }
+    }
 
     if (!whatsappResult.success) {
       return NextResponse.json(

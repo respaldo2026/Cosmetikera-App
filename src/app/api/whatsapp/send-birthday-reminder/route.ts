@@ -17,7 +17,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { WhatsAppService } from "@/services/whatsapp-service";
+import { normalizePhone } from "@/utils/whatsapp-memory";
 
 interface SendBirthdayReminderRequest {
   dias_offset: -2 | -1 | 0; // -2 = 2 días antes, -1 = 1 día antes, 0 = hoy
@@ -162,6 +164,30 @@ async function recordBirthdayNotification(
   }
 }
 
+async function logBirthdayConversationTemplate(
+  perfilId: string,
+  telefono: string,
+  diasOffset: -2 | -1 | 0,
+) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return;
+
+  const service = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const templateName = getTemplateName(diasOffset);
+  await service.from("whatsapp_conversation_history").insert({
+    telefono: normalizePhone(telefono),
+    perfil_id: perfilId,
+    rol: "agente",
+    mensaje: `Plantilla enviada: ${templateName}`,
+    tipo_mensaje: "template",
+    intento: null,
+  });
+}
+
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<BirthdayReminderResponse>> {
@@ -272,6 +298,15 @@ export async function POST(
               body.dias_offset,
               true
             );
+            try {
+              await logBirthdayConversationTemplate(
+                cliente.perfil_id,
+                cliente.telefono,
+                body.dias_offset,
+              );
+            } catch (logError) {
+              console.warn("[Birthday] No se pudo registrar historial de conversación", logError);
+            }
             enviados++;
             detalles.push({
               perfil_id: cliente.perfil_id,

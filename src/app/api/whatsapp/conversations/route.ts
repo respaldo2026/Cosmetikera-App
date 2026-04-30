@@ -2,6 +2,75 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizePhone } from "@/utils/whatsapp-memory";
 
+type ConversationMessage = {
+  id: string;
+  telefono: string;
+  rol: string;
+  mensaje: string;
+  tipo_mensaje?: string | null;
+  intento?: string | null;
+  created_at: string;
+  perfil_id?: string | null;
+};
+
+async function getTemplateMessagesByPhone(
+  supabase: ReturnType<typeof createClient>,
+  normalizedPhone: string,
+  rawPhone: string,
+): Promise<ConversationMessage[]> {
+  try {
+    const { data } = await supabase
+      .from("notificaciones_enviadas")
+      .select("id, telefono, mensaje, created_at, perfil_id, estado")
+      .eq("estado", "enviado")
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    const targetPhones = new Set([normalizePhone(normalizedPhone), normalizePhone(rawPhone)]);
+
+    return (data || [])
+      .filter((row) => targetPhones.has(normalizePhone(String(row.telefono || ""))))
+      .map((row) => ({
+        id: `notif-${row.id}`,
+        telefono: normalizePhone(String(row.telefono || normalizedPhone || rawPhone || "")),
+        rol: "agente",
+        mensaje: row.mensaje || "Plantilla enviada",
+        tipo_mensaje: "template",
+        intento: null,
+        created_at: row.created_at || new Date().toISOString(),
+        perfil_id: row.perfil_id || null,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+async function getTemplateMessagesRecent(
+  supabase: ReturnType<typeof createClient>,
+): Promise<ConversationMessage[]> {
+  try {
+    const { data } = await supabase
+      .from("notificaciones_enviadas")
+      .select("id, telefono, mensaje, created_at, perfil_id, estado")
+      .eq("estado", "enviado")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    return (data || []).map((row) => ({
+      id: `notif-${row.id}`,
+      telefono: normalizePhone(String(row.telefono || "")),
+      rol: "agente",
+      mensaje: row.mensaje || "Plantilla enviada",
+      tipo_mensaje: "template",
+      intento: null,
+      created_at: row.created_at || new Date().toISOString(),
+      perfil_id: row.perfil_id || null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -43,6 +112,14 @@ export async function GET(request: NextRequest) {
         .limit(200);
       data = retry.data;
       error = retry.error;
+    }
+
+    const templateMessages = await getTemplateMessagesByPhone(supabase, normalizedPhone, phone);
+    if (templateMessages.length > 0) {
+      const merged = [...((data || []) as ConversationMessage[]), ...templateMessages].sort(
+        (a, b) => new Date(String(a.created_at || 0)).getTime() - new Date(String(b.created_at || 0)).getTime(),
+      );
+      data = merged;
     }
 
     // Fallback a tabla legacy (agent_conversations) si la nueva tabla falla/no existe
@@ -100,10 +177,13 @@ export async function GET(request: NextRequest) {
         clientName = perfil?.nombre || "";
       }
       if (!clientName) {
+        const phoneForLike = normalizedPhone.slice(-10);
         const { data: perfilByPhone } = await supabase
           .from("perfiles")
           .select("nombre")
-          .or(`telefono.eq.${normalizedPhone},celular.eq.${normalizedPhone}`)
+          .or(
+            `telefono.eq.${normalizedPhone},celular.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%,celular.ilike.%${phoneForLike}%`
+          )
           .limit(1)
           .single();
         clientName = perfilByPhone?.nombre || "";
@@ -120,6 +200,13 @@ export async function GET(request: NextRequest) {
     .select("id, telefono, rol, mensaje, created_at, perfil_id")
     .order("created_at", { ascending: false })
     .limit(2000);
+
+  const templateRecent = await getTemplateMessagesRecent(supabase);
+  if (templateRecent.length > 0) {
+    rawMessages = [...((rawMessages || []) as ConversationMessage[]), ...templateRecent]
+      .sort((a, b) => new Date(String(b.created_at || 0)).getTime() - new Date(String(a.created_at || 0)).getTime())
+      .slice(0, 2500);
+  }
 
   // Fallback a tabla legacy cuando la nueva está vacía o no existe en producción
   if (error || !rawMessages || rawMessages.length === 0) {
@@ -225,8 +312,8 @@ export async function GET(request: NextRequest) {
 
   const perfilByPhoneMap = new Map<string, string>();
   for (const p of phonePerfRes.data || []) {
-    if (p.telefono) perfilByPhoneMap.set(p.telefono, p.nombre || "");
-    if (p.celular) perfilByPhoneMap.set(p.celular, p.nombre || "");
+    if (p.telefono) perfilByPhoneMap.set(normalizePhone(String(p.telefono)), p.nombre || "");
+    if (p.celular) perfilByPhoneMap.set(normalizePhone(String(p.celular)), p.nombre || "");
   }
 
   const enriched = conversations.map((c) => ({

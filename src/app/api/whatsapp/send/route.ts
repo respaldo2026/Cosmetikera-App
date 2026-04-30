@@ -11,8 +11,48 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { WhatsAppService } from "@/services/whatsapp-service";
+import { normalizePhone } from "@/utils/whatsapp-memory";
 import type { WhatsAppSendRequest, WhatsAppSendResponse } from "@/types/whatsapp";
+
+function getServiceSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+async function logOutboundMessage(params: {
+  phone: string;
+  type: string;
+  perfilId?: string | null;
+  templateName?: string;
+  text?: string;
+}) {
+  const supabase = getServiceSupabase();
+  if (!supabase) return;
+
+  const normalizedPhone = normalizePhone(params.phone);
+  if (!normalizedPhone) return;
+
+  let messageText = params.text || "";
+  if (!messageText && params.type === "template") {
+    messageText = `Plantilla enviada: ${params.templateName || "template"}`;
+  }
+  if (!messageText) {
+    messageText = `Mensaje saliente enviado (${params.type})`;
+  }
+
+  await supabase.from("whatsapp_conversation_history").insert({
+    telefono: normalizedPhone,
+    perfil_id: params.perfilId || null,
+    rol: "agente",
+    mensaje: messageText,
+    tipo_mensaje: params.type,
+    intento: null,
+  });
+}
 
 /**
  * Valida que la solicitud venga de Make o del frontend autenticado
@@ -189,6 +229,39 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Responder con éxito
+    const dynamicBody = body as WhatsAppSendRequest & {
+      perfil_id?: string;
+      customer_id?: string;
+      profile_id?: string;
+    };
+
+    const perfilId =
+      dynamicBody.perfil_id ||
+      dynamicBody.customer_id ||
+      dynamicBody.profile_id ||
+      null;
+
+    const outgoingText =
+      body.type === "text"
+        ? body.message || ""
+        : body.type === "template"
+        ? `Plantilla enviada: ${body.template || "template"}`
+        : body.type === "buttons"
+        ? body.message || "Mensaje interactivo enviado"
+        : body.caption || "";
+
+    try {
+      await logOutboundMessage({
+        phone: body.phone,
+        type: body.type,
+        perfilId,
+        templateName: body.template,
+        text: outgoingText,
+      });
+    } catch (logError) {
+      console.warn("[WhatsApp API] No se pudo registrar mensaje saliente en historial", logError);
+    }
+
     return NextResponse.json({
       success: true,
       messageId: response.messages?.[0]?.id,

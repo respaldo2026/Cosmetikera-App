@@ -1977,7 +1977,10 @@ export default function ConfiguracionPage() {
         onCancel={() => setModalPlantillaVisible(false)}
         onOk={handleSubmitPlantilla}
         confirmLoading={submittingPlantilla}
-        width={600}
+        width={isMobile ? "calc(100vw - 24px)" : isTablet ? 520 : 600}
+        style={isMobile ? { top: 12, paddingBottom: 0 } : undefined}
+        bodyStyle={isMobile ? { maxHeight: "70vh", overflowY: "auto", padding: 12 } : undefined}
+        centered={!isMobile}
         forceRender
       >
         <Form form={formPlantilla} layout="vertical">
