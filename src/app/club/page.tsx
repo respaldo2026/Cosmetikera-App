@@ -53,7 +53,8 @@ const { useBreakpoint } = Grid;
 
 const BRAND_FUCHSIA = "#d81b87";
 const BRAND_FUCHSIA_SOFT = "#ff4fa3";
-const WHATSAPP_BOT_NUMBER = "573104239494";
+const WHATSAPP_BOT_NUMBER =
+  process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER || "573104239494";
 
 const sectionCardStyle: React.CSSProperties = {
   borderRadius: 16,
