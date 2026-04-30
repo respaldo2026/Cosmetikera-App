@@ -38,6 +38,29 @@ interface SendClubWelcomeResponse {
   message?: string;
   error?: string;
   whatsapp_response?: unknown;
+  already_sent?: boolean;
+}
+
+/**
+ * Verifica si ya existe una bienvenida enviada para evitar duplicados.
+ */
+async function wasWelcomeAlreadySent(supabase: any, perfilId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("notificaciones_enviadas")
+    .select("id, estado")
+    .eq("perfil_id", perfilId)
+    .eq("tipo", "bienvenida_club")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[Club Welcome] No se pudo validar duplicado de bienvenida:", error.message);
+    return false;
+  }
+
+  const estado = String((data as any)?.estado || "").toLowerCase();
+  return estado === "enviado";
 }
 
 /**
@@ -225,8 +248,20 @@ async function logConversationTemplate(perfilId: string, phone: string, cedula: 
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  const normalizedPhone = normalizePhone(phone);
+  const { data: existing } = await service
+    .from("whatsapp_conversation_history")
+    .select("id")
+    .eq("perfil_id", perfilId)
+    .eq("tipo_mensaje", "template")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) return;
+
   await service.from("whatsapp_conversation_history").insert({
-    telefono: normalizePhone(phone),
+    telefono: normalizedPhone,
     perfil_id: perfilId,
     rol: "agente",
     mensaje: `Plantilla enviada: club_welcome_es | Cédula: ${cedula}`,
@@ -277,6 +312,19 @@ export async function POST(
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // 3.1 Idempotencia: si ya fue enviada, no volver a disparar WhatsApp
+    const alreadySent = await wasWelcomeAlreadySent(supabase, body.perfil_id);
+    if (alreadySent) {
+      return NextResponse.json(
+        {
+          success: true,
+          already_sent: true,
+          message: "La plantilla de bienvenida ya había sido enviada para este cliente",
+        } as SendClubWelcomeResponse,
+        { status: 200 }
+      );
+    }
 
     // 4. Obtener teléfono
     const phone =
