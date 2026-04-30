@@ -102,6 +102,7 @@ type CatalogArticle = {
   nombre?: string | null;
   categoria?: string | null;
   marca?: string | null;
+  id?: string | null;
   referencia?: string | null;
   codigo_barras?: string | null;
   descripcion?: string | null;
@@ -159,6 +160,163 @@ function formatCOP(value: number): string {
     currency: "COP",
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
+}
+
+type CustomerBusinessContext = {
+  perfilId?: string;
+  nombre?: string;
+  puntos?: number;
+  totalCompras?: number;
+  ultimasCompras?: Array<{ fecha: string; total: number }>;
+};
+
+function buildStrictPriceMatches(articles: CatalogArticle[], message: string): CatalogArticle[] {
+  const tokens = getSearchTokens(message);
+  if (tokens.length === 0) return [];
+
+  const scored = articles
+    .map((article) => {
+      const nombre = normalize(article.nombre);
+      const marca = normalize(article.marca);
+      const referencia = normalize(article.referencia);
+      const codigo = normalize(article.codigo_barras);
+      const searchable = normalize(
+        [article.nombre, article.marca, article.categoria, article.referencia, article.codigo_barras, article.descripcion]
+          .filter(Boolean)
+          .join(" "),
+      );
+
+      let score = 0;
+      for (const token of tokens) {
+        if (nombre.includes(token)) score += 12;
+        if (marca.includes(token)) score += 8;
+        if (referencia.includes(token)) score += 9;
+        if (codigo.includes(token)) score += 9;
+        if (searchable.includes(token)) score += 3;
+      }
+
+      return { article, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return Number(b.article.descuento_porcentaje || 0) - Number(a.article.descuento_porcentaje || 0);
+    })
+    .map((item) => item.article);
+
+  return scored.slice(0, 3);
+}
+
+function buildDeterministicPriceReply(customerName: string, message: string, articles: CatalogArticle[]): string | null {
+  const matches = buildStrictPriceMatches(articles, message);
+  if (matches.length === 0) return null;
+
+  const greeting = customerName ? `Hola ${customerName}` : "Hola";
+  const lines = matches.map((p) => {
+    const price = formatCOP(Number(p.precio_venta || 0));
+    const discount = Number(p.descuento_porcentaje || 0) > 0 ? ` (${p.descuento_porcentaje}% OFF)` : "";
+    return `• *${p.nombre || "Producto"}*: ${price}${discount}`;
+  });
+
+  return `${greeting}. Te paso precio real de sistema:\n${lines.join("\n")}\n¿Te cotizo también alternativas similares en ese rango?`;
+}
+
+function isGenericOffTopicAnswer(text: string): boolean {
+  const t = normalize(text);
+  return /aqui estoy para ayudarte con belleza|te asesoro en belleza|cuentame tu necesidad puntual/.test(t);
+}
+
+function hasPriceSignal(text: string): boolean {
+  const t = String(text || "");
+  return /\$|cop|\d{2,3}(?:[\.,]\d{3})+|\d+\s*off|%\s*off/i.test(t);
+}
+
+async function getCustomerBusinessContext(
+  supabase: any,
+  perfilIdRaw: string,
+  telefonoRaw: string,
+): Promise<CustomerBusinessContext | null> {
+  try {
+    const perfilId = String(perfilIdRaw || "").trim();
+    const telefono = normalizePhone(telefonoRaw || "");
+
+    type ProfileCRM = {
+      id?: string;
+      nombre_completo?: string | null;
+      puntos_fidelidad?: number | null;
+      total_compras?: number | null;
+      telefono?: string | null;
+    };
+
+    let profile: ProfileCRM | null = null;
+
+    if (perfilId) {
+      const { data } = await supabase
+        .from("perfiles")
+        .select("id,nombre_completo,puntos_fidelidad,total_compras,telefono")
+        .eq("id", perfilId)
+        .maybeSingle();
+      if (data) profile = data as ProfileCRM;
+    }
+
+    if (!profile && telefono) {
+      const last10 = telefono.slice(-10);
+      const { data } = await supabase
+        .from("perfiles")
+        .select("id,nombre_completo,puntos_fidelidad,total_compras,telefono")
+        .or(`telefono.eq.${telefono},telefono.ilike.%${last10}%`)
+        .limit(1)
+        .maybeSingle();
+      if (data) profile = data as ProfileCRM;
+    }
+
+    if (!profile?.id) return null;
+
+    const { data: ventas } = await supabase
+      .from("ventas")
+      .select("fecha,total")
+      .eq("cliente_id", profile.id)
+      .order("fecha", { ascending: false })
+      .limit(3);
+
+    const ventasRows = (ventas || []) as Array<{ fecha?: string | null; total?: number | null }>;
+
+    return {
+      perfilId: profile.id,
+      nombre: profile.nombre_completo || "",
+      puntos: Number(profile.puntos_fidelidad || 0),
+      totalCompras: Number(profile.total_compras || 0),
+      ultimasCompras: ventasRows.map((v) => ({
+        fecha: String(v.fecha || ""),
+        total: Number(v.total || 0),
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchCatalogArticles(supabase: any): Promise<CatalogArticle[]> {
+  const pageSize = 1000;
+  const rows: CatalogArticle[] = [];
+
+  for (let page = 0; page < 6; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error } = await supabase
+      .from("articulos")
+      .select("id,nombre,categoria,marca,referencia,codigo_barras,descripcion,precio_venta,stock,descuento_porcentaje,promocion_texto,activo,updated_at")
+      .or("activo.is.null,activo.eq.true")
+      .order("updated_at", { ascending: false })
+      .range(from, to);
+
+    if (error || !data || data.length === 0) break;
+    rows.push(...(data as CatalogArticle[]));
+    if (data.length < pageSize) break;
+  }
+
+  return rows;
 }
 
 function rankArticles(
@@ -279,6 +437,7 @@ function buildHeuristicFallbackResponse(params: {
   intent: AgentIntent;
   articles: CatalogArticle[];
   lastBotMessage?: string;
+  businessContext?: CustomerBusinessContext | null;
 }): string {
   const { customerName, message, intent, articles } = params;
   const greeting = customerName ? `Hola ${customerName}` : "Hola";
@@ -402,6 +561,17 @@ Estoy aquí para ayudarte en serio, paso a paso.
   }
 
   if (asksPoints) {
+    if (params.businessContext?.perfilId) {
+      const puntos = Number(params.businessContext.puntos || 0);
+      const totalCompras = Number(params.businessContext.totalCompras || 0);
+      const ultima = params.businessContext.ultimasCompras?.[0];
+      const ultimaTxt =
+        ultima && ultima.fecha
+          ? `\nÚltima compra registrada: *${new Date(ultima.fecha).toLocaleDateString("es-CO")}* por *${formatCOP(Number(ultima.total || 0))}*.`
+          : "";
+
+      return `🎁 Te confirmo tus datos del Club:\n• *Puntos actuales*: ${puntos}\n• *Total acumulado en compras*: ${formatCOP(totalCompras)}${ultimaTxt}\n¿Quieres que te diga opciones de canje según tus puntos?`;
+    }
     return `🎁 Te ayudo con tus *puntos del Club*. Para validarlos sin error, compárteme tu *cédula* y te indico saldo, nivel y opciones de canje.`;
   }
 
@@ -574,24 +744,19 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const [assetsRes, articulosRes] = await Promise.all([
+    const intent = detectIntent(message);
+
+    const [assetsRes, articulos, customerBusinessContext] = await Promise.all([
       supabase
         .from("marketing_assets")
         .select("id,titulo,descripcion,descripcion_ia,tipo_asset,url_archivo,keywords,categoria,programa_id,estado,visible_para_ia,created_at")
         .eq("visible_para_ia", true)
         .limit(80),
-      supabase
-        .from("articulos")
-        .select("nombre,categoria,marca,referencia,codigo_barras,descripcion,precio_venta,stock,descuento_porcentaje,promocion_texto,activo,updated_at")
-        .or("activo.is.null,activo.eq.true")
-        .order("updated_at", { ascending: false })
-        .limit(1500),
+      fetchCatalogArticles(supabase),
+      getCustomerBusinessContext(supabase, String(perfil_id || ""), telefono),
     ]);
 
-    const intent = detectIntent(message);
-
     const assets = Array.isArray(assetsRes.data) ? assetsRes.data : [];
-    const articulos = Array.isArray(articulosRes.data) ? (articulosRes.data as CatalogArticle[]) : [];
 
     const contextoAssets = assets
       .slice(0, 20)
@@ -659,6 +824,19 @@ export async function POST(request: NextRequest) {
               .join("\n")}\n--- Fin historial ---\nÚltimo tema tratado: ${previousTheme || "ninguno"}\nNivel de relación: ${trustLevel}`
           : `(primera vez que escribe este número)\nNivel: ${trustLevel}`;
 
+      const customerBusinessContextText = customerBusinessContext?.perfilId
+        ? [
+            `Perfil CRM: ${customerBusinessContext.nombre || customerName || "cliente"}`,
+            `Puntos actuales: ${Number(customerBusinessContext.puntos || 0)}`,
+            `Total compras acumuladas: ${formatCOP(Number(customerBusinessContext.totalCompras || 0))}`,
+            customerBusinessContext.ultimasCompras && customerBusinessContext.ultimasCompras.length > 0
+              ? `Ultimas compras: ${customerBusinessContext.ultimasCompras
+                  .map((v) => `${new Date(v.fecha).toLocaleDateString("es-CO")}: ${formatCOP(Number(v.total || 0))}`)
+                  .join(" | ")}`
+              : "Ultimas compras: sin datos",
+          ].join("\n")
+        : "Sin perfil CRM identificado por telefono/perfil_id";
+
       const prompt = [
         "Eres Dany, asesora virtual experta en belleza integral de La Cosmetikera (WhatsApp).",
         toneInstruction,
@@ -705,6 +883,9 @@ export async function POST(request: NextRequest) {
         customerName ? `[CLIENTE: ${customerName}]` : "[CLIENTE: nuevo]",
         customerMemoryContext,
         "",
+        "[DATOS CRM DEL CLIENTE - usar cuando pregunten puntos, compras o historial]:",
+        customerBusinessContextText,
+        "",
         `[MENSAJE ACTUAL del cliente]: ${message}`,
         `[Intención detectada]: ${intent}`,
         "",
@@ -740,6 +921,7 @@ export async function POST(request: NextRequest) {
         intent,
         articles: articulos,
         lastBotMessage: lastAgentMessage,
+        businessContext: customerBusinessContext,
       });
     }
 
@@ -752,6 +934,7 @@ export async function POST(request: NextRequest) {
         intent,
         articles: articulos,
         lastBotMessage: lastAgentMessage,
+        businessContext: customerBusinessContext,
       });
       // Solo usar el fallback si es genuinamente distinto; si no, mantener la respuesta de Gemini
       if (!looksRepeatedAnswer(fallback, lastAgentMessage)) {
@@ -759,6 +942,14 @@ export async function POST(request: NextRequest) {
       } else {
         const safeName = customerName ? `${customerName}, ` : "";
         responseText = `Gracias por la paciencia ${safeName}te entendí. Para ayudarte mejor, dime en una frase qué necesitas ahora: *precio de producto*, *rutina personalizada* o *puntos del club*.`;
+      }
+    }
+
+    // En consultas de precio, priorizar respuesta factual de catálogo si Gemini responde genérico/fuera de tema.
+    if (intent === "precio") {
+      const deterministicPriceReply = buildDeterministicPriceReply(customerName, message, articulos);
+      if (deterministicPriceReply && (!responseText || isGenericOffTopicAnswer(responseText) || !hasPriceSignal(responseText))) {
+        responseText = deterministicPriceReply;
       }
     }
 
