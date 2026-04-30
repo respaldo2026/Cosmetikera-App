@@ -717,18 +717,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "mensaje_whatsapp requerido" }, { status: 400 });
     }
 
-    // Extraer ID del cliente y número de teléfono
     const perfil_id = body?.perfil_id || body?.customer_id || "";
     const nameFromPayload = toDisplayName(
       String(body?.nombre || body?.contact_name || body?.profile_name || "").trim()
     );
     const rawTelefono = String(
-      body?.telefono ||
-        body?.phone ||
-        body?.numero_whatsapp ||
-        body?.telefono_whatsapp ||
-        body?.wa_id ||
-        ""
+      body?.telefono || body?.phone || body?.numero_whatsapp ||
+      body?.telefono_whatsapp || body?.wa_id || ""
     );
     const telefono = rawTelefono ? normalizePhone(rawTelefono) : "";
 
@@ -746,254 +741,272 @@ export async function POST(request: NextRequest) {
 
     const intent = detectIntent(message);
 
-    const [assetsRes, articulos, customerBusinessContext] = await Promise.all([
-      supabase
-        .from("marketing_assets")
-        .select("id,titulo,descripcion,descripcion_ia,tipo_asset,url_archivo,keywords,categoria,programa_id,estado,visible_para_ia,created_at")
-        .eq("visible_para_ia", true)
-        .limit(80),
+    // ── 1. Cargar datos en paralelo ───────────────────────────────
+    const [articulos, customerBusinessContext, historyRes, perfilRes] = await Promise.all([
       fetchCatalogArticles(supabase),
       getCustomerBusinessContext(supabase, String(perfil_id || ""), telefono),
+      // Historial real de conversación (últimos 20 mensajes, desc)
+      telefono
+        ? supabase
+            .from("whatsapp_conversation_history")
+            .select("rol, mensaje, created_at")
+            .eq("telefono", telefono)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] }),
+      // Nombre del cliente desde perfiles
+      perfil_id
+        ? supabase
+            .from("perfiles")
+            .select("nombre_completo, nombre")
+            .eq("id", perfil_id)
+            .maybeSingle()
+        : telefono
+        ? supabase
+            .from("perfiles")
+            .select("nombre_completo, nombre")
+            .or(`telefono.eq.${telefono},celular.eq.${telefono}`)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
-    const assets = Array.isArray(assetsRes.data) ? assetsRes.data : [];
-
-    const contextoAssets = assets
-      .slice(0, 20)
-      .map((a) => {
-        const kws = Array.isArray(a.keywords) ? a.keywords.join(", ") : String(a.keywords || "");
-        return `- ${a.titulo || "Material"} | categoria: ${a.categoria || "general"} | desc: ${a.descripcion_ia || a.descripcion || ""} | keywords: ${kws}`;
-      })
-      .join("\n");
-
-    const contextoArticulos = buildProductContext(articulos, message, intent);
-    const contextoAsesoria = buildSalesAdvisoryContext(articulos, message, intent);
-    const contextoBellezaExperta = buildBeautyKnowledgeContext();
-
-    // ===== INTEGRACIÓN DE MEMORIA =====
-    let customerContext = null;
-    let customerName = "";
-    let trustLevel = "nuevo";
-    let previousTheme = "";
+    // ── 2. Resolver nombre del cliente ────────────────────────────
     const extractedName = extractCustomerName(message);
+    const perfilNombre = (
+      ((perfilRes.data as any)?.nombre_completo || (perfilRes.data as any)?.nombre) ?? ""
+    ).trim();
+    const customerName = extractedName || nameFromPayload || perfilNombre || "";
 
-    if (telefono) {
-      try {
-        customerContext = await getCustomerContext(supabase, telefono);
-        if (customerContext) {
-          customerName = customerContext.nombre || "";
-          trustLevel = customerContext.nivelConfianza || "nuevo";
-          previousTheme = customerContext.ultimoTema || "";
-        }
-      } catch (memoryError) {
-        console.warn("[ai/chat] Error recuperando contexto del cliente", memoryError);
-      }
-    }
+    // ── 3. Historial ordenado cronológicamente ────────────────────
+    type HistoryRow = { rol: string; mensaje: string; created_at: string };
+    const historyRows = ((historyRes.data || []) as HistoryRow[])
+      .reverse()
+      .slice(-18);
 
-    // Prioridad de nombre: mensaje actual > payload > memoria previa
-    customerName = extractedName || nameFromPayload || customerName;
+    // ── 4. Construir catálogo relevante ───────────────────────────
+    const tokens = getSearchTokens(message);
+    const relevantArticles = rankArticles(articulos, tokens, intent).slice(0, 25);
+
+    const catalogoTexto =
+      relevantArticles.length > 0
+        ? relevantArticles
+            .map((p) => {
+              const precio = formatCOP(Number(p.precio_venta || 0));
+              const stock = Number(p.stock || 0);
+              const stockTxt = stock > 0 ? `stock:${stock}` : "agotado";
+              const dto =
+                Number(p.descuento_porcentaje || 0) > 0
+                  ? ` dto:${p.descuento_porcentaje}%`
+                  : "";
+              const desc = p.descripcion
+                ? ` | "${String(p.descripcion).slice(0, 80)}"`
+                : "";
+              return `• ${p.nombre} | ${p.marca || "N/A"} | ${p.categoria || "general"} | ${precio} | ${stockTxt}${dto}${desc}`;
+            })
+            .join("\n")
+        : articulos
+            .slice(0, 20)
+            .map((p) => {
+              const precio = formatCOP(Number(p.precio_venta || 0));
+              return `• ${p.nombre} | ${p.marca || "N/A"} | ${p.categoria || "general"} | ${precio}`;
+            })
+            .join("\n");
+
+    // ── 5. Datos del cliente ──────────────────────────────────────
+    const ultimaCompra = customerBusinessContext?.ultimasCompras?.[0];
+
+    const clienteTexto = customerBusinessContext?.perfilId
+      ? [
+          customerName ? `Nombre: ${customerName}` : "",
+          `Puntos club: ${Number(customerBusinessContext.puntos || 0)}`,
+          `Total compras: ${formatCOP(Number(customerBusinessContext.totalCompras || 0))}`,
+          ultimaCompra
+            ? `Última compra: ${new Date(
+                ultimaCompra.fecha
+              ).toLocaleDateString("es-CO")} — ${formatCOP(
+                Number(ultimaCompra.total || 0)
+              )}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" | ")
+      : customerName
+      ? `Nombre: ${customerName} | sin perfil CRM completo`
+      : "Cliente sin perfil identificado";
+
+    // ── 6. System prompt enfocado ─────────────────────────────────
+    const systemPrompt = `Eres *Dany*, asesora virtual experta en belleza de *La Cosmetikera* (WhatsApp).
+
+## MISIÓN PRINCIPAL
+Responder EXACTAMENTE lo que el cliente preguntó, usando el catálogo real de la tienda cuando aplique.
+
+## REGLAS ESTRICTAS
+1. LEE la pregunta completa. Identifica si pide: precio, producto, rutina, puntos, soporte o información.
+2. Responde SOLO lo que preguntaron. Nunca cambies el tema.
+3. Si preguntan precio: busca en el CATÁLOGO y da el precio EXACTO. Si no está, dilo honestamente.
+4. Si solo saludan: saluda breve y pregunta qué necesitan. NO diagnostiques ni recomiendas sin que pidan.
+5. Si preguntan por puntos del club: confirma con los datos CRM si están disponibles; si no, pide cédula.
+6. Si hay contexto previo (historial), ÚSALO para dar continuidad. No repitas preguntas ya respondidas.
+7. Respuestas máximo 5 líneas. Usa *negritas* para productos/precios. 1-2 emojis máximo.
+8. Para rutinas: usa pasos numerados cortos.
+9. Si el cliente se queja de que no lo entiendes: discúlpate en 1 frase y responde directo.
+10. NUNCA inventes precios ni productos que no estén en el catálogo.
+
+## ESPECIALIDADES
+Cabello (tintes, decoloración, alisados, afro/rizado), piel (acné, manchas, hidratación), uñas (acrílicas, gel, semipermanente), maquillaje, barba.
+
+## CONOCIMIENTO TÉCNICO
+${buildBeautyKnowledgeContext()}
+
+## CLIENTE
+${clienteTexto}
+
+## CATÁLOGO LA COSMETIKERA (${articulos.length} productos cargados — usa estos precios reales)
+${catalogoTexto}`;
 
     let responseText = "";
 
+    // ── 7. Llamar a Gemini con historial real (multi-turn) ────────
     if (geminiKey) {
       const genAI = new GoogleGenerativeAI(geminiKey);
+      const modelCandidates = [
+        process.env.GEMINI_MODEL_CHAT,
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-002",
+      ].filter(Boolean) as string[];
 
-      // Construir prompt con personalización por relación
-      let toneInstruction = "";
-      if (trustLevel === "leal") {
-        toneInstruction =
-          "Este es un cliente muy leal. Usa su nombre, recuerda temas previos, sé muy personal y cálido. Busca profundizar la relación.";
-      } else if (trustLevel === "conocido") {
-        toneInstruction =
-          "Este es un cliente conocido. Usa su nombre naturalmente, refiere temas previos si es relevante, sé amable y confiable.";
-      } else {
-        toneInstruction =
-          "Este es un cliente nuevo. Sé acogedor, intenta identificar sus necesidades, presenta opciones concretas.";
-      }
+      for (const modelName of modelCandidates) {
+        try {
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction: systemPrompt,
+          });
 
-      // Construir historial de conversación previo en orden cronológico consistente
-      const historialPrevio = customerContext?.historialReciente ?? [];
-      const historialOrdenado = [...historialPrevio]
-        .sort((a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime())
-        .slice(-8);
-      const customerMemoryContext = historialOrdenado.length > 0
-          ? `--- Historial REAL de esta conversación con ${customerName || "el cliente"} ---\n${historialOrdenado
-              .map((m: { rol: string; mensaje: string }) =>
-                `${m.rol === "cliente" ? "👤 Cliente" : "🤖 Asesor"}: ${m.mensaje}`
-              )
-              .join("\n")}\n--- Fin historial ---\nÚltimo tema tratado: ${previousTheme || "ninguno"}\nNivel de relación: ${trustLevel}`
-          : `(primera vez que escribe este número)\nNivel: ${trustLevel}`;
+          type GeminiTurn = { role: "user" | "model"; parts: Array<{ text: string }> };
+          const chatHistory: GeminiTurn[] = [];
 
-      const customerBusinessContextText = customerBusinessContext?.perfilId
-        ? [
-            `Perfil CRM: ${customerBusinessContext.nombre || customerName || "cliente"}`,
-            `Puntos actuales: ${Number(customerBusinessContext.puntos || 0)}`,
-            `Total compras acumuladas: ${formatCOP(Number(customerBusinessContext.totalCompras || 0))}`,
-            customerBusinessContext.ultimasCompras && customerBusinessContext.ultimasCompras.length > 0
-              ? `Ultimas compras: ${customerBusinessContext.ultimasCompras
-                  .map((v) => `${new Date(v.fecha).toLocaleDateString("es-CO")}: ${formatCOP(Number(v.total || 0))}`)
-                  .join(" | ")}`
-              : "Ultimas compras: sin datos",
-          ].join("\n")
-        : "Sin perfil CRM identificado por telefono/perfil_id";
+          for (const row of historyRows) {
+            const role: "user" | "model" = row.rol === "cliente" ? "user" : "model";
+            const texto = String(row.mensaje || "").trim();
+            if (!texto) continue;
+            const lastTurn = chatHistory.at(-1);
+            if (lastTurn && lastTurn.role === role) {
+              const firstPart = lastTurn.parts[0];
+              if (firstPart) {
+                firstPart.text += "\n" + texto;
+              } else {
+                lastTurn.parts.push({ text: texto });
+              }
+            } else {
+              chatHistory.push({ role, parts: [{ text: texto }] });
+            }
+          }
 
-      const prompt = [
-        "Eres Dany, asesora virtual experta en belleza integral de La Cosmetikera (WhatsApp).",
-        toneInstruction,
-        "",
-        "=== PASO 1 — COMPRENSIÓN OBLIGATORIA (hazlo SIEMPRE antes de responder) ===",
-        "1. LEE la pregunta del cliente con atención. Identifica QUÉ está preguntando exactamente.",
-        "2. Determina si es: pregunta de precio, pregunta de producto específico, consulta de problema (piel/cabello/uñas), saludo, seguimiento de conversación anterior, o consulta general.",
-        "3. Responde EXCLUSIVAMENTE a lo que el cliente preguntó. NO cambies el tema, NO respondas algo diferente.",
-        "4. Si no tienes la información exacta que pide, dilo con honestidad y ofrece lo más cercano que sí tienes.",
-        "5. Si la pregunta no está clara, pide aclaración con UNA sola pregunta concreta.",
-        "=== PROHIBIDO ===",
-        "- NUNCA inventes precios, productos ni información que no esté en el catálogo.",
-        "- NUNCA des una respuesta genérica de belleza cuando el cliente preguntó algo específico.",
-        "- NUNCA ignores lo que el cliente dijo para hablar de otro tema.",
-        "- NUNCA repitas literalmente la respuesta anterior si el cliente está preguntando algo nuevo.",
-        "",
-        "=== REGLAS DE FORMATO Y TONO ===",
-        "- Responde en español colombiano natural, cálido y conversacional, máximo 4-6 líneas.",
-        "- Haz respuestas didácticas y fáciles de aplicar.",
-        "- Usa de 1 a 3 emojis útiles (sin saturar).",
-        "- Resalta palabras clave con *formato WhatsApp*.",
-        "- Si explicas rutina: 1) paso... 2) paso... 3) paso...",
-        "- Evita saludos largos repetidos; responde directo al punto cuando ya hay contexto.",
-        "- Atiende a mujeres y hombres con lenguaje inclusivo.",
-        "",
-        "=== LÓGICA DE RESPUESTA ===",
-        "- Si preguntan por nombre: reconócelo si está disponible, si no pide el nombre en una frase corta.",
-        "- Si preguntan por puntos/club: solicita cédula para validar.",
-        "- Si preguntan por acceso a la app, inicio de sesión o contraseña: explica que para soporte de acceso deben escribir al correo soporte@lacosmetikera.com o contactar al administrador directamente. NO intentes resolver temas técnicos de autenticación.",
-        "- Si preguntan por precios de cursos, inscripciones o valores que pagaron: sé honesto, di que no tienes acceso a registros de pagos individuales y recomienda comunicarse directamente con la tienda para verificar.",
-        "- Si el cliente dice que no lo entendiste, que repites o que no es lógica la respuesta: reconoce el error en 1 frase, pide disculpa breve y corrige con una respuesta puntual relacionada con su último mensaje.",
-        "- Si el cliente solo saluda, NO asumas diagnóstico de cabello/piel. Responde saludo humano breve y pregunta qué necesita exactamente.",
-        "- Si detectas un problema (acné, frizz, caída, manchas): primero valida la necesidad con 1-2 preguntas, luego recomienda.",
-        "- Si el cliente responde corto a una pregunta tuya anterior ('sí', 'ondulado', 'en gel'), conecta con esa pregunta y continúa.",
-        "- Si piden precio: busca en el catálogo y da el precio REAL. Si no está en el catálogo, dilo.",
-        "- Si hay precio y descuento: mencionalo siempre.",
-        "- Cierra con una pregunta útil para continuar o concretar compra.",
-        "- Especialidades: cabello (tintes, decoloración, alisados, afro/rizado), uñas (acrílicas, gel, semipermanente), piel, maquillaje.",
-        "- Nunca hagas afirmaciones médicas absolutas.",
-        "",
-        "[CONOCIMIENTO TÉCNICO DE BELLEZA - úsalo para asesorar mejor]:",
-        contextoBellezaExperta,
-        "",
-        customerName ? `[CLIENTE: ${customerName}]` : "[CLIENTE: nuevo]",
-        customerMemoryContext,
-        "",
-        "[DATOS CRM DEL CLIENTE - usar cuando pregunten puntos, compras o historial]:",
-        customerBusinessContextText,
-        "",
-        `[MENSAJE ACTUAL del cliente]: ${message}`,
-        `[Intención detectada]: ${intent}`,
-        "",
-        "[CATÁLOGO DISPONIBLE - úsalo para responder con precios reales]:",
-        contextoArticulos || "(catálogo no disponible)",
-        "",
-        "[ASESORÍA COMERCIAL - top productos relevantes]:",
-        contextoAsesoria || "(sin coincidencias)",
-        "",
-        assets.length > 0 ? "[MATERIALES DE MARKETING]:" : "",
-        assets.length > 0 ? (contextoAssets || "") : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+          while (chatHistory.at(-1)?.role === "model") {
+            chatHistory.pop();
+          }
 
-      try {
-        responseText = await generateWithModelFallback(genAI, prompt);
-      } catch (modelError) {
-        console.warn("[ai/chat] Error no recuperable de Gemini", modelError);
-        responseText = "";
+          const chat = model.startChat({ history: chatHistory });
+          const result = await Promise.race([
+            chat.sendMessage(message),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error(`timeout-${modelName}`)), 9000)
+            ),
+          ]);
+
+          const text = result.response.text().trim();
+          if (text) {
+            responseText = text;
+            break;
+          }
+        } catch (err) {
+          const msg = String((err as Error)?.message || "").toLowerCase();
+          if (
+            msg.includes("404") ||
+            msg.includes("not found") ||
+            msg.includes("429") ||
+            msg.includes("quota") ||
+            msg.includes("rate limit") ||
+            msg.includes("resource exhausted") ||
+            msg.includes("timeout-") ||
+            msg.includes("unsupported")
+          ) {
+            continue;
+          }
+          console.warn(`[ai/chat] Error modelo ${modelName}:`, err);
+          break;
+        }
       }
     }
 
-    // Último mensaje del agente (para contexto de continuidad)
-    const lastAgentMessage = [...(customerContext?.historialReciente || [])]
-      .reverse()
-      .find((m: { rol: string; mensaje: string }) => m.rol === "agente")?.mensaje ?? "";
-
+    // ── 8. Fallback si Gemini no respondió ────────────────────────
     if (!responseText) {
+      const lastAgentMsg =
+        historyRows.filter((r) => r.rol === "agente").slice(-1)[0]?.mensaje ?? "";
       responseText = buildHeuristicFallbackResponse({
         customerName,
         message,
         intent,
         articles: articulos,
-        lastBotMessage: lastAgentMessage,
+        lastBotMessage: lastAgentMsg,
         businessContext: customerBusinessContext,
       });
     }
 
-    // Evitar respuestas repetidas consecutivas cuando Gemini/fallback se estancan
-    // Solo reemplazar si el fallback heurístico es realmente diferente (evitar ciclo infinito)
-    if (lastAgentMessage && looksRepeatedAnswer(responseText, lastAgentMessage)) {
-      const fallback = buildHeuristicFallbackResponse({
+    // ── 9. Asegurar precio real si Gemini fue genérico ────────────
+    if (intent === "precio") {
+      const deterministicPriceReply = buildDeterministicPriceReply(
         customerName,
         message,
-        intent,
-        articles: articulos,
-        lastBotMessage: lastAgentMessage,
-        businessContext: customerBusinessContext,
-      });
-      // Solo usar el fallback si es genuinamente distinto; si no, mantener la respuesta de Gemini
-      if (!looksRepeatedAnswer(fallback, lastAgentMessage)) {
-        responseText = fallback;
-      } else {
-        const safeName = customerName ? `${customerName}, ` : "";
-        responseText = `Gracias por la paciencia ${safeName}te entendí. Para ayudarte mejor, dime en una frase qué necesitas ahora: *precio de producto*, *rutina personalizada* o *puntos del club*.`;
-      }
-    }
-
-    // En consultas de precio, priorizar respuesta factual de catálogo si Gemini responde genérico/fuera de tema.
-    if (intent === "precio") {
-      const deterministicPriceReply = buildDeterministicPriceReply(customerName, message, articulos);
-      if (deterministicPriceReply && (!responseText || isGenericOffTopicAnswer(responseText) || !hasPriceSignal(responseText))) {
+        articulos
+      );
+      if (
+        deterministicPriceReply &&
+        (!responseText ||
+          isGenericOffTopicAnswer(responseText) ||
+          !hasPriceSignal(responseText))
+      ) {
         responseText = deterministicPriceReply;
       }
     }
 
-    // ===== REGISTRAR MENSAJES EN MEMORIA =====
+    // ── 10. Registrar en historial y memoria ──────────────────────
     if (telefono) {
       try {
         const detectedTheme = extractThemeFromMessage(message);
-        // Guardar mensaje del cliente + respuesta del agente + actualizar memoria en paralelo
         await Promise.all([
           logConversationMessage(supabase, telefono, perfil_id || undefined, "cliente", message),
           logConversationMessage(supabase, telefono, perfil_id || undefined, "agente", responseText),
-          // SIEMPRE actualizar memoria (incrementa contador → sube nivel de confianza)
-          updateCustomerMemory(supabase, telefono, perfil_id || undefined, customerName || undefined, detectedTheme || undefined),
+          updateCustomerMemory(
+            supabase,
+            telefono,
+            perfil_id || undefined,
+            customerName || undefined,
+            detectedTheme || undefined
+          ),
         ]);
-
-        // Compatibilidad con despliegues que aún usan tabla legacy de conversaciones
-        const legacyInsert = await supabase.from("agent_conversations").insert({
-          phone_number: telefono,
-          user_message: message,
-          agent_response: responseText,
-          created_at: new Date().toISOString(),
-        });
-
-        if (legacyInsert.error) {
-          console.warn("[ai/chat] Legacy agent_conversations no disponible:", legacyInsert.error.message);
-        }
+        await supabase
+          .from("agent_conversations")
+          .insert({
+            phone_number: telefono,
+            user_message: message,
+            agent_response: responseText,
+            created_at: new Date().toISOString(),
+          })
+          .then(({ error }: { error: any }) => {
+            if (error) console.warn("[ai/chat] Legacy insert:", error.message);
+          });
       } catch (logError) {
-        console.warn("[ai/chat] Error registrando mensajes en memoria", logError);
+        console.warn("[ai/chat] Error registrando mensajes:", logError);
       }
     }
 
-    // Sugerencia de imagen para la rama "Con imagen"
-    const mediaSuggestion = await getAgentImageSuggestion(supabase, {
-      message,
-      intent,
-    });
-
-    const payload = withMediaSuggestion(
-      {
-        response: responseText,
-        intent,
-      },
-      mediaSuggestion,
-    );
+    // ── 11. Sugerencia de imagen ──────────────────────────────────
+    const mediaSuggestion = await getAgentImageSuggestion(supabase, { message, intent });
+    const payload = withMediaSuggestion({ response: responseText, intent }, mediaSuggestion);
 
     return NextResponse.json(payload);
   } catch (error: unknown) {
