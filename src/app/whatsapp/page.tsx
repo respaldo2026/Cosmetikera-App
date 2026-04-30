@@ -17,23 +17,11 @@ import {
   RobotOutlined,
   UserOutlined,
   ReloadOutlined,
-  SendOutlined,
 } from "@ant-design/icons";
-import { Tabs } from "antd";
 
 const { Text } = Typography;
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
-type ClubRecipient = {
-  id: string;
-  perfil_id: string | null;
-  telefono: string;
-  nombre: string;
-  mensaje: string;
-  estado: string;
-  created_at: string;
-};
-
 type Conversation = {
   telefono: string;
   nombre: string;
@@ -259,9 +247,6 @@ export default function WhatsAppMonitorPage() {
   const [search, setSearch] = useState("");
   const [hasLoadedList, setHasLoadedList] = useState(false);
   const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
-  const [activeTab, setActiveTab] = useState<"conversaciones" | "plantillas">("conversaciones");
-  const [clubRecipients, setClubRecipients] = useState<ClubRecipient[]>([]);
-  const [loadingRecipients, setLoadingRecipients] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -320,26 +305,6 @@ export default function WhatsAppMonitorPage() {
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
-
-  // ── Cargar destinatarios de plantilla de bienvenida ───────────────
-  const loadClubRecipients = useCallback(async () => {
-    setLoadingRecipients(true);
-    try {
-      const res = await fetchWithTimeout("/api/whatsapp/club-recipients", 8000);
-      const json = await res.json();
-      if (json.recipients) setClubRecipients(json.recipients);
-    } catch {
-      // silencioso
-    } finally {
-      setLoadingRecipients(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "plantillas") {
-      loadClubRecipients();
-    }
-  }, [activeTab, loadClubRecipients]);
 
   // Auto-scroll al último mensaje SOLO si el usuario está cerca del final
   useEffect(() => {
@@ -433,265 +398,133 @@ export default function WhatsAppMonitorPage() {
           <Tooltip title="Actualizar">
             <ReloadOutlined
               style={{ color: "#fff", cursor: "pointer", fontSize: 16 }}
-              onClick={() => activeTab === "conversaciones" ? loadConversations(search) : loadClubRecipients()}
+              onClick={() => loadConversations(search)}
             />
           </Tooltip>
         </div>
 
-        {/* Pestañas */}
-        <Tabs
-          activeKey={activeTab}
-          onChange={(k) => setActiveTab(k as "conversaciones" | "plantillas")}
-          size="small"
-          style={{ padding: "0 4px" }}
-          items={[
-            { key: "conversaciones", label: "Conversaciones" },
-            {
-              key: "plantillas",
-              label: (
-                <span>
-                  📧 Plantillas
-                  {clubRecipients.length > 0 && (
-                    <span
-                      style={{
-                        marginLeft: 4,
-                        background: "#1677ff",
-                        color: "#fff",
-                        borderRadius: 8,
-                        fontSize: 10,
-                        padding: "1px 5px",
-                      }}
-                    >
-                      {clubRecipients.length}
-                    </span>
-                  )}
-                </span>
-              ),
-            },
-          ]}
-        />
+        {/* Buscador */}
+        <div style={{ padding: "8px 10px", background: "#f6f6f6", borderBottom: "1px solid #e9e9e9" }}>
+          <Input
+            prefix={<SearchOutlined style={{ color: "#888" }} />}
+            placeholder="Buscar por nombre o número"
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+            allowClear
+            style={{ borderRadius: 20, background: "#fff", border: "none" }}
+          />
+        </div>
 
-        {activeTab === "conversaciones" && (
-          /* Buscador */
-          <div style={{ padding: "8px 10px", background: "#f6f6f6", borderBottom: "1px solid #e9e9e9" }}>
-            <Input
-              prefix={<SearchOutlined style={{ color: "#888" }} />}
-              placeholder="Buscar por nombre o número"
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              allowClear
-              style={{ borderRadius: 20, background: "#fff", border: "none" }}
-            />
-          </div>
-        )}
-
-        {/* Lista de conversaciones O lista de plantillas */}
+        {/* Lista de conversaciones */}
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {activeTab === "conversaciones" ? (
-            loadingList ? (
-              <div style={{ textAlign: "center", padding: 32 }}>
-                <Spin />
-              </div>
-            ) : conversations.length === 0 ? (
-              <Empty
-                description="Sin conversaciones"
-                style={{ padding: 32 }}
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            ) : (
-              conversations.map((conv) => {
-                const isSelected = conv.telefono === selectedPhone;
-                const name = conv.nombre || conv.telefono;
-                const bg = getAvatarColor(conv.telefono);
-                const ini = getInitials(conv.nombre, conv.telefono);
-                return (
-                  <div
-                    key={conv.telefono}
-                    onClick={() => handleSelectConversation(conv.telefono)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "12px 16px",
-                      cursor: "pointer",
-                      background: isSelected ? "#f0f9f7" : "#fff",
-                      borderBottom: "1px solid #f2f2f2",
-                      transition: "background 0.15s",
-                      borderLeft: isSelected ? "4px solid #25D366" : "4px solid transparent",
-                    }}
-                  >
-                    <Avatar
-                      size={46}
-                      style={{ background: bg, flexShrink: 0, fontWeight: 700, fontSize: 15 }}
-                    >
-                      {ini}
-                    </Avatar>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                          <Text
-                            ellipsis
-                            style={{ fontWeight: 600, fontSize: 14, color: "#111", maxWidth: 140 }}
-                          >
-                            {name}
-                          </Text>
-                          {conv.es_plantilla && (
-                            <Tooltip title="Plantilla de bienvenida enviada">
-                              <Tag
-                                style={{
-                                  fontSize: 10,
-                                  padding: "2px 6px",
-                                  height: 18,
-                                  lineHeight: "18px",
-                                  borderRadius: 4,
-                                  background: "#e6f7ff",
-                                  border: "1px solid #91d5ff",
-                                  color: "#0050b3",
-                                  marginRight: 0,
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                📧 Plantilla
-                              </Tag>
-                            </Tooltip>
-                          )}
-                        </div>
-                        <Text style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>
-                          {formatListTime(conv.created_at)}
-                        </Text>
-                      </div>
-                      <div
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                      >
-                        <Text
-                          ellipsis
-                          style={{ fontSize: 12, color: "#777", maxWidth: 190 }}
-                        >
-                          {conv.ultimo_rol === "agente" ? (
-                            <span style={{ color: "#128C7E" }}>
-                              <RobotOutlined style={{ marginRight: 3 }} />
-                            </span>
-                          ) : null}
-                          {conv.ultimo_mensaje.replace(/\*([^*\n]+)\*/g, "$1").replace(/_([^_\n]+)_/g, "$1").replace(/~([^~\n]+)~/g, "$1").slice(0, 60)}
-                        </Text>
-                        {conv.total > 0 && (
-                          <Badge
-                            count={conv.total}
-                            overflowCount={99}
-                            style={{
-                              backgroundColor: "#25D366",
-                              fontSize: 10,
-                              flexShrink: 0,
-                            }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )
+          {loadingList ? (
+            <div style={{ textAlign: "center", padding: 32 }}>
+              <Spin />
+            </div>
+          ) : conversations.length === 0 ? (
+            <Empty
+              description="Sin conversaciones"
+              style={{ padding: 32 }}
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
           ) : (
-            /* Pestaña Plantillas Enviadas */
-            loadingRecipients ? (
-              <div style={{ textAlign: "center", padding: 32 }}>
-                <Spin />
-                <div style={{ marginTop: 8, color: "#888", fontSize: 12 }}>Cargando destinatarios...</div>
-              </div>
-            ) : clubRecipients.length === 0 ? (
-              <Empty
-                description="No hay plantillas enviadas aún"
-                style={{ padding: 32 }}
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            ) : (
-              <div>
+            conversations.map((conv) => {
+              const isSelected = conv.telefono === selectedPhone;
+              const name = conv.nombre || conv.telefono;
+              const bg = getAvatarColor(conv.telefono);
+              const ini = getInitials(conv.nombre, conv.telefono);
+              return (
                 <div
+                  key={conv.telefono}
+                  onClick={() => handleSelectConversation(conv.telefono)}
                   style={{
-                    padding: "8px 16px",
-                    background: "#f0f7ff",
-                    borderBottom: "1px solid #d6e8ff",
-                    fontSize: 12,
-                    color: "#0050b3",
-                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 16px",
+                    cursor: "pointer",
+                    background: isSelected ? "#f0f9f7" : "#fff",
+                    borderBottom: "1px solid #f2f2f2",
+                    transition: "background 0.15s",
+                    borderLeft: isSelected ? "4px solid #25D366" : "4px solid transparent",
                   }}
                 >
-                  📧 {clubRecipients.length} cliente{clubRecipients.length !== 1 ? "s" : ""} recibieron plantilla de bienvenida
-                </div>
-                {clubRecipients.map((r) => {
-                  const isSelected = r.telefono === selectedPhone;
-                  const bg = getAvatarColor(r.telefono);
-                  const ini = getInitials(r.nombre, r.telefono);
-                  const displayNombre = r.nombre || r.telefono;
-                  return (
+                  <Avatar
+                    size={46}
+                    style={{ background: bg, flexShrink: 0, fontWeight: 700, fontSize: 15 }}
+                  >
+                    {ini}
+                  </Avatar>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div
-                      key={r.id}
-                      onClick={() => {
-                        handleSelectConversation(r.telefono);
-                        setActiveTab("conversaciones");
-                      }}
                       style={{
                         display: "flex",
+                        justifyContent: "space-between",
                         alignItems: "center",
-                        gap: 12,
-                        padding: "12px 16px",
-                        cursor: "pointer",
-                        background: isSelected ? "#f0f9f7" : "#fff",
-                        borderBottom: "1px solid #f2f2f2",
-                        transition: "background 0.15s",
-                        borderLeft: isSelected ? "4px solid #1677ff" : "4px solid #91d5ff",
                       }}
                     >
-                      <Avatar
-                        size={46}
-                        style={{ background: bg, flexShrink: 0, fontWeight: 700, fontSize: 15 }}
-                      >
-                        {ini}
-                      </Avatar>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <Text
-                            ellipsis
-                            style={{ fontWeight: 700, fontSize: 14, color: "#111", maxWidth: 170 }}
-                          >
-                            {displayNombre}
-                          </Text>
-                          <Text style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>
-                            {formatListTime(r.created_at)}
-                          </Text>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                          <SendOutlined style={{ fontSize: 11, color: "#1677ff" }} />
-                          <Text style={{ fontSize: 12, color: "#555" }} ellipsis>
-                            {r.telefono}
-                          </Text>
-                          <Tag
-                            style={{
-                              fontSize: 9,
-                              padding: "0 5px",
-                              borderRadius: 4,
-                              marginLeft: "auto",
-                              flexShrink: 0,
-                              background: r.estado === "enviado" ? "#f6ffed" : "#fff1f0",
-                              border: `1px solid ${r.estado === "enviado" ? "#b7eb8f" : "#ffa39e"}`,
-                              color: r.estado === "enviado" ? "#237804" : "#cf1322",
-                            }}
-                          >
-                            {r.estado === "enviado" ? "✓ Enviado" : r.estado}
-                          </Tag>
-                        </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        <Text
+                          ellipsis
+                          style={{ fontWeight: 600, fontSize: 14, color: "#111", maxWidth: 140 }}
+                        >
+                          {name}
+                        </Text>
+                        {conv.es_plantilla && (
+                          <Tooltip title="Incluye plantilla de bienvenida enviada">
+                            <Tag
+                              style={{
+                                fontSize: 10,
+                                padding: "2px 6px",
+                                height: 18,
+                                lineHeight: "18px",
+                                borderRadius: 4,
+                                background: "#e6f7ff",
+                                border: "1px solid #91d5ff",
+                                color: "#0050b3",
+                                marginRight: 0,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              📧 Plantilla
+                            </Tag>
+                          </Tooltip>
+                        )}
                       </div>
+                      <Text style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>
+                        {formatListTime(conv.created_at)}
+                      </Text>
                     </div>
-                  );
-                })}
-              </div>
-            )
+                    <div
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                    >
+                      <Text
+                        ellipsis
+                        style={{ fontSize: 12, color: "#777", maxWidth: 190 }}
+                      >
+                        {conv.ultimo_rol === "agente" ? (
+                          <span style={{ color: "#128C7E" }}>
+                            <RobotOutlined style={{ marginRight: 3 }} />
+                          </span>
+                        ) : null}
+                        {conv.ultimo_mensaje.replace(/\*([^*\n]+)\*/g, "$1").replace(/_([^_\n]+)_/g, "$1").replace(/~([^~\n]+)~/g, "$1").slice(0, 60)}
+                      </Text>
+                      {conv.total > 0 && (
+                        <Badge
+                          count={conv.total}
+                          overflowCount={99}
+                          style={{
+                            backgroundColor: "#25D366",
+                            fontSize: 10,
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>

@@ -13,19 +13,32 @@ type ConversationMessage = {
   perfil_id: string | null;
 };
 
+function isClubWelcomeNotification(row: {
+  tipo?: string | null;
+  mensaje?: string | null;
+}): boolean {
+  const tipo = String(row.tipo || "").toLowerCase();
+  const mensaje = String(row.mensaje || "").toLowerCase();
+  if (tipo === "bienvenida_club") return true;
+  if (tipo.includes("bienvenida") && tipo.includes("club")) return true;
+  if (tipo.includes("club_welcome")) return true;
+  if (mensaje.includes("plantilla") && mensaje.includes("club")) return true;
+  if (mensaje.includes("bienvenida") && mensaje.includes("club")) return true;
+  return false;
+}
+
 async function getTemplateMessagesByPhone(
   supabase: any,
   normalizedPhone: string,
   rawPhone: string,
 ): Promise<ConversationMessage[]> {
   try {
-    // Recuperar notificaciones de bienvenida al club para este teléfono
+    // Recuperar notificaciones recientes y filtrar por plantillas de bienvenida al club
     const { data, error } = await supabase
       .from("notificaciones_enviadas")
       .select("id, telefono, mensaje, created_at, perfil_id, estado, tipo")
-      .eq("tipo", "bienvenida_club")
-      .order("created_at", { ascending: true })
-      .limit(200);
+      .order("created_at", { ascending: false })
+      .limit(3000);
 
     if (error) {
       console.warn("[getTemplateMessagesByPhone] Query error:", error);
@@ -44,6 +57,7 @@ async function getTemplateMessagesByPhone(
     const targetPhones = new Set([normalizePhone(normalizedPhone), normalizePhone(rawPhone)]);
 
     return rows
+      .filter((row) => isClubWelcomeNotification(row))
       .filter((row) => targetPhones.has(normalizePhone(String(row.telefono || ""))))
       .map((row) => ({
         id: `notif-${row.id}`,
@@ -54,7 +68,10 @@ async function getTemplateMessagesByPhone(
         intento: null,
         created_at: row.created_at || new Date().toISOString(),
         perfil_id: row.perfil_id || null,
-      }));
+      }))
+      .sort((a, b) =>
+        new Date(String(a.created_at || 0)).getTime() - new Date(String(b.created_at || 0)).getTime()
+      );
   } catch (err) {
     console.error("[getTemplateMessagesByPhone] Exception:", err);
     return [];
@@ -65,13 +82,12 @@ async function getTemplateMessagesRecent(
   supabase: any,
 ): Promise<ConversationMessage[]> {
   try {
-    // Recuperar TODAS las notificaciones de bienvenida al club, sin importar estado
+    // Recuperar notificaciones recientes y filtrar plantillas de bienvenida al club
     const { data, error } = await supabase
       .from("notificaciones_enviadas")
       .select("id, telefono, mensaje, created_at, perfil_id, estado, tipo")
-      .eq("tipo", "bienvenida_club")
       .order("created_at", { ascending: false })
-      .limit(2000);
+      .limit(3000);
 
     if (error) {
       console.warn("[getTemplateMessagesRecent] Query error:", error);
@@ -87,16 +103,19 @@ async function getTemplateMessagesRecent(
       tipo?: string | null;
     }>;
 
-    return rows.map((row) => ({
-      id: `notif-${row.id}`,
-      telefono: normalizePhone(String(row.telefono || "")),
-      rol: "agente",
-      mensaje: row.mensaje || "🎉 Bienvenida al Club Fidelización",
-      tipo_mensaje: "template",
-      intento: null,
-      created_at: row.created_at || new Date().toISOString(),
-      perfil_id: row.perfil_id || null,
-    }));
+    return rows
+      .filter((row) => isClubWelcomeNotification(row))
+      .map((row) => ({
+        id: `notif-${row.id}`,
+        telefono: normalizePhone(String(row.telefono || "")),
+        rol: "agente",
+        mensaje: row.mensaje || "🎉 Bienvenida al Club Fidelización",
+        tipo_mensaje: "template",
+        intento: null,
+        created_at: row.created_at || new Date().toISOString(),
+        perfil_id: row.perfil_id || null,
+      }))
+      .filter((row) => Boolean(row.telefono));
   } catch (err) {
     console.error("[getTemplateMessagesRecent] Exception:", err);
     return [];
