@@ -7,7 +7,7 @@ type ConversationMessage = {
   telefono: string;
   rol: string;
   mensaje: string;
-  tipo_mensaje?: string | null;
+  tipo_mensaje: string | null;
   intento?: string | null;
   created_at: string;
   perfil_id: string | null;
@@ -315,6 +315,7 @@ export async function GET(request: NextRequest) {
           telefono: normalizePhone(row.phone_number || ""),
           rol: "cliente",
           mensaje: row.user_message || "",
+          tipo_mensaje: "text",
           created_at: new Date(baseTime).toISOString(),
           perfil_id: null,
         },
@@ -323,6 +324,7 @@ export async function GET(request: NextRequest) {
           telefono: normalizePhone(row.phone_number || ""),
           rol: "agente",
           mensaje: row.agent_response || "",
+          tipo_mensaje: "text",
           created_at: new Date(baseTime + 1000).toISOString(),
           perfil_id: null,
         },
