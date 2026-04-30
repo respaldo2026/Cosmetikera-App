@@ -260,29 +260,22 @@ export async function POST(
       );
     }
 
-    // 3. Conectar a Supabase
+    // 3. Conectar a Supabase con service role para evitar bloqueos por RLS
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json(
         {
           success: false,
-          error: "Configuración de Supabase faltante",
+          error: "Configuración de Supabase service role faltante",
         } as SendClubWelcomeResponse,
         { status: 500 }
       );
     }
 
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll() {
-          // No necesitamos mutar cookies
-        },
-      },
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
     // 4. Obtener teléfono

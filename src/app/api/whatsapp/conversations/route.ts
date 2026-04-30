@@ -269,7 +269,7 @@ export async function GET(request: NextRequest) {
           .from("perfiles")
           .select("nombre, nombre_completo")
           .or(
-            `telefono.eq.${normalizedPhone},celular.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%,celular.ilike.%${phoneForLike}%`
+            `telefono.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%`
           )
           .limit(1)
           .single();
@@ -384,16 +384,16 @@ export async function GET(request: NextRequest) {
     perfilIds.length > 0
       ? supabase
           .from("perfiles")
-          .select("id, nombre, nombre_completo, telefono, celular")
+          .select("id, nombre, nombre_completo, telefono")
           .in("id", perfilIds)
       : { data: [] },
     phoneList.length > 0
       ? supabase
           .from("perfiles")
-          .select("id, nombre, nombre_completo, telefono, celular")
+          .select("id, nombre, nombre_completo, telefono")
           .or(
             phoneList
-              .map((p) => `telefono.eq.${p},celular.eq.${p}`)
+              .map((p) => `telefono.eq.${p}`)
               .join(",")
           )
           .limit(500)
@@ -409,7 +409,6 @@ export async function GET(request: NextRequest) {
   for (const p of phonePerfRes.data || []) {
     const nombre = ((p as any).nombre_completo || p.nombre || "").trim();
     if (p.telefono) perfilByPhoneMap.set(normalizePhone(String(p.telefono)), nombre);
-    if (p.celular) perfilByPhoneMap.set(normalizePhone(String(p.celular)), nombre);
   }
 
   const enriched = conversations.map((c) => ({

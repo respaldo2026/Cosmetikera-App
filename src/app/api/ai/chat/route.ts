@@ -798,7 +798,7 @@ export async function POST(request: NextRequest) {
         ? supabase
             .from("perfiles")
             .select("nombre_completo, nombre")
-            .or(`telefono.eq.${telefono},celular.eq.${telefono}`)
+          .or(`telefono.eq.${telefono}`)
             .limit(1)
             .maybeSingle()
         : Promise.resolve({ data: null }),

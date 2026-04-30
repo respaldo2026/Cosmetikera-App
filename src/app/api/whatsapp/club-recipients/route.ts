@@ -49,7 +49,7 @@ export async function GET() {
   const { data: perfiles } = perfilIds.length > 0
     ? await supabase
         .from("perfiles")
-        .select("id, nombre_completo, nombre, telefono, celular")
+        .select("id, nombre_completo, nombre, telefono")
         .in("id", perfilIds)
     : { data: [] };
 
