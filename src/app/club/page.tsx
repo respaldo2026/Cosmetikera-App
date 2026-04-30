@@ -53,8 +53,7 @@ const { useBreakpoint } = Grid;
 
 const BRAND_FUCHSIA = "#d81b87";
 const BRAND_FUCHSIA_SOFT = "#ff4fa3";
-const WHATSAPP_BOT_NUMBER =
-  process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER || "573104239494";
+const WHATSAPP_BOT_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER;
 
 const sectionCardStyle: React.CSSProperties = {
   borderRadius: 16,
@@ -65,6 +64,9 @@ const sectionCardStyle: React.CSSProperties = {
 };
 
 function buildWhatsAppLink(text: string): string {
+  if (!WHATSAPP_BOT_NUMBER) {
+    return "#";
+  }
   return `https://wa.me/${WHATSAPP_BOT_NUMBER}?text=${encodeURIComponent(text)}`;
 }
 
