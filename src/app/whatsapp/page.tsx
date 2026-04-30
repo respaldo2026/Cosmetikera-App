@@ -29,6 +29,7 @@ type Conversation = {
   ultimo_rol: string;
   created_at: string;
   total: number;
+  es_plantilla?: boolean;
 };
 
 type Message = {
@@ -462,12 +463,34 @@ export default function WhatsAppMonitorPage() {
                         alignItems: "center",
                       }}
                     >
-                      <Text
-                        ellipsis
-                        style={{ fontWeight: 600, fontSize: 14, color: "#111", maxWidth: 160 }}
-                      >
-                        {name}
-                      </Text>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        <Text
+                          ellipsis
+                          style={{ fontWeight: 600, fontSize: 14, color: "#111", maxWidth: 140 }}
+                        >
+                          {name}
+                        </Text>
+                        {conv.es_plantilla && (
+                          <Tooltip title="Plantilla de bienvenida enviada">
+                            <Tag
+                              style={{
+                                fontSize: 10,
+                                padding: "2px 6px",
+                                height: 18,
+                                lineHeight: "18px",
+                                borderRadius: 4,
+                                background: "#e6f7ff",
+                                border: "1px solid #91d5ff",
+                                color: "#0050b3",
+                                marginRight: 0,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              📧 Plantilla
+                            </Tag>
+                          </Tooltip>
+                        )}
+                      </div>
                       <Text style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>
                         {formatListTime(conv.created_at)}
                       </Text>

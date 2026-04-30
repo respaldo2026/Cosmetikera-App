@@ -269,6 +269,7 @@ export async function GET(request: NextRequest) {
       created_at: string;
       perfil_id: string | null;
       total: number;
+      es_plantilla: boolean;
     }
   >();
 
@@ -284,10 +285,15 @@ export async function GET(request: NextRequest) {
         created_at: msg.created_at,
         perfil_id: msg.perfil_id || null,
         total: 0,
+        es_plantilla: (msg as any).tipo_mensaje === "template",
       });
     }
     const entry = conversationMap.get(phoneKey)!;
     entry.total++;
+    // Si hay un mensaje de tipo template en la conversación, marcarla como tal
+    if ((msg as any).tipo_mensaje === "template") {
+      entry.es_plantilla = true;
+    }
   }
 
   let conversations = Array.from(conversationMap.values()).sort(
