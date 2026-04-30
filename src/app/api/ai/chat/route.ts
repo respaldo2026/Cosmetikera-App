@@ -438,19 +438,34 @@ function buildHeuristicFallbackResponse(params: {
   articles: CatalogArticle[];
   lastBotMessage?: string;
   businessContext?: CustomerBusinessContext | null;
+  conversationHistory?: Array<{ rol: string; mensaje: string }>;
 }): string {
   const { customerName, message, intent, articles } = params;
   const greeting = customerName ? `Hola ${customerName}` : "Hola";
-  const top = rankArticles(articles, getSearchTokens(message), intent).slice(0, 2);
-  const normalizedMessage = normalize(message);
+  const recentClientContext = (params.conversationHistory || [])
+    .filter((m) => m.rol === "cliente")
+    .slice(-4)
+    .map((m) => String(m.mensaje || "").trim())
+    .filter(Boolean)
+    .join(" ");
 
-  const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedMessage);
-  const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedMessage);
-  const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|esmalte/.test(normalizedMessage);
-  const hasColorConcern = /tinte|coloracion|decoloracion|mechas|balayage|matiz|tonalizar|rubio|castano|negro|rojizo/.test(normalizedMessage);
-  const hasStraighteningConcern = /alisado|keratina|botox capilar|planchado|repolarizacion/.test(normalizedMessage);
-  const hasAfroConcern = /afro|rizo tipo 3|rizo tipo 4|coily|crespo/.test(normalizedMessage);
-  const hasNailTechConcern = /acrilicas|acrilico|uñas en gel|unas en gel|semipermanente|polygel|gel x/.test(normalizedMessage);
+  const directTokens = getSearchTokens(message);
+  const effectiveTokens =
+    directTokens.length > 0
+      ? directTokens
+      : getSearchTokens(`${recentClientContext} ${message}`);
+
+  const top = rankArticles(articles, effectiveTokens, intent).slice(0, 3);
+  const normalizedMessage = normalize(message);
+  const normalizedContext = normalize(`${recentClientContext} ${message}`);
+
+  const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedContext);
+  const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedContext);
+  const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|esmalte/.test(normalizedContext);
+  const hasColorConcern = /tinte|coloracion|decoloracion|mechas|balayage|matiz|tonalizar|rubio|castano|negro|rojizo/.test(normalizedContext);
+  const hasStraighteningConcern = /alisado|keratina|botox capilar|planchado|repolarizacion/.test(normalizedContext);
+  const hasAfroConcern = /afro|rizo tipo 3|rizo tipo 4|coily|crespo/.test(normalizedContext);
+  const hasNailTechConcern = /acrilicas|acrilico|uñas en gel|unas en gel|semipermanente|polygel|gel x/.test(normalizedContext);
   const asksPoints = /puntos|club|fidelizacion|canje|beneficio/.test(normalizedMessage);
   const asksName = /sabes\s+mi\s+nombre|cual\s+es\s+mi\s+nombre|mi\s+nombre\??/.test(normalizedMessage);
   const asksNails = /uñas|unas|nail|semipermanente|acrilicas/.test(normalizedMessage);
@@ -459,6 +474,9 @@ function buildHeuristicFallbackResponse(params: {
   const isSimpleGreetingOnly = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey|que mas|q mas|todo bien)\s*[!.]*$/.test(normalizedMessage);
   const isCustomerComplaint = /por que me dices|por que dices|eso no|no me estas|no es una asesoria|no es asesoria|no me ayudas|me respondes lo mismo|repite|no entiendes|solo te estoy saludando|solo saludaba|te estoy saludando|te saludo/.test(normalizedMessage);
   const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
+  const asksRecommendation = /cual\s+me\s+recomiendas|que\s+me\s+recomiendas|producto\s+me\s+recomiendas|de\s+los\s+productos|cual\s+producto/.test(normalizedMessage);
+  const asksAvailability = /tienes|hay|disponible|stock|manejas|vendes/.test(normalizedMessage);
+  const asksPriceDirect = /precio|cuanto|cuánto|valor|costo|vale|cuesta/.test(normalizedMessage);
 
   // --- Detección de continuidad conversacional ---
   const lastBot = normalize(params.lastBotMessage || "");
@@ -517,6 +535,18 @@ Estoy aquí para ayudarte en serio, paso a paso.
 
   if (isRealShortFollowUp && isFollowUpMakeup) {
     return `💄 ¡Listo! Cuéntame si lo necesitas para:\n1) *Uso diario*\n2) *Evento especial*\nY te recomiendo base, corrector y sellado ideales.`;
+  }
+
+  if ((asksRecommendation || asksAvailability || asksPriceDirect) && top.length > 0) {
+    const lines = top.slice(0, 3).map((p) => {
+      const price = formatCOP(Number(p.precio_venta || 0));
+      const stock = Number(p.stock || 0);
+      const stockText = stock > 0 ? ` (stock: ${stock})` : " (agotado)";
+      const discount = Number(p.descuento_porcentaje || 0) > 0 ? ` • ${p.descuento_porcentaje}% OFF` : "";
+      return `• *${p.nombre || "Producto"}*: ${price}${stockText}${discount}`;
+    });
+
+    return `${greeting}. Para lo que vienes preguntando, estas son opciones reales de tienda:\n${lines.join("\n")}\n¿Quieres que te recomiende la mejor para *frizz* según presupuesto (económica / media / premium)?`;
   }
 
   const closeByIntent =
@@ -953,6 +983,7 @@ ${catalogoTexto}`;
         articles: articulos,
         lastBotMessage: lastAgentMsg,
         businessContext: customerBusinessContext,
+        conversationHistory: historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje })),
       });
     }
 
