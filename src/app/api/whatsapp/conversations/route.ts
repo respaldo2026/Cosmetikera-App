@@ -19,12 +19,17 @@ async function getTemplateMessagesByPhone(
   rawPhone: string,
 ): Promise<ConversationMessage[]> {
   try {
-    const { data } = await supabase
+    // Recuperar notificaciones de bienvenida al club para este teléfono
+    const { data, error } = await supabase
       .from("notificaciones_enviadas")
-      .select("id, telefono, mensaje, created_at, perfil_id, estado")
-      .eq("estado", "enviado")
+      .select("id, telefono, mensaje, created_at, perfil_id, estado, tipo")
+      .eq("tipo", "bienvenida_club")
       .order("created_at", { ascending: true })
       .limit(200);
+
+    if (error) {
+      console.warn("[getTemplateMessagesByPhone] Query error:", error);
+    }
 
     const rows = (data || []) as Array<{
       id: string | number;
@@ -32,6 +37,8 @@ async function getTemplateMessagesByPhone(
       mensaje?: string | null;
       created_at?: string | null;
       perfil_id?: string | null;
+      estado?: string | null;
+      tipo?: string | null;
     }>;
 
     const targetPhones = new Set([normalizePhone(normalizedPhone), normalizePhone(rawPhone)]);
@@ -42,13 +49,14 @@ async function getTemplateMessagesByPhone(
         id: `notif-${row.id}`,
         telefono: normalizePhone(String(row.telefono || normalizedPhone || rawPhone || "")),
         rol: "agente",
-        mensaje: row.mensaje || "Plantilla enviada",
+        mensaje: row.mensaje || "🎉 Bienvenida al Club Fidelización",
         tipo_mensaje: "template",
         intento: null,
         created_at: row.created_at || new Date().toISOString(),
         perfil_id: row.perfil_id || null,
       }));
-  } catch {
+  } catch (err) {
+    console.error("[getTemplateMessagesByPhone] Exception:", err);
     return [];
   }
 }
@@ -57,12 +65,17 @@ async function getTemplateMessagesRecent(
   supabase: any,
 ): Promise<ConversationMessage[]> {
   try {
-    const { data } = await supabase
+    // Recuperar TODAS las notificaciones de bienvenida al club, sin importar estado
+    const { data, error } = await supabase
       .from("notificaciones_enviadas")
-      .select("id, telefono, mensaje, created_at, perfil_id, estado")
-      .eq("estado", "enviado")
+      .select("id, telefono, mensaje, created_at, perfil_id, estado, tipo")
+      .eq("tipo", "bienvenida_club")
       .order("created_at", { ascending: false })
-      .limit(1000);
+      .limit(2000);
+
+    if (error) {
+      console.warn("[getTemplateMessagesRecent] Query error:", error);
+    }
 
     const rows = (data || []) as Array<{
       id: string | number;
@@ -70,19 +83,22 @@ async function getTemplateMessagesRecent(
       mensaje?: string | null;
       created_at?: string | null;
       perfil_id?: string | null;
+      estado?: string | null;
+      tipo?: string | null;
     }>;
 
     return rows.map((row) => ({
       id: `notif-${row.id}`,
       telefono: normalizePhone(String(row.telefono || "")),
       rol: "agente",
-      mensaje: row.mensaje || "Plantilla enviada",
+      mensaje: row.mensaje || "🎉 Bienvenida al Club Fidelización",
       tipo_mensaje: "template",
       intento: null,
       created_at: row.created_at || new Date().toISOString(),
       perfil_id: row.perfil_id || null,
     }));
-  } catch {
+  } catch (err) {
+    console.error("[getTemplateMessagesRecent] Exception:", err);
     return [];
   }
 }
@@ -187,22 +203,22 @@ export async function GET(request: NextRequest) {
       if (perfil_id) {
         const { data: perfil } = await supabase
           .from("perfiles")
-          .select("nombre")
+          .select("nombre, nombre_completo")
           .eq("id", perfil_id)
           .single();
-        clientName = perfil?.nombre || "";
+        clientName = ((perfil as any)?.nombre_completo || (perfil as any)?.nombre || "").trim();
       }
       if (!clientName) {
         const phoneForLike = normalizedPhone.slice(-10);
         const { data: perfilByPhone } = await supabase
           .from("perfiles")
-          .select("nombre")
+          .select("nombre, nombre_completo")
           .or(
             `telefono.eq.${normalizedPhone},celular.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%,celular.ilike.%${phoneForLike}%`
           )
           .limit(1)
           .single();
-        clientName = perfilByPhone?.nombre || "";
+        clientName = ((perfilByPhone as any)?.nombre_completo || (perfilByPhone as any)?.nombre || "").trim();
       }
     }
 
@@ -311,13 +327,13 @@ export async function GET(request: NextRequest) {
     perfilIds.length > 0
       ? supabase
           .from("perfiles")
-          .select("id, nombre, telefono, celular")
+          .select("id, nombre, nombre_completo, telefono, celular")
           .in("id", perfilIds)
       : { data: [] },
     phoneList.length > 0
       ? supabase
           .from("perfiles")
-          .select("id, nombre, telefono, celular")
+          .select("id, nombre, nombre_completo, telefono, celular")
           .or(
             phoneList
               .map((p) => `telefono.eq.${p},celular.eq.${p}`)
@@ -329,13 +345,14 @@ export async function GET(request: NextRequest) {
 
   const perfilByIdMap = new Map<string, string>();
   for (const p of perfilRes.data || []) {
-    if (p.id) perfilByIdMap.set(p.id, p.nombre || "");
+    if (p.id) perfilByIdMap.set(p.id, ((p as any).nombre_completo || p.nombre || "").trim());
   }
 
   const perfilByPhoneMap = new Map<string, string>();
   for (const p of phonePerfRes.data || []) {
-    if (p.telefono) perfilByPhoneMap.set(normalizePhone(String(p.telefono)), p.nombre || "");
-    if (p.celular) perfilByPhoneMap.set(normalizePhone(String(p.celular)), p.nombre || "");
+    const nombre = ((p as any).nombre_completo || p.nombre || "").trim();
+    if (p.telefono) perfilByPhoneMap.set(normalizePhone(String(p.telefono)), nombre);
+    if (p.celular) perfilByPhoneMap.set(normalizePhone(String(p.celular)), nombre);
   }
 
   const enriched = conversations.map((c) => ({
