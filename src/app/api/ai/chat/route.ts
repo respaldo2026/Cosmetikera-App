@@ -297,6 +297,8 @@ function buildHeuristicFallbackResponse(params: {
   const asksNails = /uñas|unas|nail|semipermanente|acrilicas/.test(normalizedMessage);
   const asksSupport = /no puedo|no me deja|no funciona|iniciar sesion|inicio de sesion|contrasena|contraseña|acceso|ingresar|no entra|no abre|usuario|clave|registrar|registro|inscripcion|inscripcion|pague|pago|cobro|valor|costo\s+del\s+curso|precio\s+del\s+curso/.test(normalizedMessage);
   const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
+  const isSimpleGreetingOnly = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey|que mas|q mas|todo bien)\s*[!.]*$/.test(normalizedMessage);
+  const isCustomerComplaint = /por que me dices|por que dices|eso no|no me estas|no es una asesoria|no es asesoria|no me ayudas|me respondes lo mismo|repite|no entiendes|solo te estoy saludando|solo saludaba|te estoy saludando|te saludo/.test(normalizedMessage);
   const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
 
   // --- Detección de continuidad conversacional ---
@@ -305,8 +307,21 @@ function buildHeuristicFallbackResponse(params: {
   const isFollowUpSkin = /piel|acne|manchas|serum|hidratante|poro|grasa|seca|mixta/.test(lastBot);
   const isFollowUpNails = /unas|esmalte|semipermanente|gel|acrilica|acrilicas|polygel|gel x|nail/.test(lastBot);
   const isFollowUpMakeup = /maquillaje|base|corrector|evento|diario/.test(lastBot);
+  const lastBotWasGeneric = /aqui estoy para ayudarte con belleza|te asesoro en belleza/.test(lastBot);
   const msgWords = normalizedMessage.split(/\s+/).filter(Boolean).length;
   const isShortFollowUp = msgWords <= 6 && lastBot.length > 10;
+
+  if (isCustomerComplaint) {
+    return `🙏 Tienes toda la razón, y gracias por decírmelo. Me equivoqué interpretando tu mensaje anterior.
+Arranquemos bien: te respondo directo y con lógica, sin rodeos.
+Cuéntame en una frase qué necesitas hoy (precio, producto, rutina o puntos del club) y te doy una respuesta puntual.`;
+  }
+
+  if (isSimpleGreetingOnly) {
+    return `${greeting} 👋 Qué bueno leerte.
+Estoy aquí para ayudarte en serio, paso a paso.
+¿Qué necesitas hoy exactamente: *precio de un producto*, *recomendación para cabello/piel/uñas* o *consulta del club*?`;
+  }
 
   // --- Respuesta de seguimiento: solo si el mensaje es MUY corto Y no tiene pregunta propia ---
   // Condición estricta: máximo 4 palabras, sin signos de pregunta, sin precios/cantidades
@@ -437,6 +452,14 @@ function buildHeuristicFallbackResponse(params: {
     const price = formatCOP(Number(p.precio_venta || 0));
      return `✅ ${greeting}. Según lo que me cuentas, una muy buena opción es *${p.nombre || "este producto"}* (${price}). ${p.descripcion ? String(p.descripcion).slice(0, 110) : "Te da muy buen resultado y buena relación calidad-precio."} ${closeByIntent}`;
   }
+
+    if (lastBotWasGeneric && isShortQuestion) {
+     return `${greeting}. Vamos a hacerlo concreto ✅
+  Dime una de estas opciones y te respondo exacto:
+  1) *Producto + precio*
+  2) *Rutina personalizada*
+  3) *Puntos del club*`;
+    }
 
   if (isGreeting || isShortQuestion) {
      return `👋 ${greeting}. Aquí estoy para ayudarte con *belleza* de forma práctica: piel, cabello, maquillaje, uñas y barba. Cuéntame tu necesidad puntual (ej: acné, resequedad, frizz, caída o presupuesto) y te respondo con pasos concretos.`;
@@ -666,6 +689,8 @@ export async function POST(request: NextRequest) {
         "- Si preguntan por puntos/club: solicita cédula para validar.",
         "- Si preguntan por acceso a la app, inicio de sesión o contraseña: explica que para soporte de acceso deben escribir al correo soporte@lacosmetikera.com o contactar al administrador directamente. NO intentes resolver temas técnicos de autenticación.",
         "- Si preguntan por precios de cursos, inscripciones o valores que pagaron: sé honesto, di que no tienes acceso a registros de pagos individuales y recomienda comunicarse directamente con la tienda para verificar.",
+        "- Si el cliente dice que no lo entendiste, que repites o que no es lógica la respuesta: reconoce el error en 1 frase, pide disculpa breve y corrige con una respuesta puntual relacionada con su último mensaje.",
+        "- Si el cliente solo saluda, NO asumas diagnóstico de cabello/piel. Responde saludo humano breve y pregunta qué necesita exactamente.",
         "- Si detectas un problema (acné, frizz, caída, manchas): primero valida la necesidad con 1-2 preguntas, luego recomienda.",
         "- Si el cliente responde corto a una pregunta tuya anterior ('sí', 'ondulado', 'en gel'), conecta con esa pregunta y continúa.",
         "- Si piden precio: busca en el catálogo y da el precio REAL. Si no está en el catálogo, dilo.",
@@ -731,6 +756,9 @@ export async function POST(request: NextRequest) {
       // Solo usar el fallback si es genuinamente distinto; si no, mantener la respuesta de Gemini
       if (!looksRepeatedAnswer(fallback, lastAgentMessage)) {
         responseText = fallback;
+      } else {
+        const safeName = customerName ? `${customerName}, ` : "";
+        responseText = `Gracias por la paciencia ${safeName}te entendí. Para ayudarte mejor, dime en una frase qué necesitas ahora: *precio de producto*, *rutina personalizada* o *puntos del club*.`;
       }
     }
 
