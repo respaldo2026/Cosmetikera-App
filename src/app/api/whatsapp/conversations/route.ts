@@ -10,11 +10,11 @@ type ConversationMessage = {
   tipo_mensaje?: string | null;
   intento?: string | null;
   created_at: string;
-  perfil_id?: string | null;
+  perfil_id: string | null;
 };
 
 async function getTemplateMessagesByPhone(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   normalizedPhone: string,
   rawPhone: string,
 ): Promise<ConversationMessage[]> {
@@ -26,9 +26,17 @@ async function getTemplateMessagesByPhone(
       .order("created_at", { ascending: true })
       .limit(200);
 
+    const rows = (data || []) as Array<{
+      id: string | number;
+      telefono?: string | null;
+      mensaje?: string | null;
+      created_at?: string | null;
+      perfil_id?: string | null;
+    }>;
+
     const targetPhones = new Set([normalizePhone(normalizedPhone), normalizePhone(rawPhone)]);
 
-    return (data || [])
+    return rows
       .filter((row) => targetPhones.has(normalizePhone(String(row.telefono || ""))))
       .map((row) => ({
         id: `notif-${row.id}`,
@@ -46,7 +54,7 @@ async function getTemplateMessagesByPhone(
 }
 
 async function getTemplateMessagesRecent(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
 ): Promise<ConversationMessage[]> {
   try {
     const { data } = await supabase
@@ -56,7 +64,15 @@ async function getTemplateMessagesRecent(
       .order("created_at", { ascending: false })
       .limit(1000);
 
-    return (data || []).map((row) => ({
+    const rows = (data || []) as Array<{
+      id: string | number;
+      telefono?: string | null;
+      mensaje?: string | null;
+      created_at?: string | null;
+      perfil_id?: string | null;
+    }>;
+
+    return rows.map((row) => ({
       id: `notif-${row.id}`,
       telefono: normalizePhone(String(row.telefono || "")),
       rol: "agente",
@@ -119,7 +135,7 @@ export async function GET(request: NextRequest) {
       const merged = [...((data || []) as ConversationMessage[]), ...templateMessages].sort(
         (a, b) => new Date(String(a.created_at || 0)).getTime() - new Date(String(b.created_at || 0)).getTime(),
       );
-      data = merged;
+      data = merged as any;
     }
 
     // Fallback a tabla legacy (agent_conversations) si la nueva tabla falla/no existe
