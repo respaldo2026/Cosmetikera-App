@@ -295,6 +295,7 @@ function buildHeuristicFallbackResponse(params: {
   const asksPoints = /puntos|club|fidelizacion|canje|beneficio/.test(normalizedMessage);
   const asksName = /sabes\s+mi\s+nombre|cual\s+es\s+mi\s+nombre|mi\s+nombre\??/.test(normalizedMessage);
   const asksNails = /uñas|unas|nail|semipermanente|acrilicas/.test(normalizedMessage);
+  const asksSupport = /no puedo|no me deja|no funciona|iniciar sesion|inicio de sesion|contrasena|contraseña|acceso|ingresar|no entra|no abre|usuario|clave|registrar|registro|inscripcion|inscripcion|pague|pago|cobro|valor|costo\s+del\s+curso|precio\s+del\s+curso/.test(normalizedMessage);
   const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
   const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
 
@@ -315,9 +316,17 @@ function buildHeuristicFallbackResponse(params: {
     !normalizedMessage.includes("?") &&
     !/cuanto|precio|vale|cuesta|hay|tienen|tienes|cuantos|como|cuando|donde/.test(normalizedMessage);
 
+  // Detectores de tipos reales (para no insertar texto arbitrario del usuario)
+  const isKnownHairType = /\b(liso|ondulado|rizado|afro|coily|crespo|fino|grueso|seco|seca|graso|grasa|danado|danada|largo|corto|teñido|teñida|normal|mixto)\b/.test(normalizedMessage);
+  const isKnownSkinType = /\b(grasa|seca|mixta|normal|sensible|acneica|madura|combinada)\b/.test(normalizedMessage);
+
   if (isRealShortFollowUp && isFollowUpHair) {
-    const hairType = message.trim();
-    return `💇 ¡Perfecto! Para cabello *${hairType}* te recomiendo:\n1) *Shampoo sin sulfatos* suave\n2) *Mascarilla hidratante* 2 veces por semana 💧\n3) *Sérum o aceite vegetal* en puntas\n¿Tu mayor preocupación es frizz, caída o resequedad?`;
+    if (isKnownHairType) {
+      const hairType = message.trim();
+      return `💇 ¡Perfecto! Para cabello *${hairType}* te recomiendo:\n1) *Shampoo sin sulfatos* suave\n2) *Mascarilla hidratante* 2 veces por semana 💧\n3) *Sérum o aceite vegetal* en puntas\n¿Tu mayor preocupación es frizz, caída o resequedad?`;
+    }
+    // Respuesta corta que NO es un tipo de cabello reconocido — seguir conversación naturalmente
+    return `💇 ¡Cuéntame un poco más sobre tu cabello! ¿Es liso, ondulado, rizado o afro? Con eso te armo la rutina exacta 🙌`;
   }
 
   if (isRealShortFollowUp && isFollowUpNails) {
@@ -325,12 +334,15 @@ function buildHeuristicFallbackResponse(params: {
   }
 
   if (isRealShortFollowUp && isFollowUpSkin) {
-    const skinType = message.trim();
-    return `✨ ¡Entendido! Para piel *${skinType}* la rutina ideal:\n1) *Limpieza suave* mañana y noche\n2) *Hidratante ligera* no comedogénica\n3) *Protector solar* diario ☀️\n¿Te preocupa más acné, manchas o resequedad?`;
+    if (isKnownSkinType) {
+      const skinType = message.trim();
+      return `✨ ¡Entendido! Para piel *${skinType}* la rutina ideal:\n1) *Limpieza suave* mañana y noche\n2) *Hidratante ligera* no comedogénica\n3) *Protector solar* diario ☀️\n¿Te preocupa más acné, manchas o resequedad?`;
+    }
+    return `✨ ¡Cuéntame! ¿Tu piel es grasa, seca, mixta o sensible? Así te doy la rutina perfecta 🌿`;
   }
 
   if (isRealShortFollowUp && isFollowUpMakeup) {
-    return `💄 ¡Listo! Para *${message.trim()}* te recomiendo:\n1) *Base ligera* de larga duración\n2) *Corrector hidratante*\n3) *Polvo fijador* para sellado\n¿Para uso diario o evento especial?`;
+    return `💄 ¡Listo! Cuéntame si lo necesitas para:\n1) *Uso diario*\n2) *Evento especial*\nY te recomiendo base, corrector y sellado ideales.`;
   }
 
   const closeByIntent =
@@ -368,6 +380,10 @@ function buildHeuristicFallbackResponse(params: {
       return `😊 Sí, te tengo registrado como *${customerName}*. ¿Quieres que te recomiende algo para piel, cabello, maquillaje o uñas hoy?`;
     }
     return `😊 Aún no tengo tu nombre guardado. Cuéntame: *¿cómo te llamas?* Así personalizo mejor cada recomendación.`;
+  }
+
+  if (asksSupport) {
+    return `🔧 Para temas de *acceso, contraseñas o pagos* no tengo forma de gestionar eso desde aquí, ya que soy el asistente de belleza 😊\nPor favor contacta directamente a la tienda:\n📞 Escríbenos al número principal o visítanos para que un asesor te ayude.\nEn lo que puedo ayudarte hoy: ¿tienes alguna consulta sobre productos, cuidado de piel o cabello?`;
   }
 
   if (asksPoints) {
@@ -648,6 +664,8 @@ export async function POST(request: NextRequest) {
         "=== LÓGICA DE RESPUESTA ===",
         "- Si preguntan por nombre: reconócelo si está disponible, si no pide el nombre en una frase corta.",
         "- Si preguntan por puntos/club: solicita cédula para validar.",
+        "- Si preguntan por acceso a la app, inicio de sesión o contraseña: explica que para soporte de acceso deben escribir al correo soporte@lacosmetikera.com o contactar al administrador directamente. NO intentes resolver temas técnicos de autenticación.",
+        "- Si preguntan por precios de cursos, inscripciones o valores que pagaron: sé honesto, di que no tienes acceso a registros de pagos individuales y recomienda comunicarse directamente con la tienda para verificar.",
         "- Si detectas un problema (acné, frizz, caída, manchas): primero valida la necesidad con 1-2 preguntas, luego recomienda.",
         "- Si el cliente responde corto a una pregunta tuya anterior ('sí', 'ondulado', 'en gel'), conecta con esa pregunta y continúa.",
         "- Si piden precio: busca en el catálogo y da el precio REAL. Si no está en el catálogo, dilo.",
@@ -701,15 +719,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Evitar respuestas repetidas consecutivas cuando Gemini/fallback se estancan
-
+    // Solo reemplazar si el fallback heurístico es realmente diferente (evitar ciclo infinito)
     if (lastAgentMessage && looksRepeatedAnswer(responseText, lastAgentMessage)) {
-      responseText = buildHeuristicFallbackResponse({
+      const fallback = buildHeuristicFallbackResponse({
         customerName,
         message,
         intent,
         articles: articulos,
         lastBotMessage: lastAgentMessage,
       });
+      // Solo usar el fallback si es genuinamente distinto; si no, mantener la respuesta de Gemini
+      if (!looksRepeatedAnswer(fallback, lastAgentMessage)) {
+        responseText = fallback;
+      }
     }
 
     // ===== REGISTRAR MENSAJES EN MEMORIA =====
