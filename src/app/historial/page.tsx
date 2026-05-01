@@ -408,7 +408,7 @@ function buildPreviousFromExactRange(exactRange: ReturnType<typeof buildExactRan
 }
 
 export default function HistorialPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { user } = useCurrentUser();
@@ -985,7 +985,7 @@ export default function HistorialPage() {
                 size="small"
                 icon={<DeleteOutlined />}
                 onClick={() => {
-                  Modal.confirm({
+                  modal.confirm({
                     title: "¿Eliminar transacción?",
                     content: "Esta acción no se puede deshacer.",
                     okText: "Eliminar",

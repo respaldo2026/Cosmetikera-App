@@ -91,7 +91,7 @@ function formatDiaMesInput(value: string): string {
 export default function ClientesPage() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { user } = useCurrentUser();
   const role = String((user as any)?.rol || "").toLowerCase();
   const isAdmin = ["administrador", "admin", "director", "administrativo"].includes(role);
@@ -175,7 +175,7 @@ export default function ClientesPage() {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: "¿Eliminar cliente?",
       content: "Se eliminará el cliente y todas sus transacciones asociadas. Esta acción no se puede deshacer.",
       okText: "Eliminar",

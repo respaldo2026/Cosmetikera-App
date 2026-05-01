@@ -33,7 +33,7 @@ export default function HistorialCharts({ stats }: Props) {
                   xField="value"
                   yField="label"
                   height={280}
-                  color="#d81b87"
+                  style={{ fill: "#d81b87" }}
                   axis={{ x: { title: false }, y: { title: false } }}
                 />
               </Card>
@@ -45,7 +45,7 @@ export default function HistorialCharts({ stats }: Props) {
                   xField="value"
                   yField="label"
                   height={280}
-                  color="#722ed1"
+                  style={{ fill: "#722ed1" }}
                   axis={{ x: { title: false }, y: { title: false } }}
                 />
               </Card>
@@ -57,7 +57,7 @@ export default function HistorialCharts({ stats }: Props) {
                   xField="value"
                   yField="label"
                   height={280}
-                  color="#1677ff"
+                  style={{ fill: "#1677ff" }}
                   axis={{ x: { title: false }, y: { title: false } }}
                 />
               </Card>
@@ -70,7 +70,7 @@ export default function HistorialCharts({ stats }: Props) {
                   colorField="label"
                   height={280}
                   label={{ text: "label", position: "outside" }}
-                  legend={{ color: { position: "bottom" } }}
+                  legend={{ position: "bottom" }}
                 />
               </Card>
             </Col>
@@ -81,7 +81,7 @@ export default function HistorialCharts({ stats }: Props) {
                   xField="label"
                   yField="value"
                   height={280}
-                  color="#13c2c2"
+                  style={{ fill: "#13c2c2" }}
                   axis={{ x: { labelAutoRotate: false }, y: { title: false } }}
                 />
               </Card>
@@ -93,8 +93,8 @@ export default function HistorialCharts({ stats }: Props) {
                   xField="label"
                   yField="value"
                   height={280}
-                  color="#fa8c16"
-                  point={{ size: 4, shape: "circle" }}
+                  style={{ stroke: "#fa8c16" }}
+                  point={{ size: 4, shape: "circle", style: { fill: "#fa8c16" } }}
                   axis={{ x: { labelAutoRotate: false }, y: { title: false } }}
                 />
               </Card>
@@ -106,7 +106,7 @@ export default function HistorialCharts({ stats }: Props) {
                   xField="label"
                   yField="value"
                   height={280}
-                  color="#52c41a"
+                  style={{ fill: "#52c41a" }}
                   axis={{ x: { labelAutoRotate: true }, y: { title: false } }}
                 />
               </Card>
@@ -118,7 +118,7 @@ export default function HistorialCharts({ stats }: Props) {
                   xField="value"
                   yField="label"
                   height={280}
-                  color="#eb2f96"
+                  style={{ fill: "#eb2f96" }}
                   axis={{ x: { title: false }, y: { title: false } }}
                 />
               </Card>
