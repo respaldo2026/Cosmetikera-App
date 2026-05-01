@@ -247,6 +247,8 @@ export default function ArticulosPage() {
   const [bulkForm] = Form.useForm();
   const [inlineDrafts, setInlineDrafts] = useState<Record<string, Partial<Pick<Articulo, InlineEditableField>>>>({});
   const [inlineSaving, setInlineSaving] = useState<Record<string, Partial<Record<InlineEditableField, boolean>>>>({});
+  const [inlineJustSaved, setInlineJustSaved] = useState<Record<string, Partial<Record<InlineEditableField, boolean>>>>({});
+  const inlineFeedbackTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Ajuste masivo
   const [ajusteOpen, setAjusteOpen] = useState(false);
@@ -809,6 +811,12 @@ export default function ArticulosPage() {
     }
   };
 
+  useEffect(() => () => {
+    for (const timeoutId of Object.values(inlineFeedbackTimersRef.current)) {
+      clearTimeout(timeoutId);
+    }
+  }, []);
+
   const normalizeInlineValue = (field: InlineEditableField, value: number) => {
     if (field === "stock") {
       return Math.max(0, Math.trunc(value));
@@ -888,6 +896,43 @@ export default function ArticulosPage() {
     });
   };
 
+  const setInlineSavedFeedback = (id: string, field: InlineEditableField) => {
+    const key = `${id}:${field}`;
+
+    setInlineJustSaved((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] ?? {}),
+        [field]: true,
+      },
+    }));
+
+    const currentTimer = inlineFeedbackTimersRef.current[key];
+    if (currentTimer) {
+      clearTimeout(currentTimer);
+    }
+
+    inlineFeedbackTimersRef.current[key] = setTimeout(() => {
+      setInlineJustSaved((prev) => {
+        const current = prev[id];
+        if (!current) return prev;
+
+        const nextForId = { ...current };
+        delete nextForId[field];
+
+        if (Object.keys(nextForId).length === 0) {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        }
+
+        return { ...prev, [id]: nextForId };
+      });
+
+      delete inlineFeedbackTimersRef.current[key];
+    }, 1400);
+  };
+
   const guardarCampoInline = async (articulo: Articulo, field: InlineEditableField) => {
     const draft = inlineDrafts[articulo.id]?.[field];
     if (typeof draft !== "number") return;
@@ -918,6 +963,7 @@ export default function ArticulosPage() {
       )));
 
       clearInlineDraft(articulo.id, field);
+      setInlineSavedFeedback(articulo.id, field);
       message.success(field === "precio_venta" ? "Precio actualizado" : "Stock actualizado");
     } catch (e: unknown) {
       message.error((e as Error)?.message || "Error al guardar cambios rápidos");
@@ -930,9 +976,21 @@ export default function ArticulosPage() {
     const value = getInlineDisplayValue(articulo, field);
     const savingField = Boolean(inlineSaving[articulo.id]?.[field]);
     const dirtyField = isInlineDirty(articulo, field);
+    const justSavedField = Boolean(inlineJustSaved[articulo.id]?.[field]);
 
     return (
-      <Space size={4} onClick={detenerEvento} onMouseDown={detenerEvento} data-stop-row-nav="true">
+      <Space
+        size={4}
+        onClick={detenerEvento}
+        onMouseDown={detenerEvento}
+        data-stop-row-nav="true"
+        style={{
+          padding: justSavedField ? "2px 4px" : undefined,
+          borderRadius: 8,
+          background: justSavedField ? "#f6ffed" : undefined,
+          transition: "background-color 220ms ease",
+        }}
+      >
         <InputNumber
           min={0}
           precision={0}
