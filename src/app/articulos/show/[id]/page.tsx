@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Card, Tabs, Typography, Space, Button, Spin, Row, Col,
   Statistic, Tag, Table, Avatar, Empty, Form, Input,
-  InputNumber, Badge, Descriptions, App, Switch,
+  InputNumber, Badge, Descriptions, App, Switch, Select,
 } from "antd";
 import {
   ArrowLeftOutlined, TagsOutlined, ShoppingOutlined,
@@ -16,6 +16,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
 import Link from "next/link";
 import EscanerCodigo from "@/components/EscanerCodigo";
+import { getCatalogosArticulosLocal, mergeCatalogos, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 
 const { Title, Text } = Typography;
 
@@ -32,10 +33,21 @@ type Articulo = {
   stock_minimo?: number;
   marca?: string;
   descripcion?: string;
+  proveedor?: string;
   activo?: boolean;
   imagen_url?: string;
   descuento_porcentaje?: number;
   promocion_texto?: string;
+};
+
+const extractCatalogosFromTicketCampos = (raw: unknown): CatalogosArticulos => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const catalogos = source.catalogos_articulos;
+  if (!catalogos || typeof catalogos !== "object") {
+    return { categorias: [], marcas: [], fabricantes: [] };
+  }
+
+  return mergeCatalogos(catalogos as Partial<CatalogosArticulos>);
 };
 
 type VentaHistorial = {
@@ -69,6 +81,11 @@ export default function ArticuloDetallePage() {
   const [formPromo] = Form.useForm();
   const [formFicha] = Form.useForm();
   const codigoBarrasValue = Form.useWatch("codigo_barras", formFicha);
+  const [catalogosCustom, setCatalogosCustom] = useState<CatalogosArticulos>({
+    categorias: [],
+    marcas: [],
+    fabricantes: [],
+  });
 
   const cargarArticulo = useCallback(async () => {
     const { data, error } = await supabaseBrowserClient
@@ -119,10 +136,47 @@ export default function ArticuloDetallePage() {
     }
   }, [id]);
 
+  const cargarCatalogosCompartidos = useCallback(async () => {
+    const localCatalogos = getCatalogosArticulosLocal();
+
+    try {
+      const { data, error } = await supabaseBrowserClient
+        .from("configuracion")
+        .select("ticket_campos")
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        throw error;
+      }
+
+      const supabaseCatalogos = extractCatalogosFromTicketCampos(data?.ticket_campos);
+      setCatalogosCustom(mergeCatalogos(localCatalogos, supabaseCatalogos));
+    } catch (error) {
+      console.error("No se pudieron cargar catalogos compartidos:", error);
+      setCatalogosCustom(localCatalogos);
+    }
+  }, []);
+
   useEffect(() => {
     cargarArticulo();
     cargarVentas();
-  }, [cargarArticulo, cargarVentas]);
+    void cargarCatalogosCompartidos();
+  }, [cargarArticulo, cargarVentas, cargarCatalogosCompartidos]);
+
+  const catalogosDisponibles = useMemo(
+    () => mergeCatalogos(
+      catalogosCustom,
+      {
+        categorias: articulo?.categoria ? [articulo.categoria] : [],
+        marcas: articulo?.marca ? [articulo.marca] : [],
+        fabricantes: articulo?.proveedor ? [articulo.proveedor] : [],
+      },
+    ),
+    [catalogosCustom, articulo?.categoria, articulo?.marca, articulo?.proveedor],
+  );
 
   const guardarPromocion = async () => {
     const values = formPromo.getFieldsValue();
@@ -158,6 +212,7 @@ export default function ArticuloDetallePage() {
           codigo_secundario: values.codigo_secundario || null,
           categoria: values.categoria || null,
           marca: values.marca || null,
+          proveedor: values.proveedor || null,
           precio_costo: values.precio_costo ?? null,
           stock_minimo: values.stock_minimo ?? null,
           descripcion: values.descripcion || null,
@@ -387,12 +442,40 @@ export default function ArticuloDetallePage() {
                       </Col>
                       <Col xs={24} md={8}>
                         <Form.Item name="categoria" label="Categoría">
-                          <Input placeholder="Ej: Esmaltes" />
+                          <Select
+                            showSearch
+                            allowClear
+                            mode="tags"
+                            maxCount={1}
+                            placeholder="Seleccionar o escribir..."
+                            options={catalogosDisponibles.categorias.map((c) => ({ label: c, value: c }))}
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="marca" label="Marca">
+                          <Select
+                            showSearch
+                            allowClear
+                            mode="tags"
+                            maxCount={1}
+                            placeholder="Seleccionar o escribir..."
+                            options={catalogosDisponibles.marcas.map((m) => ({ label: m, value: m }))}
+                          />
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={8}>
-                        <Form.Item name="marca" label="Marca">
-                          <Input placeholder="Ej: OPI" />
+                        <Form.Item name="proveedor" label="Fabricante">
+                          <Select
+                            showSearch
+                            allowClear
+                            mode="tags"
+                            maxCount={1}
+                            placeholder="Seleccionar o escribir..."
+                            options={catalogosDisponibles.fabricantes.map((f) => ({ label: f, value: f }))}
+                          />
                         </Form.Item>
                       </Col>
                     </Row>
@@ -459,6 +542,9 @@ export default function ArticuloDetallePage() {
                     </Descriptions.Item>
                     <Descriptions.Item label="Marca">
                       {articulo.marca || <Text type="secondary">—</Text>}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Fabricante">
+                      {articulo.proveedor || <Text type="secondary">—</Text>}
                     </Descriptions.Item>
                     <Descriptions.Item label="Precio de venta">
                       <Text strong style={{ color: "#d81b87" }}>
