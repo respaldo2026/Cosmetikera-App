@@ -23,6 +23,47 @@ function normalize(value: unknown): string {
     .trim();
 }
 
+type GreetingStyle =
+  | "buenos_dias"
+  | "buenas_tardes"
+  | "buenas_noches"
+  | "holi"
+  | "que_mas"
+  | "hola"
+  | "none";
+
+function detectGreetingStyle(message: string): GreetingStyle {
+  const m = normalize(message);
+  if (!m) return "none";
+  if (/\bbuenos\s+dias\b/.test(m)) return "buenos_dias";
+  if (/\bbuenas\s+tardes\b/.test(m)) return "buenas_tardes";
+  if (/\bbuenas\s+noches\b/.test(m)) return "buenas_noches";
+  if (/\bholi\b/.test(m)) return "holi";
+  if (/\bque\s+mas\b|\bq\s+mas\b|\bqlq\b/.test(m)) return "que_mas";
+  if (/\bhola\b|\bbuenas\b|\bhello\b|\bhey\b/.test(m)) return "hola";
+  return "none";
+}
+
+function buildHumanGreeting(style: GreetingStyle, customerName: string): string {
+  const named = customerName ? ` ${customerName}` : "";
+  switch (style) {
+    case "buenos_dias":
+      return `¡Buenos días${named}! ☀️`;
+    case "buenas_tardes":
+      return `¡Buenas tardes${named}! 🌸`;
+    case "buenas_noches":
+      return `¡Buenas noches${named}! ✨`;
+    case "holi":
+      return `¡Holi${named}! 😊`;
+    case "que_mas":
+      return `¡Qué más${named}! 😄`;
+    case "hola":
+      return `¡Hola${named}! 👋`;
+    default:
+      return customerName ? `Hola ${customerName}` : "Hola";
+  }
+}
+
 function toDisplayName(raw: string): string {
   return raw
     .trim()
@@ -224,6 +265,67 @@ function buildDeterministicPriceReply(customerName: string, message: string, art
   });
 
   return `${greeting}. Te paso precio real de sistema:\n${lines.join("\n")}\n¿Te cotizo también alternativas similares en ese rango?`;
+}
+
+function buildDeterministicInventoryAdvisory(
+  customerName: string,
+  message: string,
+  articles: CatalogArticle[],
+): string | null {
+  const m = normalize(message);
+  const withStock = articles.filter((a) => Number(a.stock || 0) > 0);
+  if (withStock.length === 0) return null;
+
+  const concernProfiles = [
+    {
+      match: /frizz|caida|caspa|reseco|rizado|ondulado|afro|alisado|keratina|decoloracion|tinte|cabello|pelo/,
+      label: "cabello",
+      includes: ["cabello", "shampoo", "acondicionador", "keratina", "mascarilla", "tinte", "capilar"],
+      question: "¿Tu objetivo principal es controlar frizz, caída o resequedad?",
+    },
+    {
+      match: /acne|grano|espinilla|mancha|piel grasa|piel seca|piel mixta|rosacea|arruga|poro|serum|protector solar|limpiador/,
+      label: "piel",
+      includes: ["piel", "serum", "limpiador", "hidratante", "protector", "facial", "acido", "niacinamida"],
+      question: "¿Tu piel es grasa, seca o mixta para ajustarte mejor la rutina?",
+    },
+    {
+      match: /unas|uñas|acrilica|acrilicas|gel|semipermanente|esmalte|top coat|polygel/,
+      label: "uñas",
+      includes: ["uña", "unas", "esmalte", "gel", "semipermanente", "acril", "top coat", "base"],
+      question: "¿Prefieres duración máxima, acabado natural o diseño llamativo?",
+    },
+    {
+      match: /maquillaje|base|corrector|labial|cejas|pestanas|pestañas|polvo|rubor|primer/,
+      label: "maquillaje",
+      includes: ["maquillaje", "base", "corrector", "labial", "cejas", "pestanas", "primer", "polvo"],
+      question: "¿Lo quieres para uso diario o para evento?",
+    },
+  ];
+
+  const concern = concernProfiles.find((c) => c.match.test(m));
+  const source = concern
+    ? withStock.filter((a) => {
+        const searchable = normalize([a.nombre, a.categoria, a.marca, a.descripcion].filter(Boolean).join(" "));
+        return concern.includes.some((k) => searchable.includes(normalize(k)));
+      })
+    : withStock;
+
+  const ranked = rankArticles(source.length > 0 ? source : withStock, getSearchTokens(message), "general")
+    .filter((a) => Number(a.stock || 0) > 0)
+    .slice(0, 3);
+
+  if (ranked.length === 0) return null;
+
+  const greeting = buildHumanGreeting(detectGreetingStyle(message), customerName);
+  const lines = ranked.map((p) => {
+    const precio = formatCOP(Number(p.precio_venta || 0));
+    const stock = Number(p.stock || 0);
+    const promo = Number(p.descuento_porcentaje || 0) > 0 ? ` • ${p.descuento_porcentaje}% OFF` : "";
+    return `• *${p.nombre || "Producto"}*: ${precio} (stock: ${stock})${promo}`;
+  });
+
+  return `${greeting} Te recomiendo estas opciones reales de inventario${concern ? ` para ${concern.label}` : ""}:\n${lines.join("\n")}\n${concern?.question || "¿Quieres que te ordene estas opciones por presupuesto (económica/media/premium)?"}`;
 }
 
 function isGenericOffTopicAnswer(text: string): boolean {
@@ -444,7 +546,8 @@ function buildHeuristicFallbackResponse(params: {
   conversationHistory?: Array<{ rol: string; mensaje: string }>;
 }): string {
   const { customerName, message, intent, articles } = params;
-  const greeting = customerName ? `Hola ${customerName}` : "Hola";
+  const greetingStyle = detectGreetingStyle(message);
+  const greeting = buildHumanGreeting(greetingStyle, customerName);
   const recentClientContext = (params.conversationHistory || [])
     .filter((m) => m.rol === "cliente")
     .slice(-4)
@@ -619,6 +722,11 @@ Estoy aquí para ayudarte en serio, paso a paso.
   }
 
   // Responder útil aunque no haya coincidencias en catálogo
+  if ((hasSkinConcern || hasHairConcern || hasMakeupConcern || hasNailTechConcern) && top.length === 0) {
+    const inventoryAdvice = buildDeterministicInventoryAdvisory(customerName, message, articles);
+    if (inventoryAdvice) return inventoryAdvice;
+  }
+
   if (hasSkinConcern && top.length === 0) {
      return `✨ ${greeting}. Para *acné/manchas/resequedad* te sugiero esta rutina:\n1) *Limpieza suave*\n2) *Hidratante no comedogénica*\n3) *Protector solar diario* ☀️\nSi me dices si tu piel es grasa, seca o mixta, te la personalizo.`;
   }
@@ -773,6 +881,7 @@ export async function POST(request: NextRequest) {
     });
 
     const intent = detectIntent(message);
+    const greetingStyle = detectGreetingStyle(message);
 
     // ── 1. Cargar datos en paralelo ───────────────────────────────
     const [articulos, customerBusinessContext, historyRes, perfilRes] = await Promise.all([
@@ -878,13 +987,14 @@ Responder EXACTAMENTE lo que el cliente preguntó, usando el catálogo real de l
 1. LEE la pregunta completa. Identifica si pide: precio, producto, rutina, puntos, soporte o información.
 2. Responde SOLO lo que preguntaron. Nunca cambies el tema.
 3. Si preguntan precio: busca en el CATÁLOGO y da el precio EXACTO. Si no está, dilo honestamente.
-4. Si solo saludan: saluda breve y pregunta qué necesitan. NO diagnostiques ni recomiendas sin que pidan.
+4. Si solo saludan: saluda según el estilo del saludo del cliente (hola/holi/buenos días/buenas tardes/buenas noches/qué más), luego pregunta qué necesitan. NO diagnostiques ni recomiendes sin que pidan.
 5. Si preguntan por puntos del club: confirma con los datos CRM si están disponibles; si no, pide cédula.
 6. Si hay contexto previo (historial), ÚSALO para dar continuidad. No repitas preguntas ya respondidas.
 7. Respuestas máximo 5 líneas. Usa *negritas* para productos/precios. 1-2 emojis máximo.
 8. Para rutinas: usa pasos numerados cortos.
 9. Si el cliente se queja de que no lo entiendes: discúlpate en 1 frase y responde directo.
 10. NUNCA inventes precios ni productos que no estén en el catálogo.
+11. Si recomiendas productos, prioriza inventario con stock > 0.
 
 ## ESPECIALIDADES
 Cabello (tintes, decoloración, alisados, afro/rizado), piel (acné, manchas, hidratación), uñas (acrílicas, gel, semipermanente), maquillaje, barba.
@@ -976,9 +1086,10 @@ ${catalogoTexto}`;
     }
 
     // ── 8. Fallback si Gemini no respondió ────────────────────────
+    const lastAgentMsg =
+      historyRows.filter((r) => r.rol === "agente").slice(-1)[0]?.mensaje ?? "";
+
     if (!responseText) {
-      const lastAgentMsg =
-        historyRows.filter((r) => r.rol === "agente").slice(-1)[0]?.mensaje ?? "";
       responseText = buildHeuristicFallbackResponse({
         customerName,
         message,
@@ -988,6 +1099,22 @@ ${catalogoTexto}`;
         businessContext: customerBusinessContext,
         conversationHistory: historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje })),
       });
+    }
+
+    if (lastAgentMsg && looksRepeatedAnswer(responseText, lastAgentMsg)) {
+      const altAdvice = buildDeterministicInventoryAdvisory(customerName, message, articulos);
+      responseText =
+        altAdvice ||
+        `${buildHumanGreeting(greetingStyle, customerName)} Tomo otro enfoque para ayudarte mejor:\n` +
+          buildHeuristicFallbackResponse({
+            customerName,
+            message,
+            intent,
+            articles: articulos,
+            lastBotMessage: "",
+            businessContext: customerBusinessContext,
+            conversationHistory: historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje })),
+          });
     }
 
     // ── 9. Asegurar precio real si Gemini fue genérico ────────────
@@ -1004,6 +1131,13 @@ ${catalogoTexto}`;
           !hasPriceSignal(responseText))
       ) {
         responseText = deterministicPriceReply;
+      }
+    }
+
+    if (intent !== "precio") {
+      const deterministicAdvisory = buildDeterministicInventoryAdvisory(customerName, message, articulos);
+      if (deterministicAdvisory && (isGenericOffTopicAnswer(responseText) || looksRepeatedAnswer(responseText, lastAgentMsg))) {
+        responseText = deterministicAdvisory;
       }
     }
 
