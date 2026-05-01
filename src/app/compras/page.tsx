@@ -1,23 +1,43 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Card, Button, Typography, Space, Modal, Form, Input, InputNumber,
   Select, Tag, App, Spin, Row, Col, Statistic, Table, Empty,
-  Grid, Tooltip, Avatar, DatePicker, Divider, Badge,
+  Grid, Tooltip, Avatar, DatePicker, Divider, Badge, Drawer,
+  List, Alert,
 } from "antd";
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, InboxOutlined,
   SearchOutlined, ReloadOutlined, TruckOutlined, CheckCircleOutlined,
-  ClockCircleOutlined, WarningOutlined, DollarOutlined,
+  ClockCircleOutlined, WarningOutlined,
+  BarcodeOutlined, ShoppingCartOutlined, MinusOutlined,
+  PlusCircleOutlined, CheckOutlined, ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import dayjs from "dayjs";
+import EscanerCodigo from "@components/EscanerCodigo";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
-type CompraItem = { nombre: string; cantidad: number; precio_unitario: number };
+// ── Tipos ──────────────────────────────────────────────────────────────────────
+type CarritoItem = {
+  articulo_id?: string;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+  stock_actual?: number;
+  codigo?: string;
+};
+
+type CompraItem = {
+  articulo_id?: string;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+};
+
 type Compra = {
   id: string;
   proveedor_id?: string;
@@ -27,6 +47,18 @@ type Compra = {
   estado: "pendiente" | "recibida" | "parcial" | "cancelada";
   notas?: string;
   items?: CompraItem[];
+};
+
+type Articulo = {
+  id: string;
+  nombre: string;
+  referencia?: string;
+  codigo_barras?: string;
+  precio_costo?: number;
+  precio_venta?: number;
+  stock: number;
+  categoria?: string;
+  marca?: string;
 };
 
 type CompraEstado = Compra["estado"];
@@ -42,106 +74,294 @@ export default function ComprasPage() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
-  const [form] = Form.useForm();
-  const [itemsForm, setItemsForm] = useState<CompraItem[]>([{ nombre: "", cantidad: 1, precio_unitario: 0 }]);
 
-  const [compras, setCompras] = useState<Compra[]>([]);
-  const [proveedores, setProveedores] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Compra | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState("");
+  // — Datos globales —
+  const [compras, setCompras]         = useState<Compra[]>([]);
+  const [proveedores, setProveedores] = useState<{ id: string; nombre: string }[]>([]);
+  const [articulos, setArticulos]     = useState<Articulo[]>([]);
+  const [loading, setLoading]         = useState(true);
+
+  // — Filtros lista —
+  const [search, setSearch]           = useState("");
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
 
+  // — Drawer nueva compra —
+  const [drawerOpen, setDrawerOpen]   = useState(false);
+  const [realizando, setRealizando]   = useState(false);
+
+  // — Carrito de la compra actual —
+  const [carrito, setCarrito]         = useState<CarritoItem[]>([]);
+  const [proveedorId, setProveedorId] = useState<string | undefined>();
+  const [notasCompra, setNotasCompra] = useState("");
+  const [fechaCompra, setFechaCompra] = useState<dayjs.Dayjs>(dayjs());
+
+  // — Búsqueda de artículos —
+  const [scanQuery, setScanQuery]     = useState("");
+  const [resultados, setResultados]   = useState<Articulo[]>([]);
+  const searchTimerRef                = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // — Modal crear artículo rápido —
+  const [crearForm] = Form.useForm();
+  const [crearModalOpen, setCrearModalOpen]     = useState(false);
+  const [codigoParaCrear, setCodigoParaCrear]   = useState("");
+  const [guardandoArticulo, setGuardandoArticulo] = useState(false);
+
+  // — Modal editar compra histórica —
+  const [editForm] = Form.useForm();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editando, setEditando]           = useState<Compra | null>(null);
+  const [editItems, setEditItems]         = useState<CompraItem[]>([]);
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
+
+  // ── Carga inicial ─────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
     setLoading(true);
-    const [{ data: c }, { data: p }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: a }] = await Promise.all([
       supabaseBrowserClient.from("compras").select("*").order("fecha", { ascending: false }),
       supabaseBrowserClient.from("proveedores").select("id,nombre").order("nombre"),
+      supabaseBrowserClient.from("articulos")
+        .select("id,nombre,referencia,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
+        .order("nombre"),
     ]);
     setCompras(c || []);
     setProveedores(p || []);
+    setArticulos(a || []);
     setLoading(false);
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const filtradas = compras.filter((c) => {
+  // ── Filtrado lista ────────────────────────────────────────────────────────────
+  const filtradas = useMemo(() => compras.filter((c) => {
     const matchSearch = !search ||
       (c.proveedor_nombre || "").toLowerCase().includes(search.toLowerCase()) ||
       (c.notas || "").toLowerCase().includes(search.toLowerCase());
     const matchEstado = !filtroEstado || c.estado === filtroEstado;
     return matchSearch && matchEstado;
-  });
+  }), [compras, search, filtroEstado]);
 
-  const totalGastado = compras.filter(c => c.estado === "recibida")
-    .reduce((s, c) => s + Number(c.total || 0), 0);
+  const totalGastado = useMemo(() =>
+    compras.filter(c => c.estado === "recibida").reduce((s, c) => s + Number(c.total || 0), 0),
+    [compras]
+  );
   const pendientes = compras.filter(c => c.estado === "pendiente").length;
 
-  const totalItems = useMemo(() =>
-    itemsForm.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0),
-    [itemsForm]
+  // ── Carrito helpers ───────────────────────────────────────────────────────────
+  const totalCarrito = useMemo(() =>
+    carrito.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0),
+    [carrito]
   );
 
-  const addItem = () => setItemsForm([...itemsForm, { nombre: "", cantidad: 1, precio_unitario: 0 }]);
-  const removeItem = (idx: number) => setItemsForm(itemsForm.filter((_, i) => i !== idx));
-  const updateItem = <K extends keyof CompraItem>(idx: number, field: K, value: CompraItem[K]) => {
-    setItemsForm((current) => current.map((item, itemIndex) => (
-      itemIndex === idx ? { ...item, [field]: value } as CompraItem : item
-    )));
+  const agregarAlCarrito = useCallback((art: Articulo) => {
+    setCarrito(prev => {
+      const idx = prev.findIndex(i => i.articulo_id === art.id);
+      if (idx >= 0) {
+        return prev.map((item, i) =>
+          i === idx ? { ...item, cantidad: item.cantidad + 1 } : item
+        );
+      }
+      return [...prev, {
+        articulo_id: art.id,
+        nombre: art.nombre,
+        cantidad: 1,
+        precio_unitario: art.precio_costo ?? 0,
+        stock_actual: art.stock,
+        codigo: art.referencia || art.codigo_barras || "",
+      }];
+    });
+    setScanQuery("");
+    setResultados([]);
+    message.success(`\u2713 ${art.nombre} agregado`);
+  }, [message]);
+
+  const actualizarCantidad = (idx: number, cantidad: number) => {
+    if (cantidad <= 0) return;
+    setCarrito(prev => prev.map((item, i) => i === idx ? { ...item, cantidad } : item));
   };
 
-  const openModal = (c?: Compra) => {
-    setEditing(c || null);
-    form.resetFields();
-    if (c) {
-      form.setFieldsValue({ ...c, fecha: c.fecha ? dayjs(c.fecha) : null });
-      setItemsForm(c.items || [{ nombre: "", cantidad: 1, precio_unitario: 0 }]);
+  const actualizarPrecio = (idx: number, precio: number) => {
+    setCarrito(prev => prev.map((item, i) => i === idx ? { ...item, precio_unitario: precio } : item));
+  };
+
+  const quitarDelCarrito = (idx: number) => {
+    setCarrito(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // ── Búsqueda de artículos ─────────────────────────────────────────────────────
+  const buscarArticulos = useCallback((query: string) => {
+    if (!query.trim()) { setResultados([]); return; }
+    const q = query.toLowerCase();
+    const found = articulos.filter(a =>
+      a.nombre.toLowerCase().includes(q) ||
+      (a.referencia || "").toLowerCase().includes(q) ||
+      (a.codigo_barras || "").toLowerCase().includes(q) ||
+      (a.categoria || "").toLowerCase().includes(q) ||
+      (a.marca || "").toLowerCase().includes(q)
+    ).slice(0, 10);
+    setResultados(found);
+  }, [articulos]);
+
+  const handleSearchChange = (val: string) => {
+    setScanQuery(val);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => buscarArticulos(val), 250);
+  };
+
+  const handleCodigo = useCallback((codigo: string) => {
+    const normalizado = codigo.trim();
+    const art = articulos.find(a =>
+      (a.referencia || "").toLowerCase() === normalizado.toLowerCase() ||
+      (a.codigo_barras || "").toLowerCase() === normalizado.toLowerCase()
+    );
+    if (art) {
+      agregarAlCarrito(art);
     } else {
-      form.setFieldsValue({ estado: "pendiente", fecha: dayjs() });
-      setItemsForm([{ nombre: "", cantidad: 1, precio_unitario: 0 }]);
+      const parciales = articulos.filter(a =>
+        (a.referencia || "").toLowerCase().includes(normalizado.toLowerCase()) ||
+        (a.codigo_barras || "").toLowerCase().includes(normalizado.toLowerCase())
+      );
+      if (parciales.length === 1 && parciales[0]) {
+        agregarAlCarrito(parciales[0]);
+      } else if (parciales.length > 1) {
+        setScanQuery(normalizado);
+        setResultados(parciales);
+        message.info("Varios productos encontrados, elige uno");
+      } else {
+        setCodigoParaCrear(normalizado);
+        crearForm.setFieldsValue({ referencia: normalizado });
+        setCrearModalOpen(true);
+      }
     }
-    setModalOpen(true);
+  }, [articulos, agregarAlCarrito, crearForm, message]);
+
+  // ── Crear artículo rápido ─────────────────────────────────────────────────────
+  const handleCrearArticulo = async () => {
+    const values = await crearForm.validateFields();
+    setGuardandoArticulo(true);
+    try {
+      const res = await fetch("/api/articulos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articulo: { ...values, stock: 0 } }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error creando articulo");
+      const { data: newArt } = await supabaseBrowserClient
+        .from("articulos")
+        .select("id,nombre,referencia,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
+        .eq("id", json.data[0].id)
+        .single();
+      if (newArt) {
+        setArticulos(prev => [...prev, newArt as Articulo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        agregarAlCarrito(newArt as Articulo);
+      }
+      setCrearModalOpen(false);
+      crearForm.resetFields();
+      message.success("Articulo creado y agregado a la compra");
+    } catch (e: any) {
+      message.error(e?.message || "Error creando articulo");
+    } finally {
+      setGuardandoArticulo(false);
+    }
   };
 
-  const handleGuardar = async () => {
-    const values = await form.validateFields();
-    if (itemsForm.some(i => !i.nombre)) {
-      message.warning("Todos los ítems deben tener nombre"); return;
+  // ── Realizar compra ───────────────────────────────────────────────────────────
+  const handleRealizarCompra = async () => {
+    if (carrito.length === 0) {
+      message.warning("Agrega al menos un producto a la compra");
+      return;
     }
-    setSaving(true);
+    setRealizando(true);
+    try {
+      const prov = proveedores.find(p => p.id === proveedorId);
+      const payload = {
+        proveedor_id: proveedorId || null,
+        proveedor_nombre: prov?.nombre || "",
+        fecha: fechaCompra.format("YYYY-MM-DD"),
+        total: totalCarrito,
+        estado: "recibida" as CompraEstado,
+        notas: notasCompra || null,
+        items: carrito.map(i => ({
+          articulo_id: i.articulo_id,
+          nombre: i.nombre,
+          cantidad: i.cantidad,
+          precio_unitario: i.precio_unitario,
+        })),
+      };
+
+      const { error: errCompra } = await supabaseBrowserClient
+        .from("compras")
+        .insert([payload]);
+      if (errCompra) throw new Error(errCompra.message);
+
+      const itemsConId = carrito.filter(i => i.articulo_id);
+      for (const item of itemsConId) {
+        const artActual = articulos.find(a => a.id === item.articulo_id);
+        const nuevoStock = (artActual?.stock ?? 0) + item.cantidad;
+        await fetch(`/api/articulos?id=${item.articulo_id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stock: nuevoStock }),
+        });
+      }
+
+      message.success(
+        `Compra registrada — ${itemsConId.length} articulo(s) con stock actualizado`
+      );
+      setCarrito([]);
+      setProveedorId(undefined);
+      setNotasCompra("");
+      setFechaCompra(dayjs());
+      setDrawerOpen(false);
+      cargar();
+    } catch (e: any) {
+      message.error(e?.message || "Error al registrar compra");
+    } finally {
+      setRealizando(false);
+    }
+  };
+
+  // ── Editar compra histórica ───────────────────────────────────────────────────
+  const abrirEdicion = (c: Compra) => {
+    setEditando(c);
+    editForm.setFieldsValue({ ...c, fecha: c.fecha ? dayjs(c.fecha) : null });
+    setEditItems(c.items || [{ nombre: "", cantidad: 1, precio_unitario: 0 }]);
+    setEditModalOpen(true);
+  };
+
+  const totalEditItems = editItems.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+
+  const handleGuardarEdicion = async () => {
+    const values = await editForm.validateFields();
+    if (editItems.some(i => !i.nombre)) {
+      message.warning("Todos los items deben tener nombre"); return;
+    }
+    setGuardandoEdit(true);
     const prov = proveedores.find(p => p.id === values.proveedor_id);
     const payload = {
       ...values,
       fecha: values.fecha ? dayjs(values.fecha).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
       proveedor_nombre: prov?.nombre || "",
-      total: totalItems,
-      items: itemsForm,
+      total: totalEditItems,
+      items: editItems,
     };
     try {
-      if (editing) {
-        const { error } = await supabaseBrowserClient.from("compras").update(payload).eq("id", editing.id);
-        if (error) throw error;
-        message.success("Compra actualizada");
-      } else {
-        const { error } = await supabaseBrowserClient.from("compras").insert([payload]);
-        if (error) throw error;
-        message.success("Compra registrada");
-      }
-      setModalOpen(false);
+      const { error } = await supabaseBrowserClient.from("compras").update(payload).eq("id", editando!.id);
+      if (error) throw error;
+      message.success("Compra actualizada");
+      setEditModalOpen(false);
       cargar();
     } catch (e: any) {
       message.error(e?.message || "Error");
     } finally {
-      setSaving(false);
+      setGuardandoEdit(false);
     }
   };
 
   const handleEliminar = (c: Compra) => {
     modal.confirm({
       title: "Eliminar orden de compra",
-      content: "¿Confirmas eliminar esta compra?",
+      content: "Confirmas eliminar esta compra?",
       okType: "danger", okText: "Eliminar", cancelText: "Cancelar",
       onOk: async () => {
         await supabaseBrowserClient.from("compras").delete().eq("id", c.id);
@@ -153,10 +373,11 @@ export default function ComprasPage() {
 
   const cambiarEstado = async (c: Compra, estado: CompraEstado) => {
     await supabaseBrowserClient.from("compras").update({ estado }).eq("id", c.id);
-    message.success(`Estado → ${ESTADO_CONFIG[estado]?.label}`);
+    message.success(`Estado -> ${ESTADO_CONFIG[estado]?.label}`);
     cargar();
   };
 
+  // ── Columnas tabla ────────────────────────────────────────────────────────────
   const columns = [
     {
       title: "Fecha",
@@ -192,10 +413,10 @@ export default function ComprasPage() {
       render: (v: number) => <Text strong style={{ color: "#d81b87" }}>${Number(v).toLocaleString()}</Text>,
     },
     {
-      title: "Ítems",
+      title: "Items",
       dataIndex: "items",
       key: "items",
-      render: (v: CompraItem[]) => <Tag>{(v || []).length} ítem(s)</Tag>,
+      render: (v: CompraItem[]) => <Tag>{(v || []).length} item(s)</Tag>,
     },
     {
       title: "Acciones",
@@ -210,7 +431,7 @@ export default function ComprasPage() {
             </Tooltip>
           )}
           <Tooltip title="Editar">
-            <Button size="small" icon={<EditOutlined />} onClick={() => openModal(rec)} />
+            <Button size="small" icon={<EditOutlined />} onClick={() => abrirEdicion(rec)} />
           </Tooltip>
           <Tooltip title="Eliminar">
             <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleEliminar(rec)} />
@@ -220,6 +441,7 @@ export default function ComprasPage() {
     },
   ];
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <>
       {/* HEADER */}
@@ -236,7 +458,7 @@ export default function ComprasPage() {
               </div>
               <div>
                 <Title level={4} style={{ margin: 0 }}>Compras</Title>
-                <Text type="secondary" style={{ fontSize: 12 }}>Órdenes de compra a proveedores</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>Ordenes de compra a proveedores</Text>
               </div>
             </Space>
           </Col>
@@ -245,8 +467,8 @@ export default function ComprasPage() {
               <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
               <Button
                 type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => openModal()}
+                icon={<ShoppingCartOutlined />}
+                onClick={() => setDrawerOpen(true)}
                 style={{ background: "linear-gradient(90deg,#096dd9,#1890ff)" }}
               >
                 {isMobile ? "Nueva" : "Nueva compra"}
@@ -265,33 +487,22 @@ export default function ComprasPage() {
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
-            <Statistic
-              title="Pendientes"
-              value={pendientes}
+            <Statistic title="Pendientes" value={pendientes}
               valueStyle={{ color: pendientes > 0 ? "#fa8c16" : "#52c41a" }}
-              prefix={<ClockCircleOutlined />}
-            />
+              prefix={<ClockCircleOutlined />} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
-            <Statistic
-              title="Recibidas"
-              value={compras.filter(c => c.estado === "recibida").length}
-              valueStyle={{ color: "#52c41a" }}
-              prefix={<CheckCircleOutlined />}
-            />
+            <Statistic title="Recibidas" value={compras.filter(c => c.estado === "recibida").length}
+              valueStyle={{ color: "#52c41a" }} prefix={<CheckCircleOutlined />} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, textAlign: "center" }}>
-            <Statistic
-              title="Total invertido"
-              value={totalGastado}
-              prefix="$"
+            <Statistic title="Total invertido" value={totalGastado} prefix="$"
               formatter={(v) => Number(v).toLocaleString()}
-              valueStyle={{ color: "#d81b87" }}
-            />
+              valueStyle={{ color: "#d81b87" }} />
           </Card>
         </Col>
       </Row>
@@ -326,26 +537,372 @@ export default function ComprasPage() {
         {loading ? (
           <div style={{ textAlign: "center", padding: 60 }}><Spin size="large" /></div>
         ) : filtradas.length === 0 ? (
-          <Empty description="No hay órdenes de compra" style={{ padding: 60 }}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>Nueva compra</Button>
+          <Empty description="No hay ordenes de compra" style={{ padding: 60 }}>
+            <Button type="primary" icon={<ShoppingCartOutlined />} onClick={() => setDrawerOpen(true)}>
+              Nueva compra
+            </Button>
           </Empty>
         ) : (
-          <Table dataSource={filtradas} columns={columns} rowKey="id" pagination={{ pageSize: 15 }} scroll={{ x: 600 }} />
+          <Table dataSource={filtradas} columns={columns} rowKey="id"
+            pagination={{ pageSize: 15 }} scroll={{ x: 600 }} />
         )}
       </Card>
 
-      {/* MODAL */}
+      {/* ── DRAWER: Nueva compra con scanner ──────────────────────────────── */}
+      <Drawer
+        title={
+          <Space>
+            <ShoppingCartOutlined style={{ color: "#096dd9" }} />
+            <span>Nueva compra</span>
+            {carrito.length > 0 && (
+              <Badge count={carrito.length} style={{ background: "#096dd9" }} />
+            )}
+          </Space>
+        }
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        width={isMobile ? "100%" : 600}
+        placement={isMobile ? "bottom" : "right"}
+        height={isMobile ? "95vh" : undefined}
+        footer={
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Text strong style={{ fontSize: 16 }}>
+              Total: <span style={{ color: "#d81b87" }}>${totalCarrito.toLocaleString()}</span>
+            </Text>
+            <Space>
+              <Button onClick={() => setDrawerOpen(false)}>Cancelar</Button>
+              <Button
+                type="primary"
+                icon={<CheckOutlined />}
+                loading={realizando}
+                disabled={carrito.length === 0}
+                onClick={handleRealizarCompra}
+                style={{ background: "linear-gradient(90deg,#096dd9,#1890ff)" }}
+              >
+                Realizar compra
+              </Button>
+            </Space>
+          </div>
+        }
+        bodyStyle={{ padding: "16px", overflowY: "auto" }}
+      >
+        {/* Proveedor y fecha */}
+        <Row gutter={12} style={{ marginBottom: 16 }}>
+          <Col span={14}>
+            <Text strong style={{ display: "block", marginBottom: 4 }}>Proveedor</Text>
+            <Select
+              showSearch
+              placeholder="Seleccionar proveedor"
+              style={{ width: "100%" }}
+              value={proveedorId}
+              onChange={setProveedorId}
+              allowClear
+              filterOption={(input, opt) =>
+                (opt?.label as string || "").toLowerCase().includes(input.toLowerCase())
+              }
+              options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
+            />
+          </Col>
+          <Col span={10}>
+            <Text strong style={{ display: "block", marginBottom: 4 }}>Fecha</Text>
+            <DatePicker
+              style={{ width: "100%" }}
+              value={fechaCompra}
+              onChange={(d) => d && setFechaCompra(d)}
+              format="DD/MM/YYYY"
+            />
+          </Col>
+        </Row>
+
+        <Divider orientation="left" style={{ fontSize: 13, margin: "12px 0" }}>
+          <BarcodeOutlined /> Agregar productos
+        </Divider>
+
+        {/* Scanner */}
+        <div style={{ marginBottom: 12 }}>
+          <EscanerCodigo
+            onCodigo={handleCodigo}
+            placeholder="Escanear codigo de barras..."
+            conCamara
+            submitOnEnter
+          />
+        </div>
+
+        {/* Busqueda por nombre */}
+        <Input
+          placeholder="Buscar por nombre, marca, categoria..."
+          prefix={<SearchOutlined />}
+          value={scanQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          allowClear
+          onClear={() => { setScanQuery(""); setResultados([]); }}
+          style={{ marginBottom: 8 }}
+        />
+
+        {/* Resultados de busqueda */}
+        {resultados.length > 0 && (
+          <Card
+            size="small"
+            style={{ marginBottom: 12, borderRadius: 8, maxHeight: 240, overflowY: "auto" }}
+            bodyStyle={{ padding: 0 }}
+          >
+            <List
+              size="small"
+              dataSource={resultados}
+              renderItem={(art) => (
+                <List.Item
+                  style={{ padding: "8px 12px", cursor: "pointer" }}
+                  onClick={() => agregarAlCarrito(art)}
+                  actions={[
+                    <Button
+                      key="add"
+                      size="small"
+                      type="primary"
+                      icon={<PlusCircleOutlined />}
+                      onClick={(e) => { e.stopPropagation(); agregarAlCarrito(art); }}
+                    >
+                      Agregar
+                    </Button>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={<Text strong style={{ fontSize: 13 }}>{art.nombre}</Text>}
+                    description={
+                      <Space size={4} wrap>
+                        {art.referencia && <Tag style={{ fontSize: 11 }}>{art.referencia}</Tag>}
+                        {art.marca && <Text type="secondary" style={{ fontSize: 11 }}>{art.marca}</Text>}
+                        <Text style={{ fontSize: 11, color: "#52c41a" }}>Stock: {art.stock}</Text>
+                        {art.precio_costo != null && (
+                          <Text style={{ fontSize: 11, color: "#096dd9" }}>
+                            Costo: ${art.precio_costo.toLocaleString()}
+                          </Text>
+                        )}
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+            <div
+              style={{
+                padding: "8px 12px", cursor: "pointer", borderTop: "1px solid #f0f0f0",
+                background: "#fafafa", display: "flex", alignItems: "center", gap: 8,
+              }}
+              onClick={() => {
+                setCodigoParaCrear(scanQuery);
+                crearForm.setFieldsValue({ nombre: scanQuery });
+                setCrearModalOpen(true);
+              }}
+            >
+              <PlusOutlined style={{ color: "#096dd9" }} />
+              <Text style={{ color: "#096dd9", fontSize: 12 }}>
+                No es ninguno - Crear nuevo articulo
+              </Text>
+            </div>
+          </Card>
+        )}
+
+        {/* Boton crear si sin resultados */}
+        {scanQuery.trim() && resultados.length === 0 && (
+          <Alert
+            message={
+              <Space>
+                <ExclamationCircleOutlined />
+                <Text style={{ fontSize: 13 }}>Articulo no encontrado</Text>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setCodigoParaCrear(scanQuery);
+                    crearForm.setFieldsValue({ nombre: scanQuery });
+                    setCrearModalOpen(true);
+                  }}
+                >
+                  Crear articulo
+                </Button>
+              </Space>
+            }
+            type="warning"
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
+        <Divider orientation="left" style={{ fontSize: 13, margin: "12px 0" }}>
+          <ShoppingCartOutlined /> Carrito ({carrito.length})
+        </Divider>
+
+        {/* Carrito */}
+        {carrito.length === 0 ? (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="Escanea o busca productos para agregar"
+            style={{ padding: "20px 0" }}
+          />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {carrito.map((item, idx) => (
+              <Card
+                key={idx}
+                size="small"
+                style={{ borderRadius: 8, border: "1px solid #e8f4ff", background: "#f8fbff" }}
+                bodyStyle={{ padding: "10px 12px" }}
+              >
+                <Row gutter={8} align="middle">
+                  <Col flex="auto">
+                    <Text strong style={{ fontSize: 13, display: "block" }}>{item.nombre}</Text>
+                    {item.articulo_id ? (
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        Stock actual: {item.stock_actual ?? "—"}
+                        {item.codigo ? ` - ${item.codigo}` : ""}
+                      </Text>
+                    ) : (
+                      <Tag color="orange" style={{ fontSize: 10 }}>Sin vincular</Tag>
+                    )}
+                  </Col>
+                  <Col>
+                    <Space size={4} align="center">
+                      <Button
+                        size="small"
+                        icon={<MinusOutlined />}
+                        onClick={() => actualizarCantidad(idx, item.cantidad - 1)}
+                        disabled={item.cantidad <= 1}
+                      />
+                      <InputNumber
+                        size="small"
+                        min={1}
+                        value={item.cantidad}
+                        onChange={(v) => actualizarCantidad(idx, v || 1)}
+                        style={{ width: 54 }}
+                      />
+                      <Button
+                        size="small"
+                        icon={<PlusOutlined />}
+                        onClick={() => actualizarCantidad(idx, item.cantidad + 1)}
+                      />
+                    </Space>
+                  </Col>
+                  <Col>
+                    <InputNumber
+                      size="small"
+                      min={0}
+                      value={item.precio_unitario}
+                      onChange={(v) => actualizarPrecio(idx, v ?? 0)}
+                      formatter={(v) => `$${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                      parser={(v) => Number((v || "0").replace(/\$\s?|(,*)/g, ""))}
+                      style={{ width: 90 }}
+                      placeholder="$ Costo"
+                    />
+                  </Col>
+                  <Col>
+                    <Text style={{ fontSize: 12, color: "#d81b87", width: 70, display: "inline-block", textAlign: "right" }}>
+                      ${(item.cantidad * item.precio_unitario).toLocaleString()}
+                    </Text>
+                  </Col>
+                  <Col>
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => quitarDelCarrito(idx)}
+                    />
+                  </Col>
+                </Row>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {carrito.length > 0 && (
+          <>
+            <Divider style={{ margin: "12px 0" }} />
+            <div>
+              <Text strong style={{ display: "block", marginBottom: 4 }}>Notas</Text>
+              <Input.TextArea
+                rows={2}
+                placeholder="Observaciones de la compra..."
+                value={notasCompra}
+                onChange={(e) => setNotasCompra(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+      </Drawer>
+
+      {/* MODAL: Crear articulo rapido */}
       <Modal
-        title={editing ? "Editar compra" : "Nueva orden de compra"}
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        onOk={handleGuardar}
-        confirmLoading={saving}
-        okText={editing ? "Guardar" : "Registrar compra"}
+        title={
+          <Space>
+            <PlusOutlined style={{ color: "#096dd9" }} />
+            Crear nuevo articulo
+          </Space>
+        }
+        open={crearModalOpen}
+        onCancel={() => { setCrearModalOpen(false); crearForm.resetFields(); }}
+        onOk={handleCrearArticulo}
+        confirmLoading={guardandoArticulo}
+        okText="Crear y agregar"
+        cancelText="Cancelar"
+        width={460}
+      >
+        <Form form={crearForm} layout="vertical" style={{ marginTop: 12 }}>
+          <Form.Item name="nombre" label="Nombre del producto" rules={[{ required: true, message: "El nombre es obligatorio" }]}>
+            <Input placeholder="Ej: Shampoo Argan 400ml" autoFocus />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="referencia" label="Codigo / Referencia">
+                <Input placeholder="Ej: SHA-001" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="marca" label="Marca">
+                <Input placeholder="Ej: L Oreal" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="precio_costo" label="Precio costo">
+                <InputNumber
+                  min={0}
+                  style={{ width: "100%" }}
+                  formatter={(v) => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                  parser={(v) => parseFloat((v || "0").replace(/\$\s?|(,*)/g, "")) as 0}
+                  placeholder="$ 0"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="precio_venta" label="Precio venta">
+                <InputNumber
+                  min={0}
+                  style={{ width: "100%" }}
+                  formatter={(v) => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                  parser={(v) => parseFloat((v || "0").replace(/\$\s?|(,*)/g, "")) as 0}
+                  placeholder="$ 0"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="categoria" label="Categoria">
+            <Input placeholder="Ej: Cuidado capilar" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* MODAL: Editar compra historica */}
+      <Modal
+        title={editando ? "Editar compra" : ""}
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
+        onOk={handleGuardarEdicion}
+        confirmLoading={guardandoEdit}
+        okText="Guardar"
         cancelText="Cancelar"
         width={640}
       >
-        <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
+        <Form form={editForm} layout="vertical" style={{ marginTop: 12 }}>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="proveedor_id" label="Proveedor">
@@ -368,14 +925,16 @@ export default function ComprasPage() {
             </Col>
           </Row>
 
-          <Divider orientation="left" style={{ fontSize: 13 }}>Ítems de la compra</Divider>
-          {itemsForm.map((item, idx) => (
+          <Divider orientation="left" style={{ fontSize: 13 }}>Items de la compra</Divider>
+          {editItems.map((item, idx) => (
             <Row key={idx} gutter={8} style={{ marginBottom: 8 }} align="middle">
               <Col flex="auto">
                 <Input
                   placeholder="Nombre del producto"
                   value={item.nombre}
-                  onChange={(e) => updateItem(idx, "nombre", e.target.value)}
+                  onChange={(e) => setEditItems(prev => prev.map((it, i) =>
+                    i === idx ? { ...it, nombre: e.target.value } : it
+                  ))}
                 />
               </Col>
               <Col span={4}>
@@ -383,7 +942,9 @@ export default function ComprasPage() {
                   min={1}
                   placeholder="Cant."
                   value={item.cantidad}
-                  onChange={(v) => updateItem(idx, "cantidad", v || 1)}
+                  onChange={(v) => setEditItems(prev => prev.map((it, i) =>
+                    i === idx ? { ...it, cantidad: v || 1 } : it
+                  ))}
                   style={{ width: "100%" }}
                 />
               </Col>
@@ -392,24 +953,33 @@ export default function ComprasPage() {
                   min={0}
                   placeholder="$ Precio"
                   value={item.precio_unitario}
-                  onChange={(v) => updateItem(idx, "precio_unitario", v || 0)}
+                  onChange={(v) => setEditItems(prev => prev.map((it, i) =>
+                    i === idx ? { ...it, precio_unitario: v || 0 } : it
+                  ))}
                   style={{ width: "100%" }}
                   formatter={(v) => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
                 />
               </Col>
               <Col span={2}>
-                {itemsForm.length > 1 && (
-                  <Button danger size="small" icon={<DeleteOutlined />} onClick={() => removeItem(idx)} />
+                {editItems.length > 1 && (
+                  <Button danger size="small" icon={<DeleteOutlined />}
+                    onClick={() => setEditItems(prev => prev.filter((_, i) => i !== idx))} />
                 )}
               </Col>
             </Row>
           ))}
-          <Button type="dashed" icon={<PlusOutlined />} onClick={addItem} block style={{ marginBottom: 12 }}>
-            Agregar ítem
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={() => setEditItems(prev => [...prev, { nombre: "", cantidad: 1, precio_unitario: 0 }])}
+            block
+            style={{ marginBottom: 12 }}
+          >
+            Agregar item
           </Button>
           <div style={{ textAlign: "right", padding: "8px 0" }}>
             <Text strong style={{ fontSize: 16 }}>
-              Total: <span style={{ color: "#d81b87" }}>${totalItems.toLocaleString()}</span>
+              Total: <span style={{ color: "#d81b87" }}>${totalEditItems.toLocaleString()}</span>
             </Text>
           </div>
           <Form.Item name="notas" label="Notas">
