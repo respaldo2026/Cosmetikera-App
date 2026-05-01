@@ -1054,16 +1054,6 @@ export default function ArticulosPage() {
     event.stopPropagation();
   };
 
-  const shouldSkipRowNavigation = (target: EventTarget | null): boolean => {
-    if (!(target instanceof Element)) return false;
-
-    return Boolean(
-      target.closest(
-        "button,a,input,textarea,select,label,.ant-input-number,.ant-input-number-input,.ant-btn,.ant-checkbox-wrapper,.ant-checkbox,[data-stop-row-nav='true']"
-      )
-    );
-  };
-
   const renderCard = (art: Articulo) => (
     <Col key={art.id} xs={12} sm={8} md={6} xl={4}>
       <Card
@@ -1335,8 +1325,7 @@ export default function ArticulosPage() {
               <Col xs={24} key={a.id}>
                 <Card
                   size="small"
-                  style={{ borderRadius: 10, cursor: "pointer" }}
-                  onClick={() => irADetalle(a.id)}
+                  style={{ borderRadius: 10 }}
                   bodyStyle={{ padding: "10px 12px" }}
                 >
                   <Row align="middle" gutter={8}>
@@ -1388,13 +1377,6 @@ export default function ArticulosPage() {
             size="small"
             pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} artículos` }}
             scroll={{ x: 700 }}
-            onRow={(record) => ({
-              onClick: (event) => {
-                if (shouldSkipRowNavigation(event.target)) return;
-                irADetalle(record.id);
-              },
-              style: { cursor: "pointer" },
-            })}
             columns={[
               {
                 title: "Artículo", key: "nombre",
