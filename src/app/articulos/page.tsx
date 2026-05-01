@@ -1116,6 +1116,18 @@ export default function ArticulosPage() {
                   bodyStyle={{ padding: "10px 12px" }}
                 >
                   <Row align="middle" gutter={8}>
+                    <Col>
+                      <Checkbox
+                        checked={selectedIds.includes(a.id)}
+                        onClick={detenerEvento}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setSelectedIds((prev) =>
+                            checked ? [...new Set([...prev, a.id])] : prev.filter((id) => id !== a.id)
+                          );
+                        }}
+                      />
+                    </Col>
                     <Col flex="auto">
                       <Text strong style={{ fontSize: 13, color: "#1677ff", display: "block" }}>{a.nombre}</Text>
                       <Space size={4} wrap style={{ marginTop: 4 }}>

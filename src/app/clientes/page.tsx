@@ -104,6 +104,7 @@ export default function ClientesPage() {
   const [creando, setCreando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [formNuevo] = Form.useForm();
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const deferredSearch = useDeferredValue(search);
 
   const cargar = useCallback(async () => {
@@ -138,6 +139,18 @@ export default function ClientesPage() {
     puntosTotales: clientes.reduce((s, c) => s + (c.puntos_fidelidad || 0), 0),
     nivelOroPlus: clientes.filter((c) => ["oro", "diamante"].includes(c.nivel_fidelidad || "")).length,
   }), [clientes]);
+
+  useEffect(() => {
+    setSelectedClientIds((prev) => prev.filter((id) => clientes.some((c) => c.id === id)));
+  }, [clientes]);
+
+  const filtradosIds = useMemo(() => filtrados.map((c) => c.id), [filtrados]);
+  const filtradosIdsSet = useMemo(() => new Set(filtradosIds), [filtradosIds]);
+  const selectedCount = selectedClientIds.length;
+  const selectedFiltradosCount = useMemo(
+    () => selectedClientIds.filter((id) => filtradosIdsSet.has(id)).length,
+    [filtradosIdsSet, selectedClientIds]
+  );
 
   const crearCliente = async () => {
     try {
@@ -197,7 +210,51 @@ export default function ClientesPage() {
         }
       },
     });
-  }, [cargar, clienteSeleccionado?.id, isAdmin, message]);
+  }, [cargar, clienteSeleccionado?.id, isAdmin, message, modal]);
+
+  const eliminarSeleccionados = useCallback(async () => {
+    if (!isAdmin) {
+      message.error("Solo el administrador puede eliminar clientes");
+      return;
+    }
+    if (selectedCount === 0) {
+      message.warning("Selecciona clientes para eliminar");
+      return;
+    }
+
+    modal.confirm({
+      title: `Eliminar ${selectedCount} cliente(s)`,
+      content: "Se eliminarán clientes y transacciones asociadas. Esta acción no se puede deshacer.",
+      okText: "Eliminar seleccionados",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          const headers = await authHeaders();
+          const results = await Promise.all(
+            selectedClientIds.map(async (id) => {
+              const res = await fetch(`/api/perfiles?id=${id}`, { method: "DELETE", headers });
+              return res.ok;
+            })
+          );
+
+          const okCount = results.filter(Boolean).length;
+          const failCount = results.length - okCount;
+
+          if (okCount > 0) message.success(`${okCount} cliente(s) eliminado(s)`);
+          if (failCount > 0) message.warning(`${failCount} cliente(s) no se pudieron eliminar`);
+
+          if (clienteSeleccionado?.id && selectedClientIds.includes(clienteSeleccionado.id)) {
+            setClienteSeleccionado(null);
+          }
+          setSelectedClientIds([]);
+          await cargar();
+        } catch {
+          message.error("Error al eliminar clientes en bloque");
+        }
+      },
+    });
+  }, [cargar, clienteSeleccionado?.id, isAdmin, message, modal, selectedClientIds, selectedCount]);
 
   const columns: ColumnsType<Cliente> = [
     {
@@ -336,11 +393,42 @@ export default function ClientesPage() {
         />
       </div>
 
+      <Space wrap size={[8, 8]} style={{ marginBottom: 12 }}>
+        <Button
+          size="small"
+          onClick={() => setSelectedClientIds(filtradosIds)}
+          disabled={filtradosIds.length === 0}
+        >
+          Seleccionar filtrados ({filtradosIds.length})
+        </Button>
+        <Button
+          size="small"
+          onClick={() => setSelectedClientIds((prev) => prev.filter((id) => !filtradosIdsSet.has(id)))}
+          disabled={selectedFiltradosCount === 0}
+        >
+          Deseleccionar filtrados ({selectedFiltradosCount})
+        </Button>
+        <Button size="small" onClick={() => setSelectedClientIds([])} disabled={selectedCount === 0}>
+          Limpiar selección
+        </Button>
+        {isAdmin ? (
+          <Button size="small" danger onClick={eliminarSeleccionados} disabled={selectedCount === 0}>
+            Eliminar seleccionados
+          </Button>
+        ) : null}
+        {selectedCount > 0 ? <Tag color="blue">{selectedCount} seleccionado(s)</Tag> : null}
+      </Space>
+
       {/* Tabla */}
       <Table
         dataSource={filtrados}
         columns={columns}
         rowKey="id"
+        rowSelection={{
+          selectedRowKeys: selectedClientIds,
+          onChange: (keys) => setSelectedClientIds(keys as string[]),
+          preserveSelectedRowKeys: true,
+        }}
         loading={loading}
         size="small"
         virtual

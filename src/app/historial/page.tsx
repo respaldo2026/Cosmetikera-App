@@ -441,6 +441,7 @@ export default function HistorialPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedOperacionKeys, setSelectedOperacionKeys] = useState<string[]>([]);
 
   const PAGE_SIZE = 300;
 
@@ -699,6 +700,21 @@ export default function HistorialPage() {
       .sort((a, b) => dayjs(b.fecha).valueOf() - dayjs(a.fecha).valueOf());
   }, [operacionesFiltradas, vistaFilas]);
 
+  useEffect(() => {
+    const visibleKeys = new Set(operacionesTabla.map((op) => op.key));
+    setSelectedOperacionKeys((prev) => prev.filter((key) => visibleKeys.has(key)));
+  }, [operacionesTabla]);
+
+  const operacionesTablaMap = useMemo(
+    () => new Map(operacionesTabla.map((op) => [op.key, op])),
+    [operacionesTabla]
+  );
+  const selectedOperaciones = useMemo(
+    () => selectedOperacionKeys.map((key) => operacionesTablaMap.get(key)).filter(Boolean) as HistorialEntry[],
+    [operacionesTablaMap, selectedOperacionKeys]
+  );
+  const selectedCount = selectedOperacionKeys.length;
+
   const ventasBaseFiltradas = useMemo(
     () => operacionesBaseFiltradas.filter((item) => item.tipo === "venta"),
     [operacionesBaseFiltradas]
@@ -874,6 +890,53 @@ export default function HistorialPage() {
       message.error(error instanceof Error ? error.message : "Error al eliminar transacción");
     }
   }, [cargar, isAdmin, message]);
+
+  const eliminarOperacionesSeleccionadas = useCallback(async () => {
+    if (!isAdmin) {
+      message.error("Solo el administrador puede eliminar transacciones");
+      return;
+    }
+    if (selectedCount === 0) {
+      message.warning("Selecciona transacciones para eliminar");
+      return;
+    }
+
+    modal.confirm({
+      title: `Eliminar ${selectedCount} transacción(es)`,
+      content: "Esta acción no se puede deshacer.",
+      okText: "Eliminar seleccionadas",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          const headers = await authHeaders();
+          const results = await Promise.all(
+            selectedOperaciones.map(async (record) => {
+              const res = await fetch("/api/historial", {
+                method: "DELETE",
+                headers,
+                body: JSON.stringify({ id: record.id, tipo: record.tipo }),
+              });
+              return res.ok;
+            })
+          );
+
+          const okCount = results.filter(Boolean).length;
+          const failCount = results.length - okCount;
+          if (okCount > 0) message.success(`${okCount} transacción(es) eliminada(s)`);
+          if (failCount > 0) message.warning(`${failCount} transacción(es) no se pudieron eliminar`);
+
+          if (detalle && selectedOperacionKeys.includes(detalle.key)) {
+            setDetalle(null);
+          }
+          setSelectedOperacionKeys([]);
+          await cargar();
+        } catch {
+          message.error("Error al eliminar transacciones en bloque");
+        }
+      },
+    });
+  }, [cargar, detalle, isAdmin, message, modal, selectedCount, selectedOperacionKeys, selectedOperaciones]);
 
   const columns = [
     {
@@ -1295,6 +1358,24 @@ export default function HistorialPage() {
           ) : null}
         </Space>
         <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
+          <Button
+            size="small"
+            onClick={() => setSelectedOperacionKeys(operacionesTabla.map((op) => op.key))}
+            disabled={operacionesTabla.length === 0}
+          >
+            Seleccionar filtradas ({operacionesTabla.length})
+          </Button>
+          <Button size="small" onClick={() => setSelectedOperacionKeys([])} disabled={selectedCount === 0}>
+            Deseleccionar todo
+          </Button>
+          {isAdmin ? (
+            <Button size="small" danger onClick={eliminarOperacionesSeleccionadas} disabled={selectedCount === 0}>
+              Eliminar seleccionadas
+            </Button>
+          ) : null}
+          {selectedCount > 0 ? <Tag color="blue">{selectedCount} seleccionado(s)</Tag> : null}
+        </Space>
+        <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
           <Tag color="magenta">Ventas: {stats.resumen.ventas}</Tag>
           <Tag color="blue">Compras: {stats.resumen.compras}</Tag>
           <Tag color="geekblue">Caja: {stats.resumen.movimientos}</Tag>
@@ -1315,6 +1396,11 @@ export default function HistorialPage() {
             dataSource={operacionesTabla}
             columns={columns}
             rowKey="key"
+            rowSelection={{
+              selectedRowKeys: selectedOperacionKeys,
+              onChange: (keys) => setSelectedOperacionKeys(keys as string[]),
+              preserveSelectedRowKeys: true,
+            }}
             size={isMobile ? "small" : "middle"}
             virtual
             pagination={{ pageSize: 30, showSizeChanger: true, pageSizeOptions: [20, 30, 50, 100] }}
