@@ -107,6 +107,13 @@ function getAvatarColor(phone: string): string {
   return colors[hash % colors.length] ?? "#128C7E";
 }
 
+function extractClientNameFromTemplateText(text: string): string {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/bienvenida\s+enviada\s+a\s+(.+)$/i);
+  return match?.[1]?.trim() || "";
+}
+
 // Separador de fecha entre mensajes
 function groupMessagesByDate(messages: Message[]): Array<Message | { type: "separator"; label: string }> {
   const result: Array<Message | { type: "separator"; label: string }> = [];
@@ -442,9 +449,10 @@ export default function WhatsAppMonitorPage() {
           ) : (
             conversations.map((conv) => {
               const isSelected = conv.telefono === selectedPhone;
-              const name = conv.nombre || conv.telefono;
+              const inferredName = extractClientNameFromTemplateText(conv.ultimo_mensaje || "");
+              const name = conv.nombre || inferredName || conv.telefono;
               const bg = getAvatarColor(conv.telefono);
-              const ini = getInitials(conv.nombre, conv.telefono);
+              const ini = getInitials(name, conv.telefono);
               return (
                 <div
                   key={conv.telefono}
