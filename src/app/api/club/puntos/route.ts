@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendClubPointsWhatsApp } from "@/utils/club-whatsapp";
+import {
+  DEFAULT_REGLAS,
+  GAIN_TIPOS,
+  getMonthRangeUtc,
+  getNivelDinamico,
+  mergeClubRules,
+  type ClubReglas,
+} from "@/utils/club-rules";
 
 function getAdminClient() {
   return createClient(
@@ -10,8 +18,93 @@ function getAdminClient() {
   );
 }
 
-const TIPOS_VALIDOS = ["ganados", "canjeados", "bonificacion", "ajuste", "bienvenida", "cumpleanos", "racha", "referido"] as const;
+const TIPOS_VALIDOS = ["ganados", "canjeados", "bonificacion", "ajuste", "bienvenida", "cumpleanos", "racha", "referido", "expiracion"] as const;
 type TipoPunto = (typeof TIPOS_VALIDOS)[number];
+
+const TIPOS_POSITIVOS_CON_REGLA = new Set<string>([...GAIN_TIPOS]);
+
+async function loadClubRules(supabase: ReturnType<typeof getAdminClient>): Promise<ClubReglas> {
+  const { data } = await supabase.from("club_reglas_config").select("clave,valor");
+  const raw = Object.fromEntries((data || []).map((row: any) => [row.clave, Number(row.valor)]));
+  return mergeClubRules({ ...DEFAULT_REGLAS, ...raw });
+}
+
+async function applyExpiryIfNeeded(
+  supabase: ReturnType<typeof getAdminClient>,
+  perfilId: string,
+  reglas: ClubReglas,
+  currentPoints: number,
+) {
+  const vigenciaDias = Math.max(0, Math.floor(reglas.puntos_vigencia_dias || 0));
+  if (vigenciaDias <= 0) {
+    return { pointsAfterExpiry: currentPoints, expiredNow: 0 };
+  }
+
+  const cutoffDate = new Date(Date.now() - vigenciaDias * 24 * 60 * 60 * 1000).toISOString();
+
+  const [oldGainsRes, consumptionsRes, expiredRes] = await Promise.all([
+    supabase
+      .from("puntos_historial")
+      .select("puntos,tipo")
+      .eq("perfil_id", perfilId)
+      .lt("created_at", cutoffDate)
+      .in("tipo", [...GAIN_TIPOS])
+      .limit(5000),
+    supabase
+      .from("puntos_historial")
+      .select("puntos,tipo")
+      .eq("perfil_id", perfilId)
+      .lt("created_at", cutoffDate)
+      .not("tipo", "eq", "expiracion")
+      .limit(5000),
+    supabase
+      .from("puntos_historial")
+      .select("puntos")
+      .eq("perfil_id", perfilId)
+      .eq("tipo", "expiracion")
+      .limit(5000),
+  ]);
+
+  const oldGains = (oldGainsRes.data || []).reduce((acc: number, row: any) => {
+    const value = Number(row?.puntos || 0);
+    return value > 0 ? acc + value : acc;
+  }, 0);
+
+  const consumptionsOldWindow = (consumptionsRes.data || []).reduce((acc: number, row: any) => {
+    const value = Number(row?.puntos || 0);
+    return value < 0 ? acc + Math.abs(value) : acc;
+  }, 0);
+
+  const alreadyExpired = (expiredRes.data || []).reduce((acc: number, row: any) => {
+    const value = Number(row?.puntos || 0);
+    return value < 0 ? acc + Math.abs(value) : acc;
+  }, 0);
+
+  const pendingExpiry = Math.max(0, oldGains - consumptionsOldWindow - alreadyExpired);
+  const expiredNow = Math.min(currentPoints, pendingExpiry);
+
+  if (expiredNow <= 0) {
+    return { pointsAfterExpiry: currentPoints, expiredNow: 0 };
+  }
+
+  await supabase.from("puntos_historial").insert({
+    perfil_id: perfilId,
+    tipo: "expiracion",
+    puntos: -expiredNow,
+    concepto: `Vencimiento automático de puntos (${vigenciaDias} días de vigencia)` ,
+  });
+
+  const pointsAfterExpiry = Math.max(0, currentPoints - expiredNow);
+  await supabase
+    .from("perfiles")
+    .update({
+      puntos_fidelidad: pointsAfterExpiry,
+      nivel_fidelidad: getNivelDinamico(pointsAfterExpiry, reglas),
+    })
+    .eq("id", perfilId);
+
+  return { pointsAfterExpiry, expiredNow };
+}
 
 /**
  * POST /api/club/puntos
@@ -21,7 +114,7 @@ type TipoPunto = (typeof TIPOS_VALIDOS)[number];
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { perfil_id, tipo, puntos, concepto, referencia } = body;
+    const { perfil_id, tipo, puntos, concepto, referencia, actualizar_perfil } = body;
 
     if (!perfil_id || !tipo || puntos === undefined || !concepto) {
       return NextResponse.json(
@@ -42,11 +135,66 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getAdminClient();
+    const reglas = await loadClubRules(supabase);
+
+    let puntosAplicados = Number(puntos);
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("id,nombre_completo,telefono,puntos_fidelidad,puntos_ganados")
+      .eq("id", perfil_id)
+      .maybeSingle();
+
+    if (perfil && actualizar_perfil) {
+      const currentPoints = Number(perfil.puntos_fidelidad || 0);
+      const { pointsAfterExpiry } = await applyExpiryIfNeeded(supabase, perfil_id, reglas, currentPoints);
+
+      if (puntosAplicados > 0 && TIPOS_POSITIVOS_CON_REGLA.has(String(tipo))) {
+        const { startIso, endIso } = getMonthRangeUtc(new Date());
+        const { data: monthRows } = await supabase
+          .from("puntos_historial")
+          .select("puntos,tipo")
+          .eq("perfil_id", perfil_id)
+          .gte("created_at", startIso)
+          .lte("created_at", endIso)
+          .in("tipo", [...GAIN_TIPOS])
+          .limit(5000);
+
+        const gainedThisMonth = (monthRows || []).reduce((acc: number, row: any) => {
+          const value = Number(row?.puntos || 0);
+          return value > 0 ? acc + value : acc;
+        }, 0);
+
+        const maxMes = Math.max(0, Math.floor(reglas.puntos_max_ganados_mes || 0));
+        const cupoMes = maxMes > 0 ? Math.max(0, maxMes - gainedThisMonth) : puntosAplicados;
+
+        const maxSaldo = Math.max(0, Math.floor(reglas.puntos_max_saldo || 0));
+        const cupoSaldo = maxSaldo > 0 ? Math.max(0, maxSaldo - pointsAfterExpiry) : puntosAplicados;
+
+        puntosAplicados = Math.max(0, Math.min(puntosAplicados, cupoMes, cupoSaldo));
+      }
+
+      const nextPoints = Math.max(0, pointsAfterExpiry + puntosAplicados);
+      const payloadPerfil: Record<string, unknown> = {
+        puntos_fidelidad: nextPoints,
+        nivel_fidelidad: getNivelDinamico(nextPoints, reglas),
+      };
+
+      if (puntosAplicados > 0) {
+        payloadPerfil.puntos_ganados = Number(perfil.puntos_ganados || 0) + puntosAplicados;
+      }
+
+      await supabase.from("perfiles").update(payloadPerfil).eq("id", perfil_id);
+    }
+
+    if (puntosAplicados === 0) {
+      return NextResponse.json({ ok: true, applied: 0, skipped: true });
+    }
 
     const { error } = await supabase.from("puntos_historial").insert({
       perfil_id,
       tipo,
-      puntos,
+      puntos: puntosAplicados,
       concepto,
       referencia: referencia || null,
     });
@@ -57,14 +205,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const { data: perfil } = await supabase
-        .from("perfiles")
-        .select("nombre_completo,telefono,puntos_fidelidad")
-        .eq("id", perfil_id)
-        .maybeSingle();
-
       if (perfil?.telefono) {
-        const puntosMovimiento = tipo === "canjeados" ? -Math.abs(puntos) : puntos;
+        const puntosMovimiento = tipo === "canjeados" ? -Math.abs(puntosAplicados) : puntosAplicados;
         await sendClubPointsWhatsApp({
           nombre: perfil.nombre_completo || "Cliente",
           telefono: perfil.telefono,

@@ -96,5 +96,9 @@ INSERT INTO public.club_reglas_config (clave, valor, descripcion) VALUES
   ('descuento_plata',             '5',   'Porcentaje de descuento base para nivel Plata'),
   ('descuento_oro',               '10',  'Porcentaje de descuento base para nivel Oro'),
   ('descuento_diamante',          '15',  'Porcentaje de descuento base para nivel Diamante'),
-  ('puntos_bienvenida',           '50',  'Puntos que se acreditan al registrar un cliente nuevo')
+  ('puntos_bienvenida',           '50',  'Puntos que se acreditan al registrar un cliente nuevo'),
+  ('puntos_referido',             '300', 'Puntos acreditados al referidor por cada referido válido'),
+  ('puntos_max_saldo',            '25000', 'Tope máximo de saldo de puntos por cliente'),
+  ('puntos_max_ganados_mes',      '5000', 'Tope de puntos ganados por cliente en el mes calendario'),
+  ('puntos_vigencia_dias',        '365', 'Vigencia de puntos en días para expiración automática')
 ON CONFLICT (clave) DO NOTHING;

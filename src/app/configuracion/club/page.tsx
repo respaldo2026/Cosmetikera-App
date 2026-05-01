@@ -42,6 +42,10 @@ const REGLAS_LABELS: Record<string, { label: string; description: string; min?: 
   descuento_oro:                { label: "% Descuento nivel Oro",              description: "Porcentaje de descuento automático en tienda para clientes Oro.", min: 0, max: 50 },
   descuento_diamante:           { label: "% Descuento nivel Diamante",         description: "Porcentaje de descuento automático en tienda para clientes Diamante.", min: 0, max: 50 },
   puntos_bienvenida:            { label: "Puntos de bienvenida",               description: "Puntos acreditados automáticamente al registrar un cliente nuevo.", min: 0 },
+  puntos_referido:              { label: "Puntos por referido",                description: "Puntos que recibe la cliente referidora por cada referido válido.", min: 0, max: 5000 },
+  puntos_max_saldo:             { label: "Tope máximo de saldo",               description: "Máximo de puntos acumulados simultáneamente por cliente.", min: 0 },
+  puntos_max_ganados_mes:       { label: "Tope de puntos ganados por mes",     description: "Límite mensual de acumulación por cliente para evitar crecimiento indefinido.", min: 0 },
+  puntos_vigencia_dias:         { label: "Vigencia de puntos (días)",          description: "Días de validez de los puntos antes de aplicar vencimiento.", min: 30, max: 3650 },
 };
 
 export default function ConfigClubPage() {
@@ -305,7 +309,22 @@ export default function ConfigClubPage() {
         <Form form={reglasForm} layout="vertical">
           <Divider orientation="left" style={{ fontSize: 13, color: "#888" }}>Acumulación de puntos</Divider>
           <Row gutter={[16, 0]}>
-            {["puntos_por_mil", "puntos_bienvenida"].map(clave => (
+            {["puntos_por_mil", "puntos_bienvenida", "puntos_referido"].map(clave => (
+              <Col key={clave} xs={24} sm={12} md={8}>
+                <Form.Item
+                  name={clave}
+                  label={<Tooltip title={REGLAS_LABELS[clave]?.description}><span>{REGLAS_LABELS[clave]?.label}</span></Tooltip>}
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={REGLAS_LABELS[clave]?.min ?? 0} max={REGLAS_LABELS[clave]?.max} style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+            ))}
+          </Row>
+
+          <Divider orientation="left" style={{ fontSize: 13, color: "#888" }}>Política de vencimiento y topes</Divider>
+          <Row gutter={[16, 0]}>
+            {["puntos_vigencia_dias", "puntos_max_saldo", "puntos_max_ganados_mes"].map(clave => (
               <Col key={clave} xs={24} sm={12} md={8}>
                 <Form.Item
                   name={clave}

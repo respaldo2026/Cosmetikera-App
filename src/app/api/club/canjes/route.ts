@@ -6,7 +6,8 @@ import {
   getRewardByKey,
   parseRewardCanjeDescription,
 } from "@/constants/clubRewards";
-import { isRewardEligibleDynamic, getNivelDinamico, DEFAULT_REGLAS, type DynamicClubReward, type ClubReglas } from "@/hooks/useClubConfig";
+import { isRewardEligibleDynamic, type DynamicClubReward } from "@/hooks/useClubConfig";
+import { DEFAULT_REGLAS, GAIN_TIPOS, getNivelDinamico, mergeClubRules, type ClubReglas } from "@/utils/club-rules";
 import { isBirthdayMonth } from "@/constants/clubRewards";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zgqrhzuhrwudckweslzr.supabase.co";
@@ -37,6 +38,78 @@ function normalizeCanje(canje: any) {
     rewardTitle: reward?.title || meta?.cleanDescription || canje.descripcion,
     rewardIcon: reward?.icon || "🎁",
   };
+}
+
+async function applyExpiryIfNeeded(
+  perfilId: string,
+  reglas: ClubReglas,
+  currentPoints: number,
+) {
+  const vigenciaDias = Math.max(0, Math.floor(reglas.puntos_vigencia_dias || 0));
+  if (vigenciaDias <= 0) return { pointsAfterExpiry: currentPoints, expiredNow: 0 };
+
+  const cutoffDate = new Date(Date.now() - vigenciaDias * 24 * 60 * 60 * 1000).toISOString();
+
+  const [oldGainsRes, consumptionsRes, expiredRes] = await Promise.all([
+    supabaseAdmin
+      .from("puntos_historial")
+      .select("puntos,tipo")
+      .eq("perfil_id", perfilId)
+      .lt("created_at", cutoffDate)
+      .in("tipo", [...GAIN_TIPOS])
+      .limit(5000),
+    supabaseAdmin
+      .from("puntos_historial")
+      .select("puntos,tipo")
+      .eq("perfil_id", perfilId)
+      .lt("created_at", cutoffDate)
+      .not("tipo", "eq", "expiracion")
+      .limit(5000),
+    supabaseAdmin
+      .from("puntos_historial")
+      .select("puntos")
+      .eq("perfil_id", perfilId)
+      .eq("tipo", "expiracion")
+      .limit(5000),
+  ]);
+
+  const oldGains = (oldGainsRes.data || []).reduce((acc: number, row: any) => {
+    const value = Number(row?.puntos || 0);
+    return value > 0 ? acc + value : acc;
+  }, 0);
+
+  const consumptionsOldWindow = (consumptionsRes.data || []).reduce((acc: number, row: any) => {
+    const value = Number(row?.puntos || 0);
+    return value < 0 ? acc + Math.abs(value) : acc;
+  }, 0);
+
+  const alreadyExpired = (expiredRes.data || []).reduce((acc: number, row: any) => {
+    const value = Number(row?.puntos || 0);
+    return value < 0 ? acc + Math.abs(value) : acc;
+  }, 0);
+
+  const pendingExpiry = Math.max(0, oldGains - consumptionsOldWindow - alreadyExpired);
+  const expiredNow = Math.min(currentPoints, pendingExpiry);
+
+  if (expiredNow <= 0) return { pointsAfterExpiry: currentPoints, expiredNow: 0 };
+
+  await supabaseAdmin.from("puntos_historial").insert({
+    perfil_id: perfilId,
+    tipo: "expiracion",
+    puntos: -expiredNow,
+    concepto: `Vencimiento automático de puntos (${vigenciaDias} días de vigencia)`,
+  });
+
+  const pointsAfterExpiry = Math.max(0, currentPoints - expiredNow);
+  await supabaseAdmin
+    .from("perfiles")
+    .update({
+      puntos_fidelidad: pointsAfterExpiry,
+      nivel_fidelidad: getNivelDinamico(pointsAfterExpiry, reglas),
+    })
+    .eq("id", perfilId);
+
+  return { pointsAfterExpiry, expiredNow };
 }
 
 export async function GET(request: NextRequest) {
@@ -100,12 +173,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Construir reglas dinámicas (con fallback a defaults)
-    const reglasRaw = reglasDbRes.data ?? [];
-    const reglas: ClubReglas = { ...DEFAULT_REGLAS };
-    for (const row of reglasRaw) {
-      const num = Number(row.valor);
-      if (Number.isFinite(num)) (reglas as any)[row.clave] = num;
-    }
+    const reglasRaw = Object.fromEntries((reglasDbRes.data ?? []).map((row: any) => [row.clave, Number(row.valor)]));
+    const reglas: ClubReglas = mergeClubRules({ ...DEFAULT_REGLAS, ...reglasRaw });
 
     // Buscar la recompensa en el catálogo dinámico
     const catalogoDinamico: DynamicClubReward[] = configRes.data ?? [];
@@ -114,15 +183,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Recompensa no encontrada en el catálogo activo" }, { status: 404 });
     }
 
-    const esCumple = client.fecha_nacimiento ? isBirthdayMonth(client.fecha_nacimiento) : false;
+    const currentPoints = Number(client.puntos_fidelidad || 0);
+    const { pointsAfterExpiry } = await applyExpiryIfNeeded(client.id, reglas, currentPoints);
+    const clientWithPolicy = {
+      ...client,
+      puntos_fidelidad: pointsAfterExpiry,
+      nivel_fidelidad: getNivelDinamico(pointsAfterExpiry, reglas),
+    };
 
-    if (!isRewardEligibleDynamic(reward, client, reglas, esCumple)) {
+    const esCumple = clientWithPolicy.fecha_nacimiento ? isBirthdayMonth(clientWithPolicy.fecha_nacimiento) : false;
+
+    if (!isRewardEligibleDynamic(reward, clientWithPolicy, reglas, esCumple)) {
       return NextResponse.json({ error: "No cumples las condiciones para esta recompensa" }, { status: 403 });
     }
 
     const voucherCode = buildVoucherCode();
-    const currentPoints = client.puntos_fidelidad || 0;
-    const nextPoints = currentPoints - reward.points_cost;
+    const nextPoints = pointsAfterExpiry - reward.points_cost;
     const nextLevel = getNivelDinamico(nextPoints, reglas);
 
     // Construir ClubReward compatible para buildRewardCanjeDescription

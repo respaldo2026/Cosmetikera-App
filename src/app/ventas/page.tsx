@@ -505,16 +505,10 @@ export default function VentasPage() {
 
       // Puntos de fidelidad (1 punto por cada $1000, con multiplicador de cumpleaños)
       if (clienteId && clienteSeleccionado && puntosGanados > 0) {
-        const nuevosPuntos = Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados;
-        const nuevoPuntosGanados = Number((clienteSeleccionado as any).puntos_ganados || 0) + puntosGanados;
-
         await fetch(`/api/perfiles?id=${encodeURIComponent(clienteId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            puntos_fidelidad: nuevosPuntos,
-            nivel_fidelidad: getNivelFidelidad(nuevosPuntos),
-            puntos_ganados: nuevoPuntosGanados,
             total_compras: Number(clienteSeleccionado.total_compras || 0) + totalFinal,
           }),
         });
@@ -534,6 +528,7 @@ export default function VentasPage() {
             puntos: puntosGanados,
             concepto: conceptoHistorial,
             referencia: venta?.id || null,
+            actualizar_perfil: true,
           }),
         }).catch(() => { /* no bloquea la venta */ });
       } else if (clienteId && clienteSeleccionado) {

@@ -258,17 +258,37 @@ function TabRanking({ clientes, loading, onRecargar }: { clientes: Cliente[]; lo
     setGuardando(true);
     try {
       const actuales = modalCliente.puntos_fidelidad || 0;
-      const nuevos = Math.max(0, actuales + puntos);
       const nivelAnterior = getNivel(actuales).key;
+
+      const res = await fetch("/api/club/puntos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          perfil_id: modalCliente.id,
+          tipo: puntos > 0 ? "bonificacion" : "ajuste",
+          puntos,
+          concepto,
+          actualizar_perfil: true,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "No se pudo aplicar el movimiento");
+
+      if (json?.skipped) {
+        message.warning("No se acreditaron puntos por límites de política del club");
+      } else {
+        message.success(`${puntos > 0 ? "+" : ""}${json?.applied ?? puntos} puntos aplicados`);
+      }
+
+      const nuevos = Math.max(0, actuales + Number(json?.applied ?? puntos));
       const nivelNuevo = getNivel(nuevos);
-      const { error } = await supabaseBrowserClient.from("perfiles").update({ puntos_fidelidad: nuevos, nivel_fidelidad: nivelNuevo.key }).eq("id", modalCliente.id);
-      if (error) throw error;
-      await supabaseBrowserClient.from("puntos_historial").insert({ perfil_id: modalCliente.id, tipo: puntos > 0 ? "bonificacion" : "ajuste", puntos, concepto });
-      message.success(`${puntos > 0 ? "+" : ""}${puntos} puntos aplicados`);
       if (nivelAnterior !== nivelNuevo.key) message.success(`🎉 ¡Subió a nivel ${nivelNuevo.label}!`);
       setModalCliente(null);
       onRecargar();
-    } catch { message.error("Error al aplicar puntos"); }
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Error al aplicar puntos");
+    }
     finally { setGuardando(false); }
   };
 

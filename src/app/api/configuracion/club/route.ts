@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { mergeClubRules } from "@/utils/club-rules";
 
 function getAdminClient() {
   return createClient(
@@ -32,11 +33,13 @@ export async function GET() {
     if (reglasRes.error) throw reglasRes.error;
 
     // Normalizar reglas a un objeto clave → valor numérico
-    const reglas: Record<string, number> = {};
+    const reglasRaw: Record<string, number | string> = {};
     for (const row of reglasRes.data ?? []) {
       const num = Number(row.valor);
-      reglas[row.clave] = Number.isFinite(num) ? num : row.valor;
+      reglasRaw[row.clave] = Number.isFinite(num) ? num : row.valor;
     }
+
+    const reglas = mergeClubRules(reglasRaw);
 
     return NextResponse.json({
       recompensas: recompensasRes.data ?? [],

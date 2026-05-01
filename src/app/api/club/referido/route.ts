@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-const PUNTOS_REFERIDO = 300;
+import { DEFAULT_REGLAS, GAIN_TIPOS, getMonthRangeUtc, getNivelDinamico, mergeClubRules } from "@/utils/club-rules";
 
 function getAdminClient() {
   return createClient(
@@ -51,13 +50,22 @@ export async function POST(request: NextRequest) {
 
     const supabase = getAdminClient();
 
-    // 1. Buscar al referidor cuyo UUID empieza por el prefijo
-    const { data: perfiles, error: searchError } = await supabase
+    const [reglasRes, perfilesRes] = await Promise.all([
+      supabase.from("club_reglas_config").select("clave,valor"),
+      supabase
       .from("perfiles")
       .select("id, nombre_completo, puntos_fidelidad, nivel_fidelidad")
       .eq("activo", true)
       .eq("rol", "cliente")
-      .ilike("id", `${prefix}%`);
+      .ilike("id", `${prefix}%`),
+    ]);
+
+    const reglasRaw = Object.fromEntries((reglasRes.data || []).map((row: any) => [row.clave, Number(row.valor)]));
+    const reglas = mergeClubRules({ ...DEFAULT_REGLAS, ...reglasRaw });
+
+    // 1. Buscar al referidor cuyo UUID empieza por el prefijo
+    const perfiles = perfilesRes.data;
+    const searchError = perfilesRes.error;
 
     if (searchError) {
       return NextResponse.json({ error: searchError.message }, { status: 500 });
@@ -104,12 +112,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Acreditar 300 puntos al referidor
-    const nuevosPuntos = (referidor.puntos_fidelidad || 0) + PUNTOS_REFERIDO;
+    // 4. Acreditar puntos de referido con topes dinámicos
+    const puntosReferido = Math.max(0, Math.floor(reglas.puntos_referido || 0));
+    const puntosActuales = Number(referidor.puntos_fidelidad || 0);
+
+    const { startIso, endIso } = getMonthRangeUtc(new Date());
+    const { data: ganadosMesData } = await supabase
+      .from("puntos_historial")
+      .select("puntos,tipo")
+      .eq("perfil_id", referidor.id)
+      .gte("created_at", startIso)
+      .lte("created_at", endIso)
+      .in("tipo", [...GAIN_TIPOS])
+      .limit(2000);
+
+    const ganadosMes = (ganadosMesData || []).reduce((acc: number, row: any) => {
+      const puntos = Number(row?.puntos || 0);
+      return puntos > 0 ? acc + puntos : acc;
+    }, 0);
+
+    const maxMes = Math.max(0, Math.floor(reglas.puntos_max_ganados_mes || 0));
+    const cupoMes = maxMes > 0 ? Math.max(0, maxMes - ganadosMes) : puntosReferido;
+
+    const maxSaldo = Math.max(0, Math.floor(reglas.puntos_max_saldo || 0));
+    const cupoSaldo = maxSaldo > 0 ? Math.max(0, maxSaldo - puntosActuales) : puntosReferido;
+
+    const puntosAcreditar = Math.max(0, Math.min(puntosReferido, cupoMes, cupoSaldo));
+    if (puntosAcreditar <= 0) {
+      return NextResponse.json(
+        { error: "No se acreditaron puntos de referido porque el cliente alcanzó el límite mensual o el tope de saldo." },
+        { status: 409 }
+      );
+    }
+
+    const nuevosPuntos = puntosActuales + puntosAcreditar;
 
     const { error: updateReferidorError } = await supabase
       .from("perfiles")
-      .update({ puntos_fidelidad: nuevosPuntos })
+      .update({
+        puntos_fidelidad: nuevosPuntos,
+        nivel_fidelidad: getNivelDinamico(nuevosPuntos, reglas),
+      })
       .eq("id", referidor.id);
 
     if (updateReferidorError) {
@@ -120,7 +163,7 @@ export async function POST(request: NextRequest) {
     await supabase.from("puntos_historial").insert({
       perfil_id: referidor.id,
       tipo: "referido",
-      puntos: PUNTOS_REFERIDO,
+      puntos: puntosAcreditar,
       concepto: `Referido exitoso · nuevo cliente registrado con tu código ${codigo.toUpperCase()}`,
     });
 
@@ -138,7 +181,7 @@ export async function POST(request: NextRequest) {
       referidor: {
         id: referidor.id,
         nombre: referidor.nombre_completo,
-        puntosAcreditados: PUNTOS_REFERIDO,
+        puntosAcreditados: puntosAcreditar,
         nuevosPuntos,
       },
     });

@@ -8,6 +8,11 @@ import {
   type ClubLevelKey,
   type ClubClientSnapshot,
 } from "@/constants/clubRewards";
+import {
+  DEFAULT_REGLAS,
+  mergeClubRules,
+  type ClubReglas,
+} from "@/utils/club-rules";
 
 // ─── Tipos dinámicos ────────────────────────────────────────────────────────
 
@@ -28,35 +33,8 @@ export type DynamicClubReward = {
   orden: number;
 };
 
-export type ClubReglas = {
-  puntos_por_mil: number;
-  multiplicador_cumple_bronce: number;
-  multiplicador_cumple_plata: number;
-  multiplicador_cumple_oro: number;
-  multiplicador_cumple_diamante: number;
-  puntos_min_plata: number;
-  puntos_min_oro: number;
-  puntos_min_diamante: number;
-  descuento_plata: number;
-  descuento_oro: number;
-  descuento_diamante: number;
-  puntos_bienvenida: number;
-};
-
-export const DEFAULT_REGLAS: ClubReglas = {
-  puntos_por_mil: 1,
-  multiplicador_cumple_bronce: 1,
-  multiplicador_cumple_plata: 2,
-  multiplicador_cumple_oro: 2,
-  multiplicador_cumple_diamante: 3,
-  puntos_min_plata: 1000,
-  puntos_min_oro: 5000,
-  puntos_min_diamante: 15000,
-  descuento_plata: 5,
-  descuento_oro: 10,
-  descuento_diamante: 15,
-  puntos_bienvenida: 50,
-};
+export type { ClubReglas };
+export { DEFAULT_REGLAS };
 
 // ─── Helpers que usan config dinámica ───────────────────────────────────────
 
@@ -164,7 +142,7 @@ export function useClubConfig() {
             orden: i,
           }));
 
-      const rg: ClubReglas = { ...DEFAULT_REGLAS, ...(json.reglas ?? {}) };
+      const rg: ClubReglas = mergeClubRules(json.reglas ?? {});
 
       _cache = { recompensas: r, reglas: rg };
       _cacheTime = Date.now();
