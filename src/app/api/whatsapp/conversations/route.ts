@@ -8,7 +8,7 @@ type ConversationMessage = {
   rol: string;
   mensaje: string;
   tipo_mensaje: string | null;
-  intento?: string | null;
+  intento: string | null;
   created_at: string;
   perfil_id: string | null;
 };
@@ -87,10 +87,52 @@ function extractNameFromTemplateMessage(message: string): string {
   const text = String(message || "").trim();
   if (!text) return "";
 
-  const match = text.match(/bienvenida\s+enviada\s+a\s+(.+)$/i);
-  if (!match?.[1]) return "";
+  const patterns = [
+    /bienvenida\s+enviada\s+a\s+(.+)$/i,
+    /bienvenida\s+para\s+([^|\n]+)(?:\||$)/i,
+  ];
 
-  return match[1].trim();
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const candidate = String(match?.[1] || "").trim();
+    if (candidate) return candidate;
+  }
+
+  return "";
+}
+
+function normalizeMsgFingerprint(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function dedupeNearDuplicateMessages(messages: ConversationMessage[]): ConversationMessage[] {
+  if (messages.length <= 1) return messages;
+
+  const ordered = [...messages].sort((a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at));
+  const result: ConversationMessage[] = [];
+
+  for (const current of ordered) {
+    const currentTs = toTimestamp(current.created_at);
+    const currentFingerprint = `${current.rol}|${String(current.tipo_mensaje || "")}|${normalizeMsgFingerprint(current.mensaje)}`;
+
+    const isDuplicate = result.some((existing) => {
+      const existingTs = toTimestamp(existing.created_at);
+      const existingFingerprint = `${existing.rol}|${String(existing.tipo_mensaje || "")}|${normalizeMsgFingerprint(existing.mensaje)}`;
+      const isSameContent = existingFingerprint === currentFingerprint;
+      const isSamePhone = normalizePhone(existing.telefono) === normalizePhone(current.telefono);
+      const nearInTime = Math.abs(existingTs - currentTs) <= 120000; // 2 minutos
+      return isSameContent && isSamePhone && nearInTime;
+    });
+
+    if (!isDuplicate) {
+      result.push(current);
+    }
+  }
+
+  return result;
 }
 
 async function getTemplateMessagesByPhone(
@@ -241,9 +283,10 @@ export async function GET(request: NextRequest) {
 
     const templateMessages = await getTemplateMessagesByPhone(supabase, normalizedPhone, phone);
     if (templateMessages.length > 0) {
-      const merged = [...((data || []) as ConversationMessage[]), ...templateMessages].sort(
-        (a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at),
-      );
+      const merged = dedupeNearDuplicateMessages([
+        ...((data || []) as ConversationMessage[]),
+        ...templateMessages,
+      ]).sort((a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at));
       data = merged as any;
     }
 
@@ -286,7 +329,7 @@ export async function GET(request: NextRequest) {
         ];
       });
 
-      data = legacyMessages;
+      data = dedupeNearDuplicateMessages(legacyMessages);
     }
 
     // Buscar nombre del cliente en perfiles
@@ -334,7 +377,10 @@ export async function GET(request: NextRequest) {
 
   const templateRecent = await getTemplateMessagesRecent(supabase);
   if (templateRecent.length > 0) {
-    rawMessages = [...((rawMessages || []) as ConversationMessage[]), ...templateRecent]
+    rawMessages = dedupeNearDuplicateMessages([
+      ...((rawMessages || []) as ConversationMessage[]),
+      ...templateRecent,
+    ])
       .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at))
       .slice(0, 2500);
   }
@@ -351,7 +397,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: legacyError.message }, { status: 500 });
     }
 
-    rawMessages = (legacyRows || []).flatMap((row) => {
+    rawMessages = dedupeNearDuplicateMessages((legacyRows || []).flatMap((row) => {
       const baseTime = new Date(row.created_at || new Date().toISOString()).getTime();
       return [
         {
@@ -360,6 +406,7 @@ export async function GET(request: NextRequest) {
           rol: "cliente",
           mensaje: row.user_message || "",
           tipo_mensaje: "text",
+          intento: null,
           created_at: new Date(baseTime).toISOString(),
           perfil_id: null,
         },
@@ -369,11 +416,12 @@ export async function GET(request: NextRequest) {
           rol: "agente",
           mensaje: row.agent_response || "",
           tipo_mensaje: "text",
+          intento: null,
           created_at: new Date(baseTime + 1000).toISOString(),
           perfil_id: null,
         },
       ];
-    });
+    }));
   }
 
   // Agrupar por teléfono y tomar el más reciente

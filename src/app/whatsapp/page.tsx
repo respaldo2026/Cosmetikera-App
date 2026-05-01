@@ -115,8 +115,16 @@ function getAvatarColor(phone: string): string {
 function extractClientNameFromTemplateText(text: string): string {
   const raw = String(text || "").trim();
   if (!raw) return "";
-  const match = raw.match(/bienvenida\s+enviada\s+a\s+(.+)$/i);
-  return match?.[1]?.trim() || "";
+  const patterns = [
+    /bienvenida\s+enviada\s+a\s+(.+)$/i,
+    /bienvenida\s+para\s+([^|\n]+)(?:\||$)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    const candidate = String(match?.[1] || "").trim();
+    if (candidate) return candidate;
+  }
+  return "";
 }
 
 // Separador de fecha entre mensajes

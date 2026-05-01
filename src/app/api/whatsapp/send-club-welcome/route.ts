@@ -69,6 +69,56 @@ async function wasWelcomeAlreadySent(supabase: any, perfilId: string): Promise<b
   return estado === "enviado";
 }
 
+async function wasWelcomeAlreadySentBroad(
+  supabase: any,
+  args: { perfilId: string; phone: string; cedula: string },
+): Promise<boolean> {
+  const normalizedPhone = normalizePhone(args.phone);
+  const cedulaNeedle = String(args.cedula || "").trim();
+
+  // 1) Revisión directa por perfil + tipo (idempotencia primaria)
+  if (await wasWelcomeAlreadySent(supabase, args.perfilId)) return true;
+
+  // 2) Respaldo por teléfono + cédula en auditoría, para escenarios con llamadas repetidas
+  //    desde múltiples orígenes o migraciones incompletas en constraints.
+  const { data: notifRows } = await supabase
+    .from("notificaciones_enviadas")
+    .select("estado,mensaje,telefono")
+    .eq("tipo", "bienvenida_club")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  const alreadyInNotifications = (notifRows || []).some((row: any) => {
+    const estado = String(row?.estado || "").toLowerCase();
+    const mensaje = String(row?.mensaje || "");
+    const rowPhone = normalizePhone(String(row?.telefono || ""));
+    const samePhone = Boolean(normalizedPhone) && rowPhone === normalizedPhone;
+    const hasCedula = cedulaNeedle ? mensaje.includes(cedulaNeedle) : false;
+    return estado === "enviado" && samePhone && hasCedula;
+  });
+
+  if (alreadyInNotifications) return true;
+
+  // 3) Respaldo final por historial de conversación template
+  const { data: templateRows } = await supabase
+    .from("whatsapp_conversation_history")
+    .select("mensaje,telefono")
+    .eq("tipo_mensaje", "template")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  const alreadyInConversation = (templateRows || []).some((row: any) => {
+    const mensaje = String(row?.mensaje || "");
+    const rowPhone = normalizePhone(String(row?.telefono || ""));
+    const samePhone = Boolean(normalizedPhone) && rowPhone === normalizedPhone;
+    const hasCedula = cedulaNeedle ? mensaje.includes(cedulaNeedle) : false;
+    const isWelcomeTemplate = mensaje.toLowerCase().includes("club_welcome") || mensaje.toLowerCase().includes("bienvenida");
+    return samePhone && hasCedula && isWelcomeTemplate;
+  });
+
+  return alreadyInConversation;
+}
+
 /**
  * Toma un candado lógico en notificaciones_enviadas para evitar doble envío por concurrencia.
  *
@@ -391,19 +441,6 @@ export async function POST(
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // 3.1 Idempotencia: si ya fue enviada, no volver a disparar WhatsApp
-    const alreadySent = await wasWelcomeAlreadySent(supabase, body.perfil_id);
-    if (alreadySent) {
-      return NextResponse.json(
-        {
-          success: true,
-          already_sent: true,
-          message: "La plantilla de bienvenida ya había sido enviada para este cliente",
-        } as SendClubWelcomeResponse,
-        { status: 200 }
-      );
-    }
-
     // 4. Obtener teléfono
     const phone =
       body.telefono || (await getProfilePhone(supabase, body.perfil_id));
@@ -415,6 +452,23 @@ export async function POST(
           error: "No se encontró teléfono para el perfil",
         } as SendClubWelcomeResponse,
         { status: 404 }
+      );
+    }
+
+    // 4.1 Idempotencia reforzada: evita reenvíos aunque existan llamadas duplicadas
+    const alreadySent = await wasWelcomeAlreadySentBroad(supabase, {
+      perfilId: body.perfil_id,
+      phone,
+      cedula: body.cedula,
+    });
+    if (alreadySent) {
+      return NextResponse.json(
+        {
+          success: true,
+          already_sent: true,
+          message: "La plantilla de bienvenida ya había sido enviada para este cliente",
+        } as SendClubWelcomeResponse,
+        { status: 200 }
       );
     }
 
