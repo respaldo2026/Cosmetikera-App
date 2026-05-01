@@ -41,11 +41,13 @@ import {
   ShoppingCartOutlined,
   SwapOutlined,
   UserOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { parseRewardCanjeDescription } from "@/constants/clubRewards";
 import { buildComparisonMetric, buildHistorialStats, getCurrentAndPreviousRanges } from "./stats";
 import { descargarInformeHistorialPDF } from "@/utils/historial-report";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const HistorialCharts = dynamic(() => import("./HistorialCharts"), {
   ssr: false,
@@ -409,6 +411,9 @@ export default function HistorialPage() {
   const { message } = App.useApp();
   const screens = useBreakpoint();
   const isMobile = !screens.md;
+  const { user } = useCurrentUser();
+  const role = String((user as any)?.rol || "").toLowerCase();
+  const isAdmin = ["administrador", "admin", "director", "administrativo"].includes(role);
 
   const [data, setData] = useState<HistorialPayload>({
     ventas: [],
@@ -846,6 +851,29 @@ export default function HistorialPage() {
     }
   }, [filtrosResumen, message, salesStats]);
 
+  const eliminarOperacion = useCallback(async (record: HistorialEntry) => {
+    if (!isAdmin) {
+      message.error("Solo el administrador puede eliminar transacciones");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/historial", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: record.id, tipo: record.tipo }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "No se pudo eliminar la transacción");
+
+      message.success("Transacción eliminada");
+      setDetalle(null);
+      await cargar();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Error al eliminar transacción");
+    }
+  }, [cargar, isAdmin, message]);
+
   const columns = [
     {
       title: "Fecha",
@@ -946,9 +974,30 @@ export default function HistorialPage() {
       key: "acciones",
       width: 70,
       render: (_: unknown, record: HistorialEntry) => (
-        <Tooltip title="Ver detalle">
-          <Button size="small" icon={<EyeOutlined />} onClick={() => setDetalle(record)} />
-        </Tooltip>
+        <Space>
+          <Tooltip title="Ver detalle">
+            <Button size="small" icon={<EyeOutlined />} onClick={() => setDetalle(record)} />
+          </Tooltip>
+          {isAdmin ? (
+            <Tooltip title="Eliminar transacción">
+              <Button
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  Modal.confirm({
+                    title: "¿Eliminar transacción?",
+                    content: "Esta acción no se puede deshacer.",
+                    okText: "Eliminar",
+                    okButtonProps: { danger: true },
+                    cancelText: "Cancelar",
+                    onOk: async () => eliminarOperacion(record),
+                  });
+                }}
+              />
+            </Tooltip>
+          ) : null}
+        </Space>
       ),
     },
   ];

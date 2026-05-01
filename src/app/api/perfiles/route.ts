@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sendClubWelcomeWhatsApp } from "@/utils/club-whatsapp";
+import { requireAdmin } from "../_utils/admin-guard";
+import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
 function getAdminClient() {
   return createClient(
@@ -209,6 +211,87 @@ export async function POST(request: Request) {
     return NextResponse.json({ data }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/perfiles] unexpected", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const adminCheck = await requireAdmin(request);
+    if (!adminCheck.ok) return adminCheck.response;
+
+    const { searchParams } = new URL(request.url);
+    const id = String(searchParams.get("id") || "").trim();
+    if (!id) {
+      return NextResponse.json({ error: "id requerido" }, { status: 400 });
+    }
+
+    const supabase = getAdminClient();
+
+    const { data: perfil, error: perfilError } = await supabase
+      .from("perfiles")
+      .select("id,telefono,rol")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (perfilError) {
+      return NextResponse.json({ error: perfilError.message }, { status: 400 });
+    }
+
+    if (!perfil?.id) {
+      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+    }
+
+    const telefono = String((perfil as any).telefono || "").replace(/\D/g, "");
+
+    const cascadeDeletes: any[] = [
+      supabase.from("ventas").delete().eq("cliente_id", id),
+      supabase.from("movimientos_financieros").delete().eq("estudiante_id", id),
+      supabase.from("movimientos_financieros").delete().eq("proveedor_id", id),
+      supabase.from("puntos_historial").delete().eq("perfil_id", id),
+      supabase.from("canjes").delete().eq("perfil_id", id),
+      supabase.from("club_inscripciones").delete().eq("perfil_id", id),
+      supabase.from("notificaciones_enviadas").delete().eq("perfil_id", id),
+      supabase.from("whatsapp_conversation_history").delete().eq("perfil_id", id),
+      supabase.from("whatsapp_customer_memory").delete().eq("perfil_id", id),
+    ];
+
+    if (telefono) {
+      cascadeDeletes.push(
+        supabase.from("whatsapp_conversation_history").delete().ilike("telefono", `%${telefono.slice(-10)}%`),
+        supabase.from("whatsapp_customer_memory").delete().ilike("telefono", `%${telefono.slice(-10)}%`),
+        supabase.from("agent_conversations").delete().ilike("phone_number", `%${telefono.slice(-10)}%`),
+      );
+    }
+
+    const cascadeResults = await Promise.all(cascadeDeletes);
+    const blockingErrors = cascadeResults
+      .map((r) => r?.error)
+      .filter((err) => err && !isMissingSupabaseRelationError(err));
+
+    if (blockingErrors.length > 0) {
+      return NextResponse.json(
+        { error: blockingErrors.map((err: any) => err.message).join(" | ") },
+        { status: 400 }
+      );
+    }
+
+    const { error: deletePerfilError } = await supabase.from("perfiles").delete().eq("id", id);
+    if (deletePerfilError) {
+      return NextResponse.json({ error: deletePerfilError.message }, { status: 400 });
+    }
+
+    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(id);
+    if (deleteAuthError) {
+      const msg = String(deleteAuthError.message || "").toLowerCase();
+      if (!msg.includes("not") && !msg.includes("exist") && !msg.includes("found")) {
+        return NextResponse.json({ error: deleteAuthError.message }, { status: 400 });
+      }
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[DELETE /api/perfiles]", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

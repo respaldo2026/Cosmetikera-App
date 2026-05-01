@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "../_utils/admin-guard";
 
 function getAdminClient() {
   return createClient(
@@ -137,6 +138,102 @@ export async function GET(request: Request) {
           .some((rows) => (rows ?? []).length >= pageSize),
       },
     });
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Error interno" },
+      { status: 500 }
+    );
+  }
+}
+
+type DeleteHistorialBody = {
+  id?: string;
+  tipo?: "venta" | "compra" | "movimiento" | "puntos" | "voucher";
+};
+
+function extractPosNumber(text: string): number | null {
+  const match = String(text || "").match(/(?:venta|compra)?\s*pos\s*#?\s*(\d{3,})/i);
+  if (!match?.[1]) return null;
+  const numeric = Number(match[1]);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const adminCheck = await requireAdmin(request);
+    if (!adminCheck.ok) return adminCheck.response;
+
+    const body = (await request.json()) as DeleteHistorialBody;
+    const id = String(body.id || "").trim();
+    const tipo = body.tipo;
+
+    if (!id || !tipo) {
+      return NextResponse.json({ error: "id y tipo son obligatorios" }, { status: 400 });
+    }
+
+    const supabase = getAdminClient();
+
+    if (tipo === "venta") {
+      const { data: ventaActual, error: ventaError } = await supabase
+        .from("ventas")
+        .select("id,numero_ticket")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (ventaError) {
+        return NextResponse.json({ error: ventaError.message }, { status: 400 });
+      }
+
+      if (!ventaActual?.id) {
+        return NextResponse.json({ error: "Venta no encontrada" }, { status: 404 });
+      }
+
+      const ticket = Number(ventaActual.numero_ticket || 0);
+
+      const { error: deleteVentaError } = await supabase
+        .from("ventas")
+        .delete()
+        .eq("id", id);
+
+      if (deleteVentaError) {
+        return NextResponse.json({ error: deleteVentaError.message }, { status: 400 });
+      }
+
+      if (Number.isFinite(ticket) && ticket > 0) {
+        const tag = `POS #${ticket}`;
+
+        await supabase
+          .from("movimientos_financieros")
+          .delete()
+          .or(`concepto.ilike.%${tag}%,descripcion.ilike.%${tag}%,referencia.ilike.%${ticket}%`);
+
+        await supabase
+          .from("puntos_historial")
+          .delete()
+          .or(`concepto.ilike.%${tag}%,referencia.ilike.%${ticket}%`);
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const tableByTipo: Record<Exclude<DeleteHistorialBody["tipo"], "venta" | undefined>, string> = {
+      compra: "compras",
+      movimiento: "movimientos_financieros",
+      puntos: "puntos_historial",
+      voucher: "canjes",
+    };
+
+    const table = tableByTipo[tipo as Exclude<DeleteHistorialBody["tipo"], "venta" | undefined>];
+    if (!table) {
+      return NextResponse.json({ error: "Tipo de transacción inválido" }, { status: 400 });
+    }
+
+    const { error } = await supabase.from(table).delete().eq("id", id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (error: unknown) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Error interno" },

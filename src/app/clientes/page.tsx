@@ -10,11 +10,13 @@ import {
   UserOutlined, SearchOutlined, ReloadOutlined, EditOutlined,
   PlusOutlined, PhoneOutlined, MailOutlined, TrophyOutlined,
   SaveOutlined, CloseOutlined, IdcardOutlined, RightOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -90,6 +92,9 @@ export default function ClientesPage() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { message } = App.useApp();
+  const { user } = useCurrentUser();
+  const role = String((user as any)?.rol || "").toLowerCase();
+  const isAdmin = ["administrador", "admin", "director", "administrativo"].includes(role);
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +169,35 @@ export default function ClientesPage() {
     }
   };
 
+  const eliminarCliente = useCallback(async (cliente: Cliente) => {
+    if (!isAdmin) {
+      message.error("Solo el administrador puede eliminar clientes");
+      return;
+    }
+
+    Modal.confirm({
+      title: "¿Eliminar cliente?",
+      content: "Se eliminará el cliente y todas sus transacciones asociadas. Esta acción no se puede deshacer.",
+      okText: "Eliminar",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          const res = await fetch(`/api/perfiles?id=${cliente.id}`, { method: "DELETE" });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || "No se pudo eliminar el cliente");
+          message.success("Cliente y transacciones eliminados");
+          if (clienteSeleccionado?.id === cliente.id) {
+            setClienteSeleccionado(null);
+          }
+          await cargar();
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : "Error al eliminar cliente");
+        }
+      },
+    });
+  }, [cargar, clienteSeleccionado?.id, isAdmin, message]);
+
   const columns: ColumnsType<Cliente> = [
     {
       title: "Cliente",
@@ -226,8 +260,23 @@ export default function ClientesPage() {
     {
       title: "",
       key: "ver",
-      width: 40,
-      render: () => <RightOutlined style={{ color: "#bbb" }} />,
+      width: 110,
+      render: (_: unknown, r) => (
+        <Space>
+          {isAdmin ? (
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={(event) => {
+                event.stopPropagation();
+                eliminarCliente(r);
+              }}
+            />
+          ) : null}
+          <RightOutlined style={{ color: "#bbb" }} />
+        </Space>
+      ),
     },
   ];
 
