@@ -32,6 +32,8 @@ type GreetingStyle =
   | "hola"
   | "none";
 
+type BeautyDomain = "cabello" | "piel" | "unas" | "maquillaje";
+
 function detectGreetingStyle(message: string): GreetingStyle {
   const m = normalize(message);
   if (!m) return "none";
@@ -112,6 +114,200 @@ function detectIntent(message: string): AgentIntent {
   if (/maquillaje|base|corrector|labial|pestanas|cejas|uñas|unas|acrilicas|acrilico|gel|semipermanente|esmalte|perfume|fragancia|duracion|transferencia|oxidacion/.test(m)) return "general";
 
   return "general";
+}
+
+function detectBeautyDomain(message: string): BeautyDomain | null {
+  const m = normalize(message);
+  if (!m) return null;
+  if (/unas|uñas|esmalte|acrilica|acrilicas|gel|semipermanente|polygel|top coat|manicure|nail/.test(m)) {
+    return "unas";
+  }
+  if (/maquillaje|base|corrector|labial|rubor|polvo|primer|sombras|pestanas|cejas/.test(m)) {
+    return "maquillaje";
+  }
+  if (/cabello|pelo|capilar|shampoo|acondicionador|mascarilla|frizz|caspa|caida|rizado|ondulado|afro|alisado|keratina|tinte|decoloracion/.test(m)) {
+    return "cabello";
+  }
+  if (/piel|acne|grano|espinilla|mancha|melasma|arruga|poro|serum|hidratante|protector solar|facial/.test(m)) {
+    return "piel";
+  }
+  return null;
+}
+
+function isDateTimeQuestion(message: string): boolean {
+  const m = normalize(message);
+  return /(que\s+dia\s+es\s+hoy|que\s+fecha\s+es\s+hoy|fecha\s+de\s+hoy|hoy\s+que\s+dia|hoy\s+es|sabes\s+que\s+dia|que\s+hora\s+es|hora\s+es|me\s+dices\s+la\s+hora)/.test(m);
+}
+
+function buildDateTimeDirectReply(customerName: string, message: string): string | null {
+  if (!isDateTimeQuestion(message)) return null;
+
+  const now = new Date();
+  const dia = new Intl.DateTimeFormat("es-CO", { weekday: "long" }).format(now);
+  const fecha = new Intl.DateTimeFormat("es-CO", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(now);
+  const hora = new Intl.DateTimeFormat("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(now);
+
+  const named = customerName ? ` ${customerName}` : "";
+  return `Hola${named}. Hoy es ${dia}, ${fecha}, y son las ${hora}. ¿Quieres que te ayude también con uñas, piel, cabello o maquillaje?`;
+}
+
+function detectRejectedDomainsFromMessage(message: string): BeautyDomain[] {
+  const m = normalize(message);
+  if (!m) return [];
+  if (!/(no\s+quiero|no\s+me\s+interesa|no\s+me\s+gusta|no\s+busco|no\s+deseo|no\s+necesito|sin\s+)/.test(m)) {
+    return [];
+  }
+
+  const rejected: BeautyDomain[] = [];
+  if (/cabello|pelo|capilar/.test(m)) rejected.push("cabello");
+  if (/piel|facial|acne|mancha/.test(m)) rejected.push("piel");
+  if (/unas|uñas|esmalte|gel|acrilica|acrilicas|manicure|nail/.test(m)) rejected.push("unas");
+  if (/maquillaje|base|corrector|labial|rubor|primer|cejas|pestanas/.test(m)) rejected.push("maquillaje");
+  return rejected;
+}
+
+function collectRejectedDomains(
+  message: string,
+  conversationHistory: Array<{ rol: string; mensaje: string }>,
+): Set<BeautyDomain> {
+  const result = new Set<BeautyDomain>();
+  const historyClientMessages = conversationHistory
+    .filter((row) => row.rol === "cliente")
+    .slice(-12)
+    .map((row) => String(row.mensaje || ""));
+
+  for (const text of [...historyClientMessages, message]) {
+    for (const domain of detectRejectedDomainsFromMessage(text)) {
+      result.add(domain);
+    }
+  }
+
+  return result;
+}
+
+function responseMentionsDomain(text: string, domain: BeautyDomain): boolean {
+  const t = normalize(text);
+  if (!t) return false;
+
+  switch (domain) {
+    case "cabello":
+      return /cabello|pelo|shampoo|mascarilla|capilar|frizz|caida|keratina/.test(t);
+    case "piel":
+      return /piel|acne|mancha|serum|facial|hidratante|protector/.test(t);
+    case "unas":
+      return /unas|uñas|esmalte|acrilica|acrilicas|gel|semipermanente|polygel|manicure|nail/.test(t);
+    case "maquillaje":
+      return /maquillaje|base|corrector|labial|rubor|primer|sombras/.test(t);
+    default:
+      return false;
+  }
+}
+
+function domainLabel(domain: BeautyDomain): string {
+  switch (domain) {
+    case "cabello":
+      return "cabello";
+    case "piel":
+      return "piel";
+    case "unas":
+      return "uñas";
+    case "maquillaje":
+      return "maquillaje";
+    default:
+      return "esa categoría";
+  }
+}
+
+function buildDomainFocusedReply(
+  domain: BeautyDomain,
+  customerName: string,
+  message: string,
+  articles: CatalogArticle[],
+): string {
+  const inventoryAdvice = buildDeterministicInventoryAdvisory(customerName, message, articles);
+  if (inventoryAdvice && responseMentionsDomain(inventoryAdvice, domain)) {
+    return inventoryAdvice;
+  }
+
+  const greeting = buildHumanGreeting(detectGreetingStyle(message), customerName);
+  if (domain === "unas") {
+    return `${greeting} Entendido, nos enfocamos solo en uñas. ¿Buscas fortalecer, duración o diseño? Te paso opciones con precio real y stock.`;
+  }
+  if (domain === "maquillaje") {
+    return `${greeting} Entendido, vamos solo con maquillaje. ¿Lo quieres para uso diario o para evento? Así te doy opciones con precio real.`;
+  }
+  if (domain === "cabello") {
+    return `${greeting} Entendido, vamos solo con cabello. ¿Tu prioridad es frizz, caída o resequedad? Te recomiendo opciones reales de inventario.`;
+  }
+  return `${greeting} Entendido, vamos solo con piel. ¿Tu piel es grasa, seca o mixta? Con eso te recomiendo opciones reales de tienda.`;
+}
+
+function isRepeatedAgainstRecentAgentMessages(current: string, historyRows: Array<{ rol: string; mensaje: string }>): boolean {
+  const recentAgentMessages = historyRows
+    .filter((row) => row.rol === "agente")
+    .slice(-3)
+    .map((row) => String(row.mensaje || ""));
+
+  return recentAgentMessages.some((previous) => looksRepeatedAnswer(current, previous));
+}
+
+function enforceFinalResponseQuality(params: {
+  responseText: string;
+  customerName: string;
+  message: string;
+  articles: CatalogArticle[];
+  historyRows: Array<{ rol: string; mensaje: string }>;
+  rejectedDomains: Set<BeautyDomain>;
+}): string {
+  const { customerName, message, articles, historyRows, rejectedDomains } = params;
+  let finalText = String(params.responseText || "").trim();
+
+  const directDateTime = buildDateTimeDirectReply(customerName, message);
+  if (directDateTime) {
+    finalText = directDateTime;
+  }
+
+  const requestedDomain = detectBeautyDomain(message);
+
+  if (requestedDomain && finalText && !responseMentionsDomain(finalText, requestedDomain) && !isDateTimeQuestion(message)) {
+    finalText = buildDomainFocusedReply(requestedDomain, customerName, message, articles);
+  }
+
+  if (rejectedDomains.size > 0) {
+    for (const rejected of rejectedDomains) {
+      if (requestedDomain && rejected === requestedDomain) continue;
+
+      if (responseMentionsDomain(finalText, rejected) && !isDateTimeQuestion(message)) {
+        if (requestedDomain) {
+          finalText = buildDomainFocusedReply(requestedDomain, customerName, message, articles);
+        } else {
+          const greeting = buildHumanGreeting(detectGreetingStyle(message), customerName);
+          finalText = `${greeting} Entendido, no te hablaré de ${domainLabel(rejected)}. Dime en qué categoría sí quieres ayuda: uñas, maquillaje, piel o cabello.`;
+        }
+      }
+    }
+  }
+
+  if (isRepeatedAgainstRecentAgentMessages(finalText, historyRows)) {
+    if (requestedDomain) {
+      finalText = buildDomainFocusedReply(requestedDomain, customerName, message, articles);
+    } else {
+      const alternative = buildDeterministicInventoryAdvisory(customerName, message, articles);
+      if (alternative && !isRepeatedAgainstRecentAgentMessages(alternative, historyRows)) {
+        finalText = alternative;
+      }
+    }
+  }
+
+  return finalText;
 }
 
 function buildBeautyKnowledgeContext(): string {
@@ -567,7 +763,7 @@ function buildHeuristicFallbackResponse(params: {
 
   const hasSkinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|piel grasa|piel seca|piel mixta|brillo/.test(normalizedContext);
   const hasHairConcern = /caida|quiebre|frizz|caspa|reseco|ondulado|rizado|alisado|tinte|decoloracion/.test(normalizedContext);
-  const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas|esmalte/.test(normalizedContext);
+  const hasMakeupConcern = /maquillaje|base|corrector|labial|pestanas|cejas/.test(normalizedContext);
   const hasColorConcern = /tinte|coloracion|decoloracion|mechas|balayage|matiz|tonalizar|rubio|castano|negro|rojizo/.test(normalizedContext);
   const hasStraighteningConcern = /alisado|keratina|botox capilar|planchado|repolarizacion/.test(normalizedContext);
   const hasAfroConcern = /afro|rizo tipo 3|rizo tipo 4|coily|crespo/.test(normalizedContext);
@@ -926,6 +1122,9 @@ export async function POST(request: NextRequest) {
       .reverse()
       .slice(-18);
 
+    const conversationHistory = historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje }));
+    const rejectedDomains = collectRejectedDomains(message, conversationHistory);
+
     // ── 4. Construir catálogo relevante ───────────────────────────
     const tokens = getSearchTokens(message);
     const relevantArticles = rankArticles(articulos, tokens, intent).slice(0, 25);
@@ -995,6 +1194,8 @@ Responder EXACTAMENTE lo que el cliente preguntó, usando el catálogo real de l
 9. Si el cliente se queja de que no lo entiendes: discúlpate en 1 frase y responde directo.
 10. NUNCA inventes precios ni productos que no estén en el catálogo.
 11. Si recomiendas productos, prioriza inventario con stock > 0.
+12. RESPUESTA DIRECTA PRIMERO: si preguntan fecha/hora, responde la fecha/hora en la primera línea.
+13. Si el cliente dijo que NO quiere una categoría, NO la menciones de nuevo salvo que el cliente la pida explícitamente.
 
 ## ESPECIALIDADES
 Cabello (tintes, decoloración, alisados, afro/rizado), piel (acné, manchas, hidratación), uñas (acrílicas, gel, semipermanente), maquillaje, barba.
@@ -1005,13 +1206,21 @@ ${buildBeautyKnowledgeContext()}
 ## CLIENTE
 ${clienteTexto}
 
+## CATEGORÍAS RECHAZADAS POR CLIENTE
+${rejectedDomains.size > 0 ? Array.from(rejectedDomains).map(domainLabel).join(", ") : "ninguna"}
+
 ## CATÁLOGO LA COSMETIKERA (${articulos.length} productos cargados — usa estos precios reales)
 ${catalogoTexto}`;
 
     let responseText = "";
 
+    const directDateTimeReply = buildDateTimeDirectReply(customerName, message);
+    if (directDateTimeReply) {
+      responseText = directDateTimeReply;
+    }
+
     // ── 7. Llamar a Gemini con historial real (multi-turn) ────────
-    if (geminiKey) {
+    if (!responseText && geminiKey) {
       const genAI = new GoogleGenerativeAI(geminiKey);
       const modelCandidates = [
         process.env.GEMINI_MODEL_CHAT,
@@ -1097,7 +1306,7 @@ ${catalogoTexto}`;
         articles: articulos,
         lastBotMessage: lastAgentMsg,
         businessContext: customerBusinessContext,
-        conversationHistory: historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje })),
+        conversationHistory,
       });
     }
 
@@ -1113,7 +1322,7 @@ ${catalogoTexto}`;
             articles: articulos,
             lastBotMessage: "",
             businessContext: customerBusinessContext,
-            conversationHistory: historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje })),
+            conversationHistory,
           });
     }
 
@@ -1140,6 +1349,15 @@ ${catalogoTexto}`;
         responseText = deterministicAdvisory;
       }
     }
+
+    responseText = enforceFinalResponseQuality({
+      responseText,
+      customerName,
+      message,
+      articles: articulos,
+      historyRows: conversationHistory,
+      rejectedDomains,
+    });
 
     // ── 10. Registrar en historial y memoria ──────────────────────
     if (telefono) {
