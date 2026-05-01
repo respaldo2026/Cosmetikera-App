@@ -4,6 +4,8 @@ import { sendClubWelcomeWhatsApp } from "@/utils/club-whatsapp";
 import { requireAdmin } from "../_utils/admin-guard";
 import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
 
+const ENABLE_LEGACY_TEXT_WELCOME = process.env.WHATSAPP_PERFILES_TEXT_WELCOME === "true";
+
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -196,7 +198,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    if (rol === "cliente") {
+    // Por defecto, la bienvenida del club se envía por plantilla (flujo dedicado /api/whatsapp/send-club-welcome).
+    // Este envío de texto se mantiene solo como fallback legacy si se habilita explícitamente.
+    if (rol === "cliente" && ENABLE_LEGACY_TEXT_WELCOME) {
       try {
         await sendClubWelcomeWhatsApp({
           nombre: nombre_completo.trim(),

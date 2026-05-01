@@ -15,7 +15,7 @@ import {
   SearchOutlined,
   CheckOutlined,
   RobotOutlined,
-  UserOutlined,
+  LeftOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
 
@@ -260,6 +260,7 @@ export default function WhatsAppMonitorPage() {
   const shouldStickToBottomRef = useRef(true);
   const isFetchingListRef = useRef(false);
   const isFetchingMessagesRef = useRef(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   type LoadOptions = {
     silent?: boolean;
@@ -325,6 +326,16 @@ export default function WhatsAppMonitorPage() {
     loadConversations();
   }, [loadConversations]);
 
+  useEffect(() => {
+    const updateLayout = () => {
+      setIsMobile(window.innerWidth < 992);
+    };
+
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, []);
+
   // Auto-scroll al último mensaje SOLO si el usuario está cerca del final
   useEffect(() => {
     if (!shouldStickToBottomRef.current) return;
@@ -383,37 +394,50 @@ export default function WhatsAppMonitorPage() {
     <div
       style={{
         display: "flex",
-        height: "calc(100vh - 64px)",
-        background: "#f0f2f5",
+        height: "calc(100vh - 72px)",
+        background: "linear-gradient(180deg, #eef3f6 0%, #f6f8fa 100%)",
         fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
         overflow: "hidden",
+        padding: isMobile ? 0 : 12,
+        gap: isMobile ? 0 : 12,
       }}
     >
       {/* ── Panel izquierdo: lista de conversaciones ─────────────── */}
       <div
         style={{
-          width: 360,
-          minWidth: 280,
-          borderRight: "1px solid #e0e0e0",
+          width: isMobile ? "100%" : 360,
+          minWidth: isMobile ? "100%" : 300,
+          borderRight: isMobile ? "none" : "1px solid #e0e0e0",
           background: "#FFFFFF",
           display: "flex",
           flexDirection: "column",
           flexShrink: 0,
+          borderRadius: isMobile ? 0 : 14,
+          boxShadow: isMobile ? "none" : "0 6px 22px rgba(0,0,0,0.06)",
+          overflow: "hidden",
+          height: "100%",
+          visibility: isMobile && selectedPhone ? "hidden" : "visible",
+          position: isMobile && selectedPhone ? "absolute" : "relative",
         }}
       >
         {/* Header lista */}
         <div
           style={{
             background: "#128C7E",
-            padding: "14px 16px",
+            padding: "14px 16px 10px 16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
           }}
         >
-          <Text style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>
-            WhatsApp Bot
-          </Text>
+          <div>
+            <Text style={{ color: "#fff", fontWeight: 700, fontSize: 16, display: "block" }}>
+              WhatsApp Bot
+            </Text>
+            <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 11 }}>
+              {conversations.length} conversación(es)
+            </Text>
+          </div>
           <Tooltip title="Actualizar">
             <ReloadOutlined
               style={{ color: "#fff", cursor: "pointer", fontSize: 16 }}
@@ -560,6 +584,8 @@ export default function WhatsAppMonitorPage() {
             backgroundImage:
               "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h60v60H0z' fill='%23f0ede8' fill-opacity='0.5'/%3E%3C/svg%3E\")",
             overflow: "hidden",
+            borderRadius: isMobile ? 0 : 14,
+            boxShadow: isMobile ? "none" : "0 6px 22px rgba(0,0,0,0.06)",
           }}
         >
           {/* Header conversación */}
@@ -573,6 +599,14 @@ export default function WhatsAppMonitorPage() {
               boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
             }}
           >
+            {isMobile && (
+              <Tooltip title="Volver a conversaciones">
+                <LeftOutlined
+                  onClick={() => setSelectedPhone(null)}
+                  style={{ color: "#fff", fontSize: 16, cursor: "pointer" }}
+                />
+              </Tooltip>
+            )}
             <Avatar
               size={42}
               style={{ background: avatarBg, fontWeight: 700, fontSize: 15, flexShrink: 0 }}
@@ -681,6 +715,8 @@ export default function WhatsAppMonitorPage() {
             justifyContent: "center",
             background: "#f8f9fa",
             gap: 16,
+            borderRadius: isMobile ? 0 : 14,
+            boxShadow: isMobile ? "none" : "0 6px 22px rgba(0,0,0,0.06)",
           }}
         >
           <div

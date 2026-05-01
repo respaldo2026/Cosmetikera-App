@@ -41,6 +41,12 @@ interface SendClubWelcomeResponse {
   already_sent?: boolean;
 }
 
+type WelcomeLockResult = {
+  acquired: boolean;
+  alreadySent?: boolean;
+  inProgress?: boolean;
+};
+
 /**
  * Verifica si ya existe una bienvenida enviada para evitar duplicados.
  */
@@ -61,6 +67,78 @@ async function wasWelcomeAlreadySent(supabase: any, perfilId: string): Promise<b
 
   const estado = String((data as any)?.estado || "").toLowerCase();
   return estado === "enviado";
+}
+
+/**
+ * Toma un candado lógico en notificaciones_enviadas para evitar doble envío por concurrencia.
+ *
+ * Estrategia:
+ * - `INSERT` inicial por (perfil_id,tipo) con estado "procesando".
+ * - Si falla por UNIQUE, se revisa estado actual:
+ *   - enviado -> no reenviar.
+ *   - procesando -> otra request ya está ejecutando el envío.
+ *   - error -> se permite reintento tomando nuevamente estado "procesando".
+ */
+async function acquireWelcomeSendLock(
+  supabase: any,
+  perfilId: string,
+  phone: string,
+  cedula: string,
+): Promise<WelcomeLockResult> {
+  const pendingPayload = {
+    perfil_id: perfilId,
+    tipo: "bienvenida_club",
+    telefono: phone,
+    mensaje: `Plantilla: club_welcome_es | Cédula: ${cedula}`,
+    estado: "procesando",
+  };
+
+  const { error: insertError } = await supabase
+    .from("notificaciones_enviadas")
+    .insert(pendingPayload);
+
+  if (!insertError) {
+    return { acquired: true };
+  }
+
+  if (insertError.code !== "23505") {
+    console.warn("[Club Welcome] Error adquiriendo lock de envío:", insertError.message);
+    return { acquired: false };
+  }
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("notificaciones_enviadas")
+    .select("id, estado")
+    .eq("perfil_id", perfilId)
+    .eq("tipo", "bienvenida_club")
+    .maybeSingle();
+
+  if (fetchError) {
+    console.warn("[Club Welcome] No se pudo consultar lock existente:", fetchError.message);
+    return { acquired: false };
+  }
+
+  const estado = String((existing as any)?.estado || "").toLowerCase();
+  if (estado === "enviado") {
+    return { acquired: false, alreadySent: true };
+  }
+  if (estado === "procesando") {
+    return { acquired: false, inProgress: true };
+  }
+
+  // Permite reintento si estaba en error (o estado desconocido)
+  const { error: retryError } = await supabase
+    .from("notificaciones_enviadas")
+    .update({ estado: "procesando", telefono: phone, mensaje: pendingPayload.mensaje })
+    .eq("perfil_id", perfilId)
+    .eq("tipo", "bienvenida_club");
+
+  if (retryError) {
+    console.warn("[Club Welcome] No se pudo tomar lock para reintento:", retryError.message);
+    return { acquired: false };
+  }
+
+  return { acquired: true };
 }
 
 /**
@@ -340,15 +418,49 @@ export async function POST(
       );
     }
 
-    // 5. Enviar plantilla de WhatsApp (pre-aprobada por Meta)
+    // 5. Candado anti-concurrencia: evita doble envío simultáneo de plantilla
+    const lock = await acquireWelcomeSendLock(supabase, body.perfil_id, phone, body.cedula);
+    if (!lock.acquired) {
+      if (lock.alreadySent) {
+        return NextResponse.json(
+          {
+            success: true,
+            already_sent: true,
+            message: "La plantilla de bienvenida ya había sido enviada para este cliente",
+          } as SendClubWelcomeResponse,
+          { status: 200 }
+        );
+      }
+
+      if (lock.inProgress) {
+        return NextResponse.json(
+          {
+            success: true,
+            already_sent: true,
+            message: "Ya existe un envío de bienvenida en proceso para este cliente",
+          } as SendClubWelcomeResponse,
+          { status: 200 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No se pudo asegurar el envío único de la plantilla. Intenta nuevamente.",
+        } as SendClubWelcomeResponse,
+        { status: 409 }
+      );
+    }
+
+    // 6. Enviar plantilla de WhatsApp (pre-aprobada por Meta)
     // Plantilla: "club_welcome_es"
     // Variable: cedula
     const whatsappResult = await sendWhatsAppMessage(phone, body.cedula);
 
-    // 6. Construir mensaje para auditoría (para notificaciones_enviadas)
+    // 7. Construir mensaje para auditoría (para notificaciones_enviadas)
     const mensajeAuditoria = `Plantilla: club_welcome_es | Cédula: ${body.cedula}`;
 
-    // 7. Registrar notificación
+    // 8. Registrar notificación
     await logNotification(
       supabase,
       body.perfil_id,
@@ -358,7 +470,7 @@ export async function POST(
       whatsappResult.success
     );
 
-    // 8. Registrar inscripción al club
+    // 9. Registrar inscripción al club
     await logClubInscription(supabase, body.perfil_id, whatsappResult.success);
 
     if (whatsappResult.success) {
