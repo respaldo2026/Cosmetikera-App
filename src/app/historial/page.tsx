@@ -325,6 +325,21 @@ function formatPercent(value: number | null) {
   return `${prefix}${value.toLocaleString()}%`;
 }
 
+function extractPosOperationKey(entry: HistorialEntry): string | null {
+  const source = `${entry.titulo || ""} ${entry.detalle || ""} ${entry.referencia || ""}`;
+  const match = source.match(/(?:venta|compra)?\s*pos\s*#?\s*(\d{3,})/i);
+  if (!match?.[1]) return null;
+  return `pos-${match[1]}`;
+}
+
+function getOperacionPriority(tipo: TipoOperacion): number {
+  if (tipo === "venta") return 5;
+  if (tipo === "compra") return 4;
+  if (tipo === "movimiento") return 3;
+  if (tipo === "puntos") return 2;
+  return 1;
+}
+
 function buildExactRange(
   diaFiltro: Dayjs | null,
   mesFiltro: Dayjs | null,
@@ -416,6 +431,7 @@ export default function HistorialPage() {
   const [anioFiltro, setAnioFiltro] = useState<number | null>(null);
   const [detalle, setDetalle] = useState<HistorialEntry | null>(null);
   const [mostrarGraficas, setMostrarGraficas] = useState(false);
+  const [vistaFilas, setVistaFilas] = useState<"resumida" | "detallada">("resumida");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -643,6 +659,39 @@ export default function HistorialPage() {
     }),
     [exactRange, operacionesBaseFiltradas, periodo, rango]
   );
+
+  const operacionesTabla = useMemo(() => {
+    if (vistaFilas === "detallada") return operacionesFiltradas;
+
+    const grouped = new Map<string, HistorialEntry>();
+    const counts = new Map<string, number>();
+
+    for (const item of operacionesFiltradas) {
+      const groupKey = extractPosOperationKey(item) || item.key;
+      counts.set(groupKey, (counts.get(groupKey) || 0) + 1);
+
+      const current = grouped.get(groupKey);
+      if (!current) {
+        grouped.set(groupKey, item);
+        continue;
+      }
+
+      if (getOperacionPriority(item.tipo) > getOperacionPriority(current.tipo)) {
+        grouped.set(groupKey, item);
+      }
+    }
+
+    return Array.from(grouped.entries())
+      .map(([groupKey, item]) => {
+        const related = counts.get(groupKey) || 1;
+        if (related <= 1) return item;
+        return {
+          ...item,
+          detalle: `${item.detalle} · +${related - 1} relacionado(s)`,
+        };
+      })
+      .sort((a, b) => dayjs(b.fecha).valueOf() - dayjs(a.fecha).valueOf());
+  }, [operacionesFiltradas, vistaFilas]);
 
   const ventasBaseFiltradas = useMemo(
     () => operacionesBaseFiltradas.filter((item) => item.tipo === "venta"),
@@ -1169,6 +1218,14 @@ export default function HistorialPage() {
           <Button onClick={() => setMostrarGraficas((current) => !current)}>
             {mostrarSeccionGraficas ? "Ocultar gráficas" : "Mostrar gráficas"}
           </Button>
+          <Segmented
+            value={vistaFilas}
+            onChange={(value) => setVistaFilas(value as "resumida" | "detallada")}
+            options={[
+              { label: "Vista resumida", value: "resumida" },
+              { label: "Vista detallada", value: "detallada" },
+            ]}
+          />
           <Button
             onClick={() => {
               setPeriodo("mes");
@@ -1201,11 +1258,11 @@ export default function HistorialPage() {
           <div style={{ textAlign: "center", padding: 64 }}>
             <Spin size="large" />
           </div>
-        ) : operacionesFiltradas.length === 0 ? (
+        ) : operacionesTabla.length === 0 ? (
           <Empty description="No hay operaciones para los filtros seleccionados" style={{ padding: 64 }} />
         ) : (
           <Table
-            dataSource={operacionesFiltradas}
+            dataSource={operacionesTabla}
             columns={columns}
             rowKey="key"
             size={isMobile ? "small" : "middle"}
