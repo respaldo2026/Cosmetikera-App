@@ -932,7 +932,7 @@ export default function ArticulosPage() {
     const dirtyField = isInlineDirty(articulo, field);
 
     return (
-      <Space size={4} onClick={detenerEvento} onMouseDown={detenerEvento}>
+      <Space size={4} onClick={detenerEvento} onMouseDown={detenerEvento} data-stop-row-nav="true">
         <InputNumber
           min={0}
           precision={0}
@@ -994,6 +994,16 @@ export default function ArticulosPage() {
 
   const detenerEvento = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
+  };
+
+  const shouldSkipRowNavigation = (target: EventTarget | null): boolean => {
+    if (!(target instanceof Element)) return false;
+
+    return Boolean(
+      target.closest(
+        "button,a,input,textarea,select,label,.ant-input-number,.ant-input-number-input,.ant-btn,.ant-checkbox-wrapper,.ant-checkbox,[data-stop-row-nav='true']"
+      )
+    );
   };
 
   const renderCard = (art: Articulo) => (
@@ -1321,7 +1331,10 @@ export default function ArticulosPage() {
             pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} artículos` }}
             scroll={{ x: 700 }}
             onRow={(record) => ({
-              onClick: () => irADetalle(record.id),
+              onClick: (event) => {
+                if (shouldSkipRowNavigation(event.target)) return;
+                irADetalle(record.id);
+              },
               style: { cursor: "pointer" },
             })}
             columns={[
