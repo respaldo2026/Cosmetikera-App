@@ -12,7 +12,7 @@ import {
   InboxOutlined, BarcodeOutlined, ShopOutlined, AppstoreOutlined,
   UnorderedListOutlined, CameraOutlined, EyeOutlined, PercentageOutlined,
   DollarOutlined, RiseOutlined, FallOutlined, ControlOutlined, CopyOutlined,
-  FileExcelOutlined, UploadOutlined,
+  FileExcelOutlined, UploadOutlined, CheckOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
@@ -69,6 +69,8 @@ type Articulo = {
   activo?: boolean;
   imagen_url?: string;
 };
+
+type InlineEditableField = "precio_venta" | "stock";
 
 type ImportArticuloDraft = {
   nombre: string;
@@ -243,6 +245,8 @@ export default function ArticulosPage() {
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkForm] = Form.useForm();
+  const [inlineDrafts, setInlineDrafts] = useState<Record<string, Partial<Pick<Articulo, InlineEditableField>>>>({});
+  const [inlineSaving, setInlineSaving] = useState<Record<string, Partial<Record<InlineEditableField, boolean>>>>({});
 
   // Ajuste masivo
   const [ajusteOpen, setAjusteOpen] = useState(false);
@@ -805,6 +809,158 @@ export default function ArticulosPage() {
     }
   };
 
+  const normalizeInlineValue = (field: InlineEditableField, value: number) => {
+    if (field === "stock") {
+      return Math.max(0, Math.trunc(value));
+    }
+    return Math.max(0, Math.round(value));
+  };
+
+  const setInlineDraftValue = (id: string, field: InlineEditableField, value: number | null) => {
+    setInlineDrafts((prev) => {
+      const current = prev[id] ?? {};
+
+      if (value === null || Number.isNaN(value)) {
+        const nextForId = { ...current };
+        delete nextForId[field];
+        if (Object.keys(nextForId).length === 0) {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        }
+        return { ...prev, [id]: nextForId };
+      }
+
+      return {
+        ...prev,
+        [id]: {
+          ...current,
+          [field]: normalizeInlineValue(field, value),
+        },
+      };
+    });
+  };
+
+  const getInlineDisplayValue = (articulo: Articulo, field: InlineEditableField) => {
+    const draft = inlineDrafts[articulo.id]?.[field];
+    return typeof draft === "number" ? draft : articulo[field];
+  };
+
+  const isInlineDirty = (articulo: Articulo, field: InlineEditableField) => {
+    const draft = inlineDrafts[articulo.id]?.[field];
+    return typeof draft === "number" && draft !== articulo[field];
+  };
+
+  const clearInlineDraft = (id: string, field: InlineEditableField) => {
+    setInlineDrafts((prev) => {
+      const current = prev[id];
+      if (!current || !Object.prototype.hasOwnProperty.call(current, field)) return prev;
+
+      const nextForId = { ...current };
+      delete nextForId[field];
+
+      if (Object.keys(nextForId).length === 0) {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+
+      return { ...prev, [id]: nextForId };
+    });
+  };
+
+  const setInlineSavingState = (id: string, field: InlineEditableField, savingField: boolean) => {
+    setInlineSaving((prev) => {
+      const current = prev[id] ?? {};
+      const nextForId = {
+        ...current,
+        [field]: savingField,
+      };
+
+      const hasAny = Object.values(nextForId).some(Boolean);
+      if (!hasAny) {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+
+      return { ...prev, [id]: nextForId };
+    });
+  };
+
+  const guardarCampoInline = async (articulo: Articulo, field: InlineEditableField) => {
+    const draft = inlineDrafts[articulo.id]?.[field];
+    if (typeof draft !== "number") return;
+
+    const normalizedValue = normalizeInlineValue(field, draft);
+    if (normalizedValue === articulo[field]) {
+      clearInlineDraft(articulo.id, field);
+      return;
+    }
+
+    setInlineSavingState(articulo.id, field, true);
+    try {
+      const res = await fetch(`/api/articulos?id=${articulo.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: normalizedValue }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "No se pudo actualizar el artículo");
+      }
+
+      setArticulos((prev) => prev.map((item) => (
+        item.id === articulo.id
+          ? { ...item, [field]: normalizedValue }
+          : item
+      )));
+
+      clearInlineDraft(articulo.id, field);
+      message.success(field === "precio_venta" ? "Precio actualizado" : "Stock actualizado");
+    } catch (e: unknown) {
+      message.error((e as Error)?.message || "Error al guardar cambios rápidos");
+    } finally {
+      setInlineSavingState(articulo.id, field, false);
+    }
+  };
+
+  const renderInlineNumberEditor = (articulo: Articulo, field: InlineEditableField) => {
+    const value = getInlineDisplayValue(articulo, field);
+    const savingField = Boolean(inlineSaving[articulo.id]?.[field]);
+    const dirtyField = isInlineDirty(articulo, field);
+
+    return (
+      <Space size={4} onClick={detenerEvento} onMouseDown={detenerEvento}>
+        <InputNumber
+          min={0}
+          precision={0}
+          step={field === "precio_venta" ? 500 : 1}
+          value={typeof value === "number" ? value : 0}
+          onChange={(next) => setInlineDraftValue(articulo.id, field, next)}
+          onPressEnter={() => { if (dirtyField && !savingField) void guardarCampoInline(articulo, field); }}
+          style={{ width: field === "precio_venta" ? 120 : 90 }}
+          disabled={savingField}
+        />
+        {dirtyField && (
+          <Tooltip title="Guardar cambio rápido">
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckOutlined />}
+              loading={savingField}
+              onClick={(event) => {
+                detenerEvento(event);
+                void guardarCampoInline(articulo, field);
+              }}
+            />
+          </Tooltip>
+        )}
+      </Space>
+    );
+  };
+
   const getStockColor = (art: Articulo) => {
     if (art.stock === 0) return "#ff4d4f";
     if (art.stock <= (art.stock_minimo ?? 3)) return "#fa8c16";
@@ -877,8 +1033,8 @@ export default function ArticulosPage() {
           <Tooltip key="view" title="Ver detalle">
             <EyeOutlined onClick={(event) => { detenerEvento(event); irADetalle(art.id); }} />
           </Tooltip>,
-          <Tooltip key="edit" title="Editar">
-            <EditOutlined onClick={(event) => { detenerEvento(event); openModal(art); }} />
+          <Tooltip key="edit" title="Editar detalle">
+            <EditOutlined onClick={(event) => { detenerEvento(event); irADetalle(art.id); }} />
           </Tooltip>,
           <Tooltip key="copy" title="Duplicar artículo">
             <CopyOutlined style={{ color: "#1677ff" }} onClick={(event) => { detenerEvento(event); duplicarArticulo(art); }} />
@@ -1142,7 +1298,7 @@ export default function ArticulosPage() {
                     </Col>
                     <Col>
                       <Space size={4}>
-                        <Button size="small" icon={<EditOutlined />} onClick={(e) => { detenerEvento(e); openModal(a); }} />
+                        <Button size="small" icon={<EditOutlined />} onClick={(e) => { detenerEvento(e); irADetalle(a.id); }} />
                         <Button size="small" danger icon={<DeleteOutlined />} onClick={(e) => { detenerEvento(e); handleEliminar(a); }} />
                       </Space>
                     </Col>
@@ -1194,7 +1350,14 @@ export default function ArticulosPage() {
               },
               {
                 title: "P. Venta", dataIndex: "precio_venta", width: 110, align: "right" as const,
-                render: (v: number) => <Text strong style={{ color: "#d81b87" }}>{`$${Number(v).toLocaleString()}`}</Text>,
+                render: (_: number, a: Articulo) => (
+                  <Space size={4} direction="vertical" style={{ width: "100%" }}>
+                    {renderInlineNumberEditor(a, "precio_venta")}
+                    <Text strong style={{ color: "#d81b87", fontSize: 12 }}>
+                      {`$${Number(a.precio_venta).toLocaleString()}`}
+                    </Text>
+                  </Space>
+                ),
                 sorter: (a: Articulo, b: Articulo) => a.precio_venta - b.precio_venta,
               },
               {
@@ -1203,7 +1366,12 @@ export default function ArticulosPage() {
               },
               {
                 title: "Stock", dataIndex: "stock", width: 90, align: "center" as const,
-                render: (v: number, a: Articulo) => getStockTag(a),
+                render: (_: number, a: Articulo) => (
+                  <Space size={4} direction="vertical" style={{ width: "100%", alignItems: "center" }}>
+                    {renderInlineNumberEditor(a, "stock")}
+                    {getStockTag(a)}
+                  </Space>
+                ),
                 sorter: (a: Articulo, b: Articulo) => a.stock - b.stock,
               },
               {
@@ -1215,7 +1383,7 @@ export default function ArticulosPage() {
                 render: (_: unknown, a: Articulo) => (
                   <Space size={4}>
                     <Tooltip title="Ver"><Button size="small" icon={<EyeOutlined />} onClick={(event) => { detenerEvento(event); irADetalle(a.id); }} /></Tooltip>
-                    <Tooltip title="Editar"><Button size="small" icon={<EditOutlined />} onClick={(event) => { detenerEvento(event); openModal(a); }} /></Tooltip>
+                    <Tooltip title="Editar detalle"><Button size="small" icon={<EditOutlined />} onClick={(event) => { detenerEvento(event); irADetalle(a.id); }} /></Tooltip>
                     <Tooltip title="Duplicar"><Button size="small" icon={<CopyOutlined />} onClick={(event) => { detenerEvento(event); duplicarArticulo(a); }} /></Tooltip>
                     <Tooltip title="Eliminar"><Button size="small" danger icon={<DeleteOutlined />} onClick={(event) => { detenerEvento(event); handleEliminar(a); }} /></Tooltip>
                   </Space>
