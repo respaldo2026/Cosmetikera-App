@@ -78,6 +78,16 @@ function pickProfileNameForPhone(
   return "";
 }
 
+function extractNameFromTemplateMessage(message: string): string {
+  const text = String(message || "").trim();
+  if (!text) return "";
+
+  const match = text.match(/bienvenida\s+enviada\s+a\s+(.+)$/i);
+  if (!match?.[1]) return "";
+
+  return match[1].trim();
+}
+
 async function getTemplateMessagesByPhone(
   supabase: any,
   normalizedPhone: string,
@@ -299,6 +309,13 @@ export async function GET(request: NextRequest) {
           .limit(20);
         clientName = pickProfileNameForPhone((perfilByPhone || []) as any, normalizedPhone);
       }
+      if (!clientName) {
+        const fromTemplate = (data as ConversationMessage[])
+          .filter((m) => String(m.tipo_mensaje || "") === "template")
+          .map((m) => extractNameFromTemplateMessage(String(m.mensaje || "")))
+          .find((name) => Boolean(name));
+        clientName = fromTemplate || "";
+      }
     }
 
     return NextResponse.json({ messages: data || [], clientName });
@@ -367,6 +384,7 @@ export async function GET(request: NextRequest) {
       perfil_id: string | null;
       total: number;
       es_plantilla: boolean;
+      nombre_inferido: string;
     }
   >();
 
@@ -383,6 +401,7 @@ export async function GET(request: NextRequest) {
         perfil_id: msg.perfil_id || null,
         total: 0,
         es_plantilla: (msg as any).tipo_mensaje === "template",
+        nombre_inferido: extractNameFromTemplateMessage(String(msg.mensaje || "")),
       });
     }
     const entry = conversationMap.get(phoneKey)!;
@@ -390,6 +409,9 @@ export async function GET(request: NextRequest) {
     // Si hay un mensaje de tipo template en la conversación, marcarla como tal
     if ((msg as any).tipo_mensaje === "template") {
       entry.es_plantilla = true;
+      if (!entry.nombre_inferido) {
+        entry.nombre_inferido = extractNameFromTemplateMessage(String(msg.mensaje || ""));
+      }
     }
   }
 
@@ -441,6 +463,7 @@ export async function GET(request: NextRequest) {
       (c.perfil_id ? perfilByIdMap.get(c.perfil_id) : "") ||
       perfilByPhoneMap.get(c.telefono) ||
       perfilByLast10Map.get(c.telefono.slice(-10)) ||
+      c.nombre_inferido ||
       "",
   }));
 
