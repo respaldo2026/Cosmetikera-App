@@ -13,6 +13,11 @@ type ConversationMessage = {
   perfil_id: string | null;
 };
 
+function toTimestamp(value: unknown): number {
+  const t = Date.parse(String(value || ""));
+  return Number.isFinite(t) ? t : 0;
+}
+
 function isRelevantSentNotification(row: {
   tipo?: string | null;
   estado?: string | null;
@@ -140,9 +145,7 @@ async function getTemplateMessagesByPhone(
         created_at: row.created_at || new Date().toISOString(),
         perfil_id: row.perfil_id || null,
       }))
-      .sort((a, b) =>
-        new Date(String(a.created_at || 0)).getTime() - new Date(String(b.created_at || 0)).getTime()
-      );
+      .sort((a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at));
   } catch (err) {
     console.error("[getTemplateMessagesByPhone] Exception:", err);
     return [];
@@ -239,7 +242,7 @@ export async function GET(request: NextRequest) {
     const templateMessages = await getTemplateMessagesByPhone(supabase, normalizedPhone, phone);
     if (templateMessages.length > 0) {
       const merged = [...((data || []) as ConversationMessage[]), ...templateMessages].sort(
-        (a, b) => new Date(String(a.created_at || 0)).getTime() - new Date(String(b.created_at || 0)).getTime(),
+        (a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at),
       );
       data = merged as any;
     }
@@ -332,7 +335,7 @@ export async function GET(request: NextRequest) {
   const templateRecent = await getTemplateMessagesRecent(supabase);
   if (templateRecent.length > 0) {
     rawMessages = [...((rawMessages || []) as ConversationMessage[]), ...templateRecent]
-      .sort((a, b) => new Date(String(b.created_at || 0)).getTime() - new Date(String(a.created_at || 0)).getTime())
+      .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at))
       .slice(0, 2500);
   }
 
@@ -416,7 +419,7 @@ export async function GET(request: NextRequest) {
   }
 
   let conversations = Array.from(conversationMap.values()).sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    (a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at)
   );
 
   // Enriquecer con nombre del cliente
@@ -476,5 +479,7 @@ export async function GET(request: NextRequest) {
       )
     : enriched;
 
-  return NextResponse.json({ conversations: filtered });
+  const ordered = filtered.sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at));
+
+  return NextResponse.json({ conversations: ordered });
 }

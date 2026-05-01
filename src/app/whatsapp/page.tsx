@@ -53,6 +53,11 @@ async function fetchWithTimeout(input: RequestInfo | URL, timeoutMs = 7000): Pro
   }
 }
 
+function toTimestamp(value: unknown): number {
+  const t = Date.parse(String(value || ""));
+  return Number.isFinite(t) ? t : 0;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("es-CO", {
@@ -278,7 +283,10 @@ export default function WhatsAppMonitorPage() {
       const res = await fetchWithTimeout(`/api/whatsapp/conversations?${params}`);
       const json = await res.json();
       if (json.conversations) {
-        setConversations(json.conversations);
+        const ordered = [...json.conversations].sort(
+          (a: Conversation, b: Conversation) => toTimestamp(b.created_at) - toTimestamp(a.created_at),
+        );
+        setConversations(ordered);
       }
       setHasLoadedList(true);
     } catch {
