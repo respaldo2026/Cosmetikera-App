@@ -37,30 +37,50 @@ export async function requireAdmin(
     };
   }
 
-  const supabaseAuth = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll() {
-        // No se requiere mutar cookies en este flujo.
-      },
-    },
-  });
+  const admin = getAdminClient();
+  let userId: string | null = null;
 
-  const { data: authData, error: authError } = await supabaseAuth.auth.getUser();
-  if (authError || !authData.user?.id) {
+  // 1. Intentar verificar por Bearer token (Authorization header)
+  const authHeader = request.headers.get("authorization") ?? request.headers.get("Authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+
+  if (bearerToken) {
+    const { data: userData, error: userError } = await admin.auth.getUser(bearerToken);
+    if (!userError && userData.user?.id) {
+      userId = userData.user.id;
+    }
+  }
+
+  // 2. Fallback: verificar por cookies de sesión
+  if (!userId) {
+    const supabaseAuth = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() {
+          // No se requiere mutar cookies en este flujo.
+        },
+      },
+    });
+
+    const { data: authData, error: authError } = await supabaseAuth.auth.getUser();
+    if (!authError && authData.user?.id) {
+      userId = authData.user.id;
+    }
+  }
+
+  if (!userId) {
     return {
       ok: false,
       response: NextResponse.json({ error: "No autorizado" }, { status: 401 }),
     };
   }
 
-  const admin = getAdminClient();
   const { data: perfil, error: perfilError } = await admin
     .from("perfiles")
     .select("rol")
-    .eq("id", authData.user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (perfilError) {
@@ -78,5 +98,5 @@ export async function requireAdmin(
     };
   }
 
-  return { ok: true, userId: authData.user.id };
+  return { ok: true, userId };
 }

@@ -48,6 +48,7 @@ import { parseRewardCanjeDescription } from "@/constants/clubRewards";
 import { buildComparisonMetric, buildHistorialStats, getCurrentAndPreviousRanges } from "./stats";
 import { descargarInformeHistorialPDF } from "@/utils/historial-report";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { authHeaders } from "@/utils/auth-fetch";
 
 const HistorialCharts = dynamic(() => import("./HistorialCharts"), {
   ssr: false,
@@ -860,7 +861,7 @@ export default function HistorialPage() {
     try {
       const res = await fetch("/api/historial", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders(),
         body: JSON.stringify({ id: record.id, tipo: record.tipo }),
       });
       const json = await res.json();

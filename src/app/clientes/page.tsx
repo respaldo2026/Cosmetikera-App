@@ -13,6 +13,7 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { authHeaders } from "@/utils/auth-fetch";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
@@ -183,7 +184,7 @@ export default function ClientesPage() {
       cancelText: "Cancelar",
       onOk: async () => {
         try {
-          const res = await fetch(`/api/perfiles?id=${cliente.id}`, { method: "DELETE" });
+          const res = await fetch(`/api/perfiles?id=${cliente.id}`, { method: "DELETE", headers: await authHeaders() });
           const json = await res.json();
           if (!res.ok) throw new Error(json.error || "No se pudo eliminar el cliente");
           message.success("Cliente y transacciones eliminados");
