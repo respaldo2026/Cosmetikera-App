@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Card, Tabs, Typography, Space, Button, Spin, Row, Col,
   Statistic, Tag, Table, Avatar, Empty, Form, Input,
@@ -52,8 +52,11 @@ type VentaHistorial = {
 export default function ArticuloDetallePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { message } = App.useApp();
   const id = params.id as string;
+  const backQuery = searchParams.toString();
+  const backToListHref = backQuery ? `/articulos?${backQuery}` : "/articulos";
 
   const [articulo, setArticulo] = useState<Articulo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -191,7 +194,7 @@ export default function ArticuloDetallePage() {
   if (!articulo) {
     return (
       <Empty description="Artículo no encontrado">
-        <Button onClick={() => router.push("/articulos")}>Volver</Button>
+        <Button onClick={() => router.push(backToListHref)}>Volver</Button>
       </Empty>
     );
   }
@@ -238,7 +241,7 @@ export default function ArticuloDetallePage() {
       <Card style={{ marginBottom: 16, borderRadius: 12 }} bodyStyle={{ padding: "12px 16px" }}>
         <Row gutter={[16, 12]} align="middle">
           <Col>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push("/articulos")}>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(backToListHref)}>
               Volver
             </Button>
           </Col>

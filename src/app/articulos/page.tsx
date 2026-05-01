@@ -217,19 +217,28 @@ export default function ArticulosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const processedQuickCodeRef = useRef<string | null>(null);
+  const searchParamQ = searchParams.get("q")?.trim() ?? "";
+  const searchParamCategoria = searchParams.get("categoria")?.trim() || null;
+  const searchParamMarca = Array.from(new Set(
+    searchParams.getAll("marca").map((value) => value.trim()).filter(Boolean)
+  ));
+  const searchParamProveedor = searchParams.get("proveedor")?.trim() ?? "";
+  const searchParamTamano = searchParams.get("tamano")?.trim() ?? "";
+  const searchParamEmpaque = searchParams.get("empaque")?.trim() ?? "";
+  const searchParamVista = searchParams.get("vista") === "grid" ? "grid" : "lista";
 
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Articulo | null>(null);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState("");
-  const [filtroCategoria, setFiltroCategoria] = useState<string | null>(null);
-  const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
-  const [filtroProveedor, setFiltroProveedor] = useState("");
-  const [filtroTamano, setFiltroTamano] = useState("");
-  const [filtroEmpaque, setFiltroEmpaque] = useState("");
-  const [vista, setVista] = useState<"grid" | "lista">("lista");
+  const [search, setSearch] = useState(searchParamQ);
+  const [filtroCategoria, setFiltroCategoria] = useState<string | null>(searchParamCategoria);
+  const [filtroMarca, setFiltroMarca] = useState<string[]>(searchParamMarca);
+  const [filtroProveedor, setFiltroProveedor] = useState(searchParamProveedor);
+  const [filtroTamano, setFiltroTamano] = useState(searchParamTamano);
+  const [filtroEmpaque, setFiltroEmpaque] = useState(searchParamEmpaque);
+  const [vista, setVista] = useState<"grid" | "lista">(searchParamVista);
   const [selectedIds, setSelectedIds] = useState<React.Key[]>([]);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -809,7 +818,22 @@ export default function ArticulosPage() {
   };
 
   const irADetalle = (id: string) => {
-    router.push(`/articulos/show/${id}`);
+    const params = new URLSearchParams();
+    const query = search.trim();
+
+    if (query) params.set("q", query);
+    if (filtroCategoria) params.set("categoria", filtroCategoria);
+    for (const marca of filtroMarca) {
+      const marcaTrimmed = marca.trim();
+      if (marcaTrimmed) params.append("marca", marcaTrimmed);
+    }
+    if (filtroProveedor.trim()) params.set("proveedor", filtroProveedor.trim());
+    if (filtroTamano.trim()) params.set("tamano", filtroTamano.trim());
+    if (filtroEmpaque.trim()) params.set("empaque", filtroEmpaque.trim());
+    if (vista) params.set("vista", vista);
+
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    router.push(`/articulos/show/${id}${suffix}`);
   };
 
   const detenerEvento = (event: React.MouseEvent<HTMLElement>) => {
