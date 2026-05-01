@@ -10,13 +10,45 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
 import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
-import { getCatalogosArticulosLocal, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
+import { getCatalogosArticulosLocal, mergeCatalogos, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
 import { ROLES } from "@/constants/roles";
 
 const { TextArea } = Input;
 const { Option } = Select;
 const LOGO_STORAGE_BUCKET = "branding";
+const TICKET_FIELD_KEYS = Object.keys(DEFAULT_TICKET_FIELDS) as Array<keyof typeof DEFAULT_TICKET_FIELDS>;
+
+const extractTicketFieldsFromConfig = (raw: unknown) => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const next = { ...DEFAULT_TICKET_FIELDS };
+
+  for (const key of TICKET_FIELD_KEYS) {
+    if (typeof source[key] === "boolean") {
+      next[key] = source[key] as boolean;
+    }
+  }
+
+  return next;
+};
+
+const extractCatalogosFromConfig = (raw: unknown): CatalogosArticulos => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const catalogos = source.catalogos_articulos;
+  if (!catalogos || typeof catalogos !== "object") {
+    return { categorias: [], marcas: [], fabricantes: [] };
+  }
+
+  return mergeCatalogos(catalogos as Partial<CatalogosArticulos>);
+};
+
+const buildTicketCamposPayload = (
+  ticketFields: typeof DEFAULT_TICKET_FIELDS,
+  catalogosArticulos: CatalogosArticulos,
+) => ({
+  ...ticketFields,
+  catalogos_articulos: mergeCatalogos(catalogosArticulos),
+});
 
 // Interfaces
 interface Admin {
@@ -284,6 +316,44 @@ export default function ConfiguracionPage() {
       cargarConfigPosTab();
     }
   };
+
+  const persistCatalogosInSupabase = useCallback(async (nextCatalogos: CatalogosArticulos) => {
+    try {
+      const { data: configRow, error: configError } = await supabaseBrowserClient
+        .from("configuracion")
+        .select("id")
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (configError && configError.code !== "PGRST116") {
+        throw configError;
+      }
+
+      const payloadTicketCampos = buildTicketCamposPayload(ticketFields, nextCatalogos);
+
+      if (configRow?.id) {
+        const { error: updateError } = await supabaseBrowserClient
+          .from("configuracion")
+          .update({ ticket_campos: payloadTicketCampos })
+          .eq("id", configRow.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const newId = generateUUID();
+        const { error: insertError } = await supabaseBrowserClient
+          .from("configuracion")
+          .insert({ id: newId, ticket_campos: payloadTicketCampos });
+
+        if (insertError) throw insertError;
+        setConfiguracionId(newId);
+      }
+    } catch (error) {
+      console.error("Error guardando catálogos en Supabase:", error);
+      messageApi.error("No se pudieron sincronizar los catálogos en Supabase");
+    }
+  }, [messageApi, ticketFields]);
 
   // ==================== FUNCIONES POS / IMPRESORA ====================
   const cargarConfigPosTab = useCallback(async () => {
@@ -611,7 +681,14 @@ export default function ConfiguracionPage() {
           setConfiguracionId(null);
         }
         if (data.ticket_campos && typeof data.ticket_campos === "object") {
-          setTicketFields((prev) => ({ ...prev, ...data.ticket_campos }));
+          const ticketCamposRaw = data.ticket_campos;
+          setTicketFields(extractTicketFieldsFromConfig(ticketCamposRaw));
+
+          const catalogosSupabase = extractCatalogosFromConfig(ticketCamposRaw);
+          const localCatalogos = getCatalogosArticulosLocal();
+          const mergedCatalogos = mergeCatalogos(localCatalogos, catalogosSupabase);
+          const savedCatalogos = saveCatalogosArticulosLocal(mergedCatalogos);
+          setCatalogosArticulos(savedCatalogos);
         }
         formAcademia.setFieldsValue(data);
         if (data.logo_url) {
@@ -656,8 +733,9 @@ export default function ConfiguracionPage() {
   const guardarCatalogos = useCallback((next: CatalogosArticulos) => {
     const saved = saveCatalogosArticulosLocal(next);
     setCatalogosArticulos(saved);
+    void persistCatalogosInSupabase(saved);
     return saved;
-  }, []);
+  }, [persistCatalogosInSupabase]);
 
   const agregarCatalogoItem = useCallback((tipo: keyof CatalogosArticulos, value: string) => {
     const item = value.trim();
@@ -732,7 +810,10 @@ export default function ConfiguracionPage() {
         }
       }
 
-      const datosNormalizados = normalizarDatosFormulario({ ...valuesSinId, ticket_campos: ticketFields });
+      const datosNormalizados = normalizarDatosFormulario({
+        ...valuesSinId,
+        ticket_campos: buildTicketCamposPayload(ticketFields, catalogosArticulos),
+      });
       const { error } = await supabaseBrowserClient
         .from("configuracion")
         .upsert({ ...datosNormalizados, id: idParaGuardar });

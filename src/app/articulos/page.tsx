@@ -40,6 +40,16 @@ const CATEGORIAS_DEFAULT = [
   "Cejas y pestañas", "Accesorios", "Herramientas", "Insumos",
 ];
 
+const extractCatalogosFromTicketCampos = (raw: unknown): CatalogosArticulos => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const catalogos = source.catalogos_articulos;
+  if (!catalogos || typeof catalogos !== "object") {
+    return { categorias: [], marcas: [], fabricantes: [] };
+  }
+
+  return mergeCatalogos(catalogos as Partial<CatalogosArticulos>);
+};
+
 type Articulo = {
   id: string;
   nombre: string;
@@ -286,11 +296,35 @@ export default function ArticulosPage() {
     setLoading(false);
   }, []);
 
+  const cargarCatalogosCompartidos = useCallback(async () => {
+    const localCatalogos = getCatalogosArticulosLocal();
+
+    try {
+      const { data, error } = await supabaseBrowserClient
+        .from("configuracion")
+        .select("ticket_campos")
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        throw error;
+      }
+
+      const supabaseCatalogos = extractCatalogosFromTicketCampos(data?.ticket_campos);
+      setCatalogosCustom(mergeCatalogos(localCatalogos, supabaseCatalogos));
+    } catch (error) {
+      console.error("No se pudieron cargar catálogos compartidos:", error);
+      setCatalogosCustom(localCatalogos);
+    }
+  }, []);
+
   useEffect(() => { cargar(); }, [cargar]);
 
   useEffect(() => {
-    setCatalogosCustom(getCatalogosArticulosLocal());
-  }, []);
+    void cargarCatalogosCompartidos();
+  }, [cargarCatalogosCompartidos]);
 
   useEffect(() => {
     const quickCode = searchParams.get("quickCode")?.trim();
@@ -568,7 +602,7 @@ export default function ArticulosPage() {
 
   const openModal = (art?: Articulo) => {
     setEditing(art || null);
-    setCatalogosCustom(getCatalogosArticulosLocal());
+    void cargarCatalogosCompartidos();
     form.setFieldsValue(art ? { ...art } : { activo: true, stock: 0, stock_minimo: 3 });
     setModalOpen(true);
   };
