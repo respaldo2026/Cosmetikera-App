@@ -250,6 +250,7 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 export default function WhatsAppMonitorPage() {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -266,6 +267,8 @@ export default function WhatsAppMonitorPage() {
   const isFetchingListRef = useRef(false);
   const isFetchingMessagesRef = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
+  const isResizingPanelRef = useRef(false);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(360);
 
   type LoadOptions = {
     silent?: boolean;
@@ -344,6 +347,41 @@ export default function WhatsAppMonitorPage() {
     return () => window.removeEventListener("resize", updateLayout);
   }, []);
 
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!isResizingPanelRef.current || isMobile) return;
+      const root = rootRef.current;
+      if (!root) return;
+
+      const rect = root.getBoundingClientRect();
+      const proposed = event.clientX - rect.left;
+      const nextWidth = Math.max(280, Math.min(560, proposed));
+      setLeftPanelWidth(nextWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (!isResizingPanelRef.current) return;
+      isResizingPanelRef.current = false;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isMobile]);
+
+  const startResizePanel = () => {
+    if (isMobile) return;
+    isResizingPanelRef.current = true;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+  };
+
   // Auto-scroll al último mensaje SOLO si el usuario está cerca del final
   useEffect(() => {
     if (!shouldStickToBottomRef.current) return;
@@ -400,6 +438,7 @@ export default function WhatsAppMonitorPage() {
   // ── Render ───────────────────────────────────────────────────────
   return (
     <div
+      ref={rootRef}
       style={{
         display: "flex",
         height: "calc(100vh - 72px)",
@@ -407,13 +446,13 @@ export default function WhatsAppMonitorPage() {
         fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
         overflow: "hidden",
         padding: isMobile ? 0 : 12,
-        gap: isMobile ? 0 : 12,
+        gap: 0,
       }}
     >
       {/* ── Panel izquierdo: lista de conversaciones ─────────────── */}
       <div
         style={{
-          width: isMobile ? "100%" : 360,
+          width: isMobile ? "100%" : leftPanelWidth,
           minWidth: isMobile ? "100%" : 300,
           borderRight: isMobile ? "none" : "1px solid #e0e0e0",
           background: "#FFFFFF",
@@ -580,6 +619,31 @@ export default function WhatsAppMonitorPage() {
           )}
         </div>
       </div>
+
+      {!isMobile && (
+        <div
+          onMouseDown={startResizePanel}
+          style={{
+            width: 10,
+            cursor: "col-resize",
+            position: "relative",
+            flexShrink: 0,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "stretch",
+          }}
+          title="Arrastra para ampliar o reducir el simulador"
+        >
+          <div
+            style={{
+              width: 2,
+              background: "#cfd8e3",
+              borderRadius: 4,
+              margin: "14px 0",
+            }}
+          />
+        </div>
+      )}
 
       {/* ── Panel derecho: chat ───────────────────────────────────── */}
       {selectedPhone ? (

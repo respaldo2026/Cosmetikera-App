@@ -64,6 +64,107 @@ function normalizarPayload(body: Record<string, unknown>) {
   return payload;
 }
 
+function normalizarTelefonoWhatsApp(telefono: string | null): string {
+  const digits = String(telefono || "").replace(/\D/g, "").trim();
+  if (!digits) return "";
+  // Si viene en formato local CO (10 dígitos), anteponer 57 para Meta API.
+  if (digits.length === 10) return `57${digits}`;
+  return digits;
+}
+
+async function triggerClubWelcomeTemplate(args: {
+  origin: string;
+  perfilId: string;
+  cedula: string;
+  telefono: string;
+}) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  const apiKey = process.env.WHATSAPP_API_KEY;
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const response = await fetch(`${args.origin}/api/whatsapp/send-club-welcome`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        perfil_id: args.perfilId,
+        cedula: args.cedula,
+        telefono: args.telefono,
+      }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    const json = await response.json().catch(() => ({}));
+    return {
+      ok: response.ok,
+      alreadySent: Boolean((json as any)?.already_sent),
+      message: String((json as any)?.message || ""),
+      error: String((json as any)?.error || ""),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      alreadySent: false,
+      message: "",
+      error: error instanceof Error ? error.message : "Error llamando send-club-welcome",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function ensureMonitorEntryForClubWelcome(args: {
+  supabase: ReturnType<typeof getAdminClient>;
+  perfilId: string;
+  telefono: string;
+  nombre: string;
+  cedula: string;
+}) {
+  const mensaje = `Plantilla pendiente: club_welcome_es | Bienvenida para ${args.nombre} | Cédula: ${args.cedula}`;
+
+  await args.supabase
+    .from("notificaciones_enviadas")
+    .upsert(
+      {
+        perfil_id: args.perfilId,
+        tipo: "bienvenida_club",
+        telefono: args.telefono,
+        mensaje,
+        estado: "pendiente",
+      },
+      { onConflict: "perfil_id,tipo" }
+    );
+
+  const { data: existingTemplate } = await args.supabase
+    .from("whatsapp_conversation_history")
+    .select("id")
+    .eq("perfil_id", args.perfilId)
+    .eq("tipo_mensaje", "template")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!existingTemplate?.id) {
+    await args.supabase.from("whatsapp_conversation_history").insert({
+      telefono: args.telefono,
+      perfil_id: args.perfilId,
+      rol: "agente",
+      mensaje,
+      tipo_mensaje: "template",
+      intento: null,
+    });
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -209,6 +310,36 @@ export async function POST(request: Request) {
         });
       } catch (whatsappError) {
         console.warn("[POST /api/perfiles] No se pudo enviar WhatsApp de bienvenida", whatsappError);
+      }
+    }
+
+    if (rol === "cliente") {
+      const telefonoWhatsApp = normalizarTelefonoWhatsApp(telefonoNormalizado);
+      const perfilId = String((data as any)?.id || "").trim();
+
+      if (perfilId && telefonoWhatsApp && cedulaNormalizada) {
+        const origin = new URL(request.url).origin;
+        const trigger = await triggerClubWelcomeTemplate({
+          origin,
+          perfilId,
+          cedula: cedulaNormalizada,
+          telefono: telefonoWhatsApp,
+        });
+
+        if (!trigger.ok && !trigger.alreadySent) {
+          console.warn("[POST /api/perfiles] Falló trigger de plantilla bienvenida, se crea fallback visible", trigger.error || trigger.message);
+          try {
+            await ensureMonitorEntryForClubWelcome({
+              supabase,
+              perfilId,
+              telefono: telefonoWhatsApp,
+              nombre: nombre_completo.trim(),
+              cedula: cedulaNormalizada,
+            });
+          } catch (fallbackError) {
+            console.warn("[POST /api/perfiles] Falló fallback para monitor WhatsApp", fallbackError);
+          }
+        }
       }
     }
 
