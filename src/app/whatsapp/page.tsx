@@ -291,7 +291,19 @@ export default function WhatsAppMonitorPage() {
       const res = await fetchWithTimeout(`/api/whatsapp/conversations?phone=${encodeURIComponent(phone)}`);
       const json = await res.json();
       if (json.messages) setMessages(json.messages);
-      if (json.clientName !== undefined) setClientName(json.clientName);
+      if (json.clientName !== undefined) {
+        const resolvedName = String(json.clientName || "").trim();
+        setClientName(resolvedName);
+        if (resolvedName) {
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.telefono === phone && !String(c.nombre || "").trim()
+                ? { ...c, nombre: resolvedName }
+                : c
+            )
+          );
+        }
+      }
       setHasLoadedMessages(true);
     } catch {
       // silencioso

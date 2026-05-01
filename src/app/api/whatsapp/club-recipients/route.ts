@@ -54,14 +54,56 @@ export async function GET() {
     : { data: [] };
 
   const perfilMap = new Map<string, string>();
+  const perfilByPhoneMap = new Map<string, string>();
+  const perfilByLast10Map = new Map<string, string>();
   for (const p of perfiles || []) {
     const nombre = (p.nombre_completo || p.nombre || "").trim();
     if (p.id && nombre) perfilMap.set(p.id, nombre);
+    if (nombre && p.telefono) {
+      const normalized = normalizePhone(String(p.telefono));
+      if (normalized && !perfilByPhoneMap.has(normalized)) {
+        perfilByPhoneMap.set(normalized, nombre);
+      }
+      const last10 = normalized.slice(-10);
+      if (last10 && !perfilByLast10Map.has(last10)) {
+        perfilByLast10Map.set(last10, nombre);
+      }
+    }
+  }
+
+  const missingPhones = rows
+    .map((r) => normalizePhone(String(r.telefono || "")))
+    .filter((t) => Boolean(t) && !perfilByPhoneMap.has(t));
+
+  if (missingPhones.length > 0) {
+    const last10Set = Array.from(new Set(missingPhones.map((t) => t.slice(-10)).filter(Boolean)));
+    if (last10Set.length > 0) {
+      const phoneOrFilters = last10Set.map((d) => `telefono.ilike.%${d}%`).join(",");
+      const { data: perfilesByPhone } = await supabase
+        .from("perfiles")
+        .select("id, nombre_completo, nombre, telefono")
+        .or(phoneOrFilters)
+        .limit(500);
+
+      for (const p of perfilesByPhone || []) {
+        const nombre = (p.nombre_completo || p.nombre || "").trim();
+        if (!nombre || !p.telefono) continue;
+        const normalized = normalizePhone(String(p.telefono));
+        if (!normalized) continue;
+        if (!perfilByPhoneMap.has(normalized)) perfilByPhoneMap.set(normalized, nombre);
+        const last10 = normalized.slice(-10);
+        if (last10 && !perfilByLast10Map.has(last10)) perfilByLast10Map.set(last10, nombre);
+      }
+    }
   }
 
   const recipients = rows.map((row) => {
-    const nombre = (row.perfil_id ? perfilMap.get(row.perfil_id) : "") || "";
     const telefono = normalizePhone(String(row.telefono || ""));
+    const nombre =
+      (row.perfil_id ? perfilMap.get(row.perfil_id) : "") ||
+      perfilByPhoneMap.get(telefono) ||
+      perfilByLast10Map.get(telefono.slice(-10)) ||
+      "";
     return {
       id: row.id,
       perfil_id: row.perfil_id,
