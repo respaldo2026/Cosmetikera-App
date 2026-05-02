@@ -119,7 +119,7 @@ async function sendBirthdayReminder(
 
   try {
     // Enviar plantilla con nombre del cliente como {{1}}
-    const params = nombreCliente ? [{ type: "text", text: nombreCliente }] : [];
+    const params = nombreCliente ? [nombreCliente] : [];
     const result = await WhatsAppService.sendTemplate(
       telefono,
       templateName,
