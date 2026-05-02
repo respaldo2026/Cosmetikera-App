@@ -259,7 +259,7 @@ async function sendWhatsAppMessage(
   }
 
   try {
-    const url = `https://graph.instagram.com/v18.0/${PHONE_NUMBER_ID}/messages`;
+    const url = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
     const normalizedPhone = phone.replace(/\D/g, "");
 
     // Usar plantilla pre-aprobada en Meta

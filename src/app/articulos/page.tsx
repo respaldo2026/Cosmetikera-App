@@ -32,6 +32,20 @@ const loadXlsx = () => {
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+/** Normaliza campos que pueden estar guardados como string-array ej: ["OPI"] → "OPI" */
+const normalizeTagField = (v: unknown): string | undefined => {
+  if (!v) return undefined;
+  if (Array.isArray(v)) return (v[0] as string) || undefined;
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (t.startsWith("[")) {
+      try { const p = JSON.parse(t); return Array.isArray(p) ? ((p[0] as string) || undefined) : (t || undefined); } catch { /* ignore */ }
+    }
+    return t || undefined;
+  }
+  return undefined;
+};
+
 const formatPrecio = (v: number | string | undefined) =>
   `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
@@ -307,7 +321,12 @@ export default function ArticulosPage() {
       from += pageSize;
     }
 
-    setArticulos(allRows);
+    setArticulos(allRows.map((a) => ({
+      ...a,
+      categoria: normalizeTagField(a.categoria),
+      marca: normalizeTagField(a.marca),
+      proveedor: normalizeTagField(a.proveedor),
+    })));
     setLoading(false);
   }, []);
 
@@ -618,7 +637,12 @@ export default function ArticulosPage() {
   const openModal = (art?: Articulo) => {
     setEditing(art || null);
     void cargarCatalogosCompartidos();
-    form.setFieldsValue(art ? { ...art } : { activo: true, stock: 0, stock_minimo: 3 });
+    form.setFieldsValue(art ? {
+      ...art,
+      categoria: art.categoria ? [art.categoria] : undefined,
+      marca: art.marca ? [art.marca] : undefined,
+      proveedor: art.proveedor ? [art.proveedor] : undefined,
+    } : { activo: true, stock: 0, stock_minimo: 3 });
     setModalOpen(true);
   };
 
@@ -656,9 +680,9 @@ export default function ArticulosPage() {
     form.setFieldsValue({
       nombre: `${art.nombre} (copia)`,
       codigo_barras: undefined,
-      categoria: art.categoria,
-      marca: art.marca,
-      proveedor: art.proveedor,
+      categoria: art.categoria ? [art.categoria] : undefined,
+      marca: art.marca ? [art.marca] : undefined,
+      proveedor: art.proveedor ? [art.proveedor] : undefined,
       tamano: art.tamano,
       empaque: art.empaque,
       descripcion: art.descripcion,
@@ -677,9 +701,9 @@ export default function ArticulosPage() {
   const handleGuardar = async () => {
     const values = await form.validateFields();
     // El Select con mode="tags" devuelve array; normalizar a string
-    if (Array.isArray(values.categoria)) {
-      values.categoria = values.categoria[0] ?? undefined;
-    }
+    if (Array.isArray(values.categoria)) values.categoria = values.categoria[0] ?? undefined;
+    if (Array.isArray(values.marca)) values.marca = values.marca[0] ?? undefined;
+    if (Array.isArray(values.proveedor)) values.proveedor = values.proveedor[0] ?? undefined;
     const datosNormalizados = normalizarDatosFormulario(values);
     setSaving(true);
     try {

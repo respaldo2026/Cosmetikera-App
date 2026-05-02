@@ -20,6 +20,20 @@ import { getCatalogosArticulosLocal, mergeCatalogos, type CatalogosArticulos } f
 
 const { Title, Text } = Typography;
 
+/** Normaliza campos que pueden estar guardados como string-array ej: ["OPI"] → "OPI" */
+const normalizeTagField = (v: unknown): string | undefined => {
+  if (!v) return undefined;
+  if (Array.isArray(v)) return (v[0] as string) || undefined;
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (t.startsWith("[")) {
+      try { const p = JSON.parse(t); return Array.isArray(p) ? ((p[0] as string) || undefined) : (t || undefined); } catch { /* ignore */ }
+    }
+    return t || undefined;
+  }
+  return undefined;
+};
+
 type Articulo = {
   id: string;
   nombre: string;
@@ -94,8 +108,19 @@ export default function ArticuloDetallePage() {
       .eq("id", id)
       .single();
     if (!error && data) {
-      setArticulo(data as Articulo);
-      formFicha.setFieldsValue(data);
+      const art: Articulo = {
+        ...(data as Articulo),
+        categoria: normalizeTagField((data as Articulo).categoria),
+        marca: normalizeTagField((data as Articulo).marca),
+        proveedor: normalizeTagField((data as Articulo).proveedor),
+      };
+      setArticulo(art);
+      formFicha.setFieldsValue({
+        ...art,
+        categoria: art.categoria ? [art.categoria] : undefined,
+        marca: art.marca ? [art.marca] : undefined,
+        proveedor: art.proveedor ? [art.proveedor] : undefined,
+      });
     }
     setLoading(false);
   }, [formFicha, id]);
@@ -210,9 +235,9 @@ export default function ArticuloDetallePage() {
           ...values,
           referencia: values.referencia || null,
           codigo_secundario: values.codigo_secundario || null,
-          categoria: values.categoria || null,
-          marca: values.marca || null,
-          proveedor: values.proveedor || null,
+          categoria: Array.isArray(values.categoria) ? (values.categoria[0] || null) : (values.categoria || null),
+          marca: Array.isArray(values.marca) ? (values.marca[0] || null) : (values.marca || null),
+          proveedor: Array.isArray(values.proveedor) ? (values.proveedor[0] || null) : (values.proveedor || null),
           precio_costo: values.precio_costo ?? null,
           stock_minimo: values.stock_minimo ?? null,
           descripcion: values.descripcion || null,
@@ -336,7 +361,12 @@ export default function ArticuloDetallePage() {
                   guardarFicha();
                   return;
                 }
-                formFicha.setFieldsValue(articulo);
+                formFicha.setFieldsValue({
+                  ...articulo,
+                  categoria: articulo.categoria ? [articulo.categoria] : undefined,
+                  marca: articulo.marca ? [articulo.marca] : undefined,
+                  proveedor: articulo.proveedor ? [articulo.proveedor] : undefined,
+                });
                 setEditandoFicha(true);
               }}
               style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)" }}
@@ -520,7 +550,7 @@ export default function ArticuloDetallePage() {
                       <Button type="primary" icon={<SaveOutlined />} loading={savingFicha} onClick={guardarFicha} style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)" }}>
                         Guardar cambios
                       </Button>
-                      <Button onClick={() => { formFicha.setFieldsValue(articulo); setEditandoFicha(false); }}>
+                      <Button onClick={() => { formFicha.setFieldsValue({ ...articulo, categoria: articulo.categoria ? [articulo.categoria] : undefined, marca: articulo.marca ? [articulo.marca] : undefined, proveedor: articulo.proveedor ? [articulo.proveedor] : undefined }); setEditandoFicha(false); }}>
                         Cancelar
                       </Button>
                     </Space>
