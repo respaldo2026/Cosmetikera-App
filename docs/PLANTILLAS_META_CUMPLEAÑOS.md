@@ -1,91 +1,86 @@
-# Plantillas de Meta Business Manager - Cumpleaños
+# Plantillas de Meta Business Manager - Cumpleaños (MARKETING)
 
-## ⚠️ IMPORTANTE
+## ℹ️ NOTA
 
-Estas plantillas **DEBEN ser 100% transaccionales** (sin beneficios, descuentos ni promociones) para evitar ser reclasificadas a MARKETING.
+Meta clasifica los mensajes de cumpleaños como **MARKETING** automaticamente. Estas plantillas estan optimizadas para maxima conversion dentro de esa categoria.
 
 ---
 
-## 📋 Plantilla 1: Cumpleaños en 2 Días
+## 📋 Plantilla 1: Cumpleanos en 2 Dias
 
 **Template Name:** `cumpleanos_recordatorio_2d_es`
-**Category:** TRANSACTIONAL ← (Critical!)
+**Category:** MARKETING
 **Language:** Spanish (es)
 
 **Content (copia EXACTO):**
 ```
-Tu cumpleaños es en 2 días 🎂
+Hola {{1}}! 🎂
 
-Accede a tu cuenta en el Club La Cosmetikera:
-https://app.cosmetikera.com/club
+Tu cumpleanos es en 2 dias y en La Cosmetikera tenemos algo especial para ti.
 
-¿Preguntas? Escribe "Hola" 💬
+Escribe "CUMPLE" para ver tu regalo de cumpleanos 🎁
 ```
 
 ---
 
-## 📋 Plantilla 2: Cumpleaños Mañana
+## 📋 Plantilla 2: Cumpleanos Manana
 
 **Template Name:** `cumpleanos_recordatorio_1d_es`
-**Category:** TRANSACTIONAL ← (Critical!)
+**Category:** MARKETING
 **Language:** Spanish (es)
 
 **Content (copia EXACTO):**
 ```
-¡Mañana es tu cumpleaños! 🎂
+Hola {{1}}! 🎂
 
-Entra a tu cuenta en el Club La Cosmetikera:
-https://app.cosmetikera.com/club
+Manana es tu cumpleanos! En La Cosmetikera tenemos una sorpresa lista para ti.
 
-¿Preguntas? Escribe "Hola" 💬
+Escribe "CUMPLE" para reclamarla antes de que expire 🎁
 ```
 
 ---
 
-## 📋 Plantilla 3: ¡Feliz Cumpleaños Hoy!
+## 📋 Plantilla 3: Feliz Cumpleanos Hoy
 
 **Template Name:** `cumpleanos_celebracion_es`
-**Category:** TRANSACTIONAL ← (Critical!)
+**Category:** MARKETING
 **Language:** Spanish (es)
 
 **Content (copia EXACTO):**
 ```
-¡Feliz cumpleaños! 🎂🎉
+Feliz cumpleanos {{1}}! 🎂🎉
 
-Entra a tu cuenta en el Club La Cosmetikera:
-https://app.cosmetikera.com/club
+Hoy es tu dia especial y La Cosmetikera lo celebra contigo.
 
-¿Preguntas? Escribe "Hola" 💬
+Escribe "CUMPLE" para activar tu regalo de hoy 🎁
 ```
 
 ---
 
-## ✅ Por qué estas cumplen normas de Meta
+## ✅ Por que estas convierten mejor
 
-| Elemento | ✅ Transaccional |
-|----------|---------|
-| **Notificación de evento** | Es del cumplea\u00f1os del cliente |
-| **Sin mencionar descuentos** | No hay "descuento", "oferta", "compra" |
-| **Sin mencionar beneficios** | No hay "puntos x2", "productos VIP" |
-| **Sin urgencia de compra** | No hay "aprovecha ahora", "no esperes" |
-| **Info clara de cuenta** | "Accede a tu cuenta" = notificación legítima |
-| **URL a portal de cliente** | `/club` es donde accede (no tienda) |
-| **Sin emojis de regalo/promo** | Solo 🎂🎉 (cumpleaños) |
-| **Invitación neutral** | "Escribe Hola" para preguntas, no venta |
+| Elemento | Razon |
+|----------|-------|
+| **{{1}} = nombre del cliente** | Personalizacion aumenta apertura 40% |
+| **"algo especial para ti"** | Genera curiosidad sin revelar todo |
+| **"Escribe CUMPLE"** | CTA claro y facil de responder |
+| **"antes de que expire"** | Urgencia aumenta conversion |
+| **Emoji 🎁** | Refuerza la idea de regalo |
 
 ---
 
-## ❌ Qué NO incluir (Meta rechaza/reclasifica)
+## 📝 Como usar la variable {{1}}
 
-```
-❌ "Descuento especial de cumpleaños"
-❌ "Tenemos sorpresas para ti"
-❌ "Puntos x2 en compras"
-❌ "Acceso a productos VIP"
-❌ "Promoción de cumpleaños"
-❌ "No pierdas esta oportunidad"
-❌ "Compra ahora con tu descuento"
-❌ Emojis 🎁🎀💝 (regalo/regalo)
+En Meta Business Manager:
+- `{{1}}` se reemplaza automaticamente con el nombre del cliente
+- En tu codigo, ya se envia el nombre en el payload del template
+
+En el endpoint `send-birthday-reminder`, el parametro se envia asi:
+```json
+"components": [{
+  "type": "body",
+  "parameters": [{ "type": "text", "text": "Maria" }]
+}]
 ```
 
 ---
@@ -96,39 +91,46 @@ https://app.cosmetikera.com/club
 2. Buscar **"Message Templates"** o **WhatsApp > Settings > Message Templates**
 3. Click **Create Template**
 4. **Template Name**: Copiar exacto (ej. `cumpleanos_recordatorio_2d_es`)
-5. **Category**: Seleccionar **TRANSACTIONAL** (no Marketing)
-6. **Language**: **Spanish (Español)**
+5. **Category**: Seleccionar **MARKETING**
+6. **Language**: **Spanish (Espanol)**
 7. **Message Content**: Pegar el contenido de arriba **EXACTO**
 8. **Submit for Review**
-9. Esperar aprobación (~2-24 horas)
+9. Esperar aprobacion (~2-24 horas)
 
 ---
 
-## 🔍 Status de Aprobación
+## 🔍 Status de Aprobacion
 
 Una vez enviadas, revisalas en Meta:
 - **Approved** ✅ = Listo para usar
-- **Pending** ⏳ = En revisión (espera ~24h)
-- **Rejected** ❌ = Necesita cambios (Meta dirá por qué)
-
-Si rechaza, típicamente es porque:
-- Menciona descuentos/beneficios → Quita esa palabra
-- Parece marketing → Hazlo más simple
-- URL incorrecta → Verifica que sea `/club`
-- **Caracteres especiales** → Meta rechaza ñ, acentos en nombres. Solo usa a-z, 0-9, guion bajo
+- **Pending** ⏳ = En revision (espera ~24h)
+- **Rejected** ❌ = Necesita cambios
 
 ---
 
-## 🚀 Después de Aprobación
+## 🚀 Despues de Aprobacion
 
-1. **Migración SQL ejecutada en Supabase** ✅
+1. **Migracion SQL ejecutada en Supabase** ✅
 2. **Endpoint listo** ✅
-3. **Plantillas aprobadas en Meta** ← Aquí estás
+3. **Plantillas aprobadas en Meta** ← Aqui estas
 4. **Configurar Make.com** - 3 escenarios diarios
 5. **Testing con dry_run**
 6. **Go Live**
 
 ---
 
-**Versión:** 2.1 (100% Meta Compliant)
-**Última actualización:** 28 de abril de 2026
+**Version:** 3.0 (Marketing - Alta Conversion)
+**Ultima actualizacion:** 2 de mayo de 2026
+
+---
+
+## ✅ Notas adicionales
+
+- Las plantillas usan `{{1}}` = nombre del cliente (ya configurado en el endpoint)
+- Meta las clasifica como MARKETING (normal para mensajes de cumpleanos)
+- Funciona 24/7 sin restriccion de ventana horaria para templates
+
+---
+
+**Version:** 3.0 (Marketing - Alta Conversion)
+**Ultima actualizacion:** 2 de mayo de 2026

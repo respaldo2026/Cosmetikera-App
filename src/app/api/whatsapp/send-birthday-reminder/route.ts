@@ -112,16 +112,18 @@ async function sendBirthdayReminder(
   supabase: any,
   perfilId: string,
   telefono: string,
-  diasOffset: -2 | -1 | 0
+  diasOffset: -2 | -1 | 0,
+  nombreCliente?: string
 ): Promise<{ success: boolean; error?: string }> {
   const templateName = getTemplateName(diasOffset);
 
   try {
-    // Enviar plantilla (sin variables, son genéricas)
+    // Enviar plantilla con nombre del cliente como {{1}}
+    const params = nombreCliente ? [{ type: "text", text: nombreCliente }] : [];
     const result = await WhatsAppService.sendTemplate(
       telefono,
       templateName,
-      [],
+      params,
       "es"
     );
 
@@ -246,10 +248,13 @@ export async function POST(
       },
     });
 
-    // 4. Obtener clientes con cumpleaños en el offset especificado
+    // 4. Obtener clientes con cumpleaños en el offset especificado.
+    // La función SQL devuelve diferencia en días como valor positivo (2,1,0),
+    // mientras este endpoint acepta payload en formato negocio (-2,-1,0).
+    const diasParaConsulta = body.dias_offset === 0 ? 0 : Math.abs(body.dias_offset);
     const { data: clientes, error: fetchError } = await supabase.rpc(
       "get_clientes_cumpleaños_proximos",
-      { dias_offset: body.dias_offset }
+      { dias_offset: diasParaConsulta }
     );
 
     if (fetchError) {
@@ -287,7 +292,8 @@ export async function POST(
             supabase,
             cliente.perfil_id,
             cliente.telefono,
-            body.dias_offset
+            body.dias_offset,
+            cliente.nombre_completo
           );
 
           if (result.success) {
