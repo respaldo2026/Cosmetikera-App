@@ -416,6 +416,27 @@ function getSearchTokens(message: string): string[] {
     .filter((token) => token.length >= 3 && !STOPWORDS.has(token));
 }
 
+function expandTokenVariants(tokens: string[]): string[] {
+  const out = new Set<string>();
+
+  for (const token of tokens) {
+    if (!token) continue;
+    out.add(token);
+
+    if (token.endsWith("es") && token.length > 4) {
+      out.add(token.slice(0, -2));
+    }
+    if (token.endsWith("s") && token.length > 3) {
+      out.add(token.slice(0, -1));
+    }
+    if (token.endsWith("as") && token.length > 4) {
+      out.add(`${token.slice(0, -1)}a`);
+    }
+  }
+
+  return Array.from(out).filter((t) => t.length >= 3 && !STOPWORDS.has(t));
+}
+
 function formatCOP(value: number): string {
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -434,7 +455,7 @@ type CustomerBusinessContext = {
 };
 
 function buildStrictPriceMatches(articles: CatalogArticle[], message: string): CatalogArticle[] {
-  const tokens = getSearchTokens(message);
+  const tokens = expandTokenVariants(getSearchTokens(message));
   if (tokens.length === 0) return [];
 
   const scored = articles
@@ -477,16 +498,43 @@ function buildDeterministicPriceReply(customerName: string, message: string, art
   const greeting = customerName ? `Hola ${customerName}` : "Hola";
   const lines = matches.map((p) => {
     const price = formatCOP(Number(p.precio_venta || 0));
+    const stock = Number(p.stock || 0);
+    const stockText = stock > 0 ? ` (stock: ${stock})` : " (agotado)";
     const discount = Number(p.descuento_porcentaje || 0) > 0 ? ` (${p.descuento_porcentaje}% OFF)` : "";
-    return `• *${p.nombre || "Producto"}*: ${price}${discount}`;
+    return `• *${p.nombre || "Producto"}*: ${price}${discount}${stockText}`;
   });
 
-  return `${greeting}. Te paso precio real de sistema:\n${lines.join("\n")}\n¿Te cotizo también alternativas similares en ese rango?`;
+  return `${greeting}. Te paso precio real de sistema:\n${lines.join("\n")}\n${buildPriceAdvisoryTail(message, matches)}`;
+}
+
+function buildPriceAdvisoryTail(message: string, products: CatalogArticle[]): string {
+  const corpus = normalize(
+    [
+      message,
+      ...products.map((p) => [p.nombre, p.categoria, p.descripcion, p.marca].filter(Boolean).join(" ")),
+    ].join(" "),
+  );
+
+  if (/cabello|shampoo|champu|acondicionador|mascarilla|keratina|capilar|tinte|decoloracion|alisado/.test(corpus)) {
+    return "Si quieres, te recomiendo la mejor opción según tu tipo de cabello y te explico modo de uso y cuidados para mejores resultados.";
+  }
+  if (/piel|serum|suero|hidratante|limpiador|protector|facial|acne|mancha/.test(corpus)) {
+    return "Si quieres, te recomiendo la mejor opción según tu tipo de piel y te explico cómo usarla sin irritación.";
+  }
+  if (/maquillaje|base|corrector|labial|rubor|primer|sombras/.test(corpus)) {
+    return "Si quieres, te recomiendo la mejor opción según tu tono/tipo de piel y te explico aplicación y duración.";
+  }
+  if (/unas|uñas|esmalte|gel|semipermanente|acrilica|acrilicas|polygel/.test(corpus)) {
+    return "Si quieres, te recomiendo la mejor opción según el acabado que buscas y te explico preparación y cuidados.";
+  }
+
+  return "Si quieres, te recomiendo la mejor opción para tu necesidad y te explico modo de uso y cuidados de forma clara.";
 }
 
 function buildCategoryPriceReply(customerName: string, message: string, articles: CatalogArticle[]): string | null {
   const m = normalize(message);
   if (!m || articles.length === 0) return null;
+  const tokens = expandTokenVariants(getSearchTokens(message));
 
   const categoryRules: Array<{ test: RegExp; keywords: string[]; label: string }> = [
     {
@@ -512,15 +560,16 @@ function buildCategoryPriceReply(customerName: string, message: string, articles
   ];
 
   const rule = categoryRules.find((r) => r.test.test(m));
-  if (!rule) return null;
 
   const candidates = articles
-    .filter((a) => Number(a.stock || 0) > 0)
     .map((a) => {
       const searchable = normalize([a.nombre, a.categoria, a.descripcion, a.marca].filter(Boolean).join(" "));
       let score = 0;
-      for (const k of rule.keywords) {
+      for (const k of rule?.keywords || []) {
         if (searchable.includes(normalize(k))) score += 2;
+      }
+      for (const token of tokens) {
+        if (searchable.includes(token)) score += 3;
       }
       if (Number(a.descuento_porcentaje || 0) > 0) score += 1;
       return { a, score };
@@ -538,11 +587,14 @@ function buildCategoryPriceReply(customerName: string, message: string, articles
   const greeting = customerName ? `Hola ${customerName}` : "Hola";
   const lines = candidates.map((p) => {
     const price = formatCOP(Number(p.precio_venta || 0));
+    const stock = Number(p.stock || 0);
+    const stockText = stock > 0 ? ` (stock: ${stock})` : " (agotado)";
     const discount = Number(p.descuento_porcentaje || 0) > 0 ? ` (${p.descuento_porcentaje}% OFF)` : "";
-    return `• *${p.nombre || "Producto"}*: ${price}${discount}`;
+    return `• *${p.nombre || "Producto"}*: ${price}${discount}${stockText}`;
   });
 
-  return `${greeting}. Te comparto precios reales de ${rule.label}:\n${lines.join("\n")}\nSi quieres, te filtro por presupuesto (económico / medio / premium).`;
+  const label = rule?.label || "productos relacionados";
+  return `${greeting}. Te comparto precios reales de ${label}:\n${lines.join("\n")}\n${buildPriceAdvisoryTail(message, candidates)}`;
 }
 
 function buildDeterministicInventoryAdvisory(
@@ -949,6 +1001,7 @@ function buildHeuristicFallbackResponse(params: {
       : getSearchTokens(`${recentClientContext} ${message}`);
 
   const top = rankArticles(articles, effectiveTokens, intent).slice(0, 3);
+  const strictPriceTop = buildStrictPriceMatches(articles, message);
   const normalizedMessage = normalize(message);
   const normalizedContext = normalize(`${recentClientContext} ${message}`);
 
@@ -1034,8 +1087,9 @@ Soy *Dany*, tu asesora virtual. ¿En qué te puedo ayudar hoy?
     return `💄 ¡Listo! Cuéntame si lo necesitas para:\n1) *Uso diario*\n2) *Evento especial*\nY te recomiendo base, corrector y sellado ideales.`;
   }
 
-  if ((asksRecommendation || asksAvailability || asksPriceDirect) && top.length > 0) {
-    const lines = top.slice(0, 3).map((p) => {
+  if ((asksRecommendation || asksAvailability || asksPriceDirect) && (asksPriceDirect ? strictPriceTop.length > 0 : top.length > 0)) {
+    const source = asksPriceDirect ? strictPriceTop.slice(0, 3) : top.slice(0, 3);
+    const lines = source.map((p) => {
       const price = formatCOP(Number(p.precio_venta || 0));
       const stock = Number(p.stock || 0);
       const stockText = stock > 0 ? ` (stock: ${stock})` : " (agotado)";
@@ -1043,7 +1097,7 @@ Soy *Dany*, tu asesora virtual. ¿En qué te puedo ayudar hoy?
       return `• *${p.nombre || "Producto"}*: ${price}${stockText}${discount}`;
     });
 
-    return `${greeting}. Para lo que vienes preguntando, estas son opciones reales de tienda:\n${lines.join("\n")}\n¿Quieres que te recomiende la mejor para *frizz* según presupuesto (económica / media / premium)?`;
+    return `${greeting}. Para lo que vienes preguntando, estas son opciones reales de tienda:\n${lines.join("\n")}\nSi quieres, te recomiendo cuál te conviene más según tu tipo de cabello y te explico modo de uso y cuidados.`;
   }
 
   const closeByIntent =
