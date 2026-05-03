@@ -550,6 +550,26 @@ export default function VentasPage() {
             actualizar_perfil: true,
           }),
         }).catch(() => { /* no bloquea la venta */ });
+
+        // Notificación WhatsApp de puntos ganados (fire-and-forget, solo si tiene teléfono)
+        if (clienteSeleccionado.telefono) {
+          const puntosTotal = Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados;
+          const nivelActual = getNivelFidelidad(puntosTotal);
+          fetch("/api/whatsapp/send-puntos-compra", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              // La sesión de Supabase en cookies autentica este endpoint
+            },
+            body: JSON.stringify({
+              perfil_id: clienteId,
+              telefono: String(clienteSeleccionado.telefono).replace(/\D/g, ""),
+              puntos_ganados: puntosGanados,
+              puntos_totales: puntosTotal,
+              nivel: nivelActual,
+            }),
+          }).catch(() => { /* no bloquea la venta */ });
+        }
       } else if (clienteId && clienteSeleccionado) {
         // Solo actualizar total_compras aunque no se acumulen puntos
         await fetch(`/api/perfiles?id=${encodeURIComponent(clienteId)}`, {
