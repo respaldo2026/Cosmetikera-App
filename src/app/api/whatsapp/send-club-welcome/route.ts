@@ -41,6 +41,9 @@ interface SendClubWelcomeResponse {
   already_sent?: boolean;
 }
 
+const CLUB_WELCOME_TEMPLATE_NAME =
+  process.env.WHATSAPP_TEMPLATE_CLUB_WELCOME || "club_welcome_es";
+
 type WelcomeLockResult = {
   acquired: boolean;
   alreadySent?: boolean;
@@ -139,7 +142,7 @@ async function acquireWelcomeSendLock(
     perfil_id: perfilId,
     tipo: "bienvenida_club",
     telefono: phone,
-    mensaje: `Plantilla: club_welcome_es | Cédula: ${cedula}`,
+    mensaje: `Plantilla: ${CLUB_WELCOME_TEMPLATE_NAME} | Cédula: ${cedula}`,
     estado: "procesando",
   };
 
@@ -263,7 +266,7 @@ async function sendWhatsAppMessage(
     const normalizedPhone = phone.replace(/\D/g, "");
 
     // Usar plantilla pre-aprobada en Meta
-    // Nombre: club_welcome_es
+    // Nombre: WHATSAPP_TEMPLATE_CLUB_WELCOME (fallback: club_welcome_es)
     // Variable {{1}}: cedula
     const response = await fetch(url, {
       method: "POST",
@@ -276,7 +279,7 @@ async function sendWhatsAppMessage(
         to: normalizedPhone,
         type: "template",
         template: {
-          name: "club_welcome_es", // Nombre de la plantilla en Meta
+          name: CLUB_WELCOME_TEMPLATE_NAME,
           language: {
             code: "es", // Español
           },
@@ -392,7 +395,7 @@ async function logConversationTemplate(perfilId: string, phone: string, cedula: 
     telefono: normalizedPhone,
     perfil_id: perfilId,
     rol: "agente",
-    mensaje: `Plantilla enviada: club_welcome_es | Cédula: ${cedula}`,
+    mensaje: `Plantilla enviada: ${CLUB_WELCOME_TEMPLATE_NAME} | Cédula: ${cedula}`,
     tipo_mensaje: "template",
     intento: null,
   });
@@ -507,12 +510,12 @@ export async function POST(
     }
 
     // 6. Enviar plantilla de WhatsApp (pre-aprobada por Meta)
-    // Plantilla: "club_welcome_es"
+    // Plantilla: configurable por env (WHATSAPP_TEMPLATE_CLUB_WELCOME)
     // Variable: cedula
     const whatsappResult = await sendWhatsAppMessage(phone, body.cedula);
 
     // 7. Construir mensaje para auditoría (para notificaciones_enviadas)
-    const mensajeAuditoria = `Plantilla: club_welcome_es | Cédula: ${body.cedula}`;
+    const mensajeAuditoria = `Plantilla: ${CLUB_WELCOME_TEMPLATE_NAME} | Cédula: ${body.cedula}`;
 
     // 8. Registrar notificación
     await logNotification(

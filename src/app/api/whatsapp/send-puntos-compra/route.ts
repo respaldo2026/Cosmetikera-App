@@ -37,6 +37,9 @@ interface SendPuntosRequest {
   numero_venta: string;
 }
 
+const PUNTOS_COMPRA_TEMPLATE_NAME =
+  process.env.WHATSAPP_TEMPLATE_PUNTOS_COMPRA || "puntos_compra_es";
+
 // ── Auth ───────────────────────────────────────────────────────────────────
 async function validateRequest(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get("x-api-key");
@@ -116,7 +119,7 @@ async function sendReciboWhatsApp(
         to: normalizedPhone,
         type: "template",
         template: {
-          name: "puntos_compra_es",
+          name: PUNTOS_COMPRA_TEMPLATE_NAME,
           language: { code: "es" },
           components: [
             {
@@ -167,7 +170,7 @@ async function logConversation(
     telefono: normalizePhone(phone),
     perfil_id: perfilId,
     rol: "agente",
-    mensaje: `Plantilla enviada: puntos_compra_es | Total: $${totalCompra.toLocaleString("es-CO")} | Ref: ${numeroVenta} | ${success ? "OK" : "ERROR"}`,
+    mensaje: `Plantilla enviada: ${PUNTOS_COMPRA_TEMPLATE_NAME} | Total: $${totalCompra.toLocaleString("es-CO")} | Ref: ${numeroVenta} | ${success ? "OK" : "ERROR"}`,
 
     tipo_mensaje: "template",
     intento: null,
