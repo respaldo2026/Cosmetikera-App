@@ -1,23 +1,27 @@
 /**
  * POST /api/whatsapp/send-puntos-compra
  *
- * Envía plantilla WhatsApp "puntos_compra_es" al cliente
- * cada vez que acumula puntos en una compra POS.
+ * Envía plantilla WhatsApp "recibo_compra_es" (UTILITY aprobada por Meta)
+ * al cliente cada vez que realiza una compra en el POS.
+ *
+ * Plantilla: recibo_compra_es
+ *   {{1}} = nombre del cliente
+ *   {{2}} = total de la compra (ej: "45.000")
+ *   {{3}} = número de venta (ej: "#0042")
  *
  * Payload:
  * {
  *   "perfil_id": "uuid",
- *   "telefono": "3001234567",       // requerido (ya limpio, sin +57)
- *   "puntos_ganados": 15,           // puntos de ESTA compra
- *   "puntos_totales": 320,          // puntos totales tras la compra
- *   "nivel": "Plata"                // nivel actual
+ *   "telefono": "3001234567",   // requerido (solo dígitos)
+ *   "total_compra": 45000,      // total en pesos
+ *   "numero_venta": "#0042"     // referencia de la venta
  * }
  *
- * Auth: header x-api-key (igual que send-club-welcome)
+ * Auth: sesión de Supabase en cookies (llamada desde el cliente POS)
  *
  * Reglas:
  * - Solo se envía si el cliente tiene teléfono
- * - No bloquea el flujo de venta (llamada fire-and-forget)
+ * - No bloquea el flujo de venta (fire-and-forget)
  * - Se registra en whatsapp_conversation_history para auditoría
  */
 
@@ -29,9 +33,8 @@ import { normalizePhone } from "@/utils/whatsapp-memory";
 interface SendPuntosRequest {
   perfil_id: string;
   telefono: string;
-  puntos_ganados: number;
-  puntos_totales: number;
-  nivel: string;
+  total_compra: number;
+  numero_venta: string;
 }
 
 // ── Auth ───────────────────────────────────────────────────────────────────
@@ -81,12 +84,11 @@ async function getNombreCliente(perfilId: string): Promise<string> {
 }
 
 // ── Enviar plantilla por WhatsApp Cloud API ────────────────────────────────
-async function sendPuntosWhatsApp(
+async function sendReciboWhatsApp(
   phone: string,
   nombre: string,
-  puntosGanados: number,
-  puntosTotal: number,
-  nivel: string
+  totalCompra: number,
+  numeroVenta: string
 ): Promise<{ success: boolean; response?: unknown; error?: string }> {
   const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -114,16 +116,15 @@ async function sendPuntosWhatsApp(
         to: normalizedPhone,
         type: "template",
         template: {
-          name: "puntos_compra_es",
+          name: "recibo_compra_es",
           language: { code: "es" },
           components: [
             {
               type: "body",
               parameters: [
-                { type: "text", text: nombre },                           // {{1}}
-                { type: "text", text: String(puntosGanados) },            // {{2}}
-                { type: "text", text: String(puntosTotal) },              // {{3}}
-                { type: "text", text: nivel },                            // {{4}}
+                { type: "text", text: nombre },                                               // {{1}}
+                { type: "text", text: totalCompra.toLocaleString("es-CO") },                 // {{2}}
+                { type: "text", text: numeroVenta },                                          // {{3}}
               ],
             },
           ],
@@ -150,9 +151,8 @@ async function sendPuntosWhatsApp(
 async function logConversation(
   perfilId: string,
   phone: string,
-  puntosGanados: number,
-  puntosTotal: number,
-  nivel: string,
+  totalCompra: number,
+  numeroVenta: string,
   success: boolean
 ) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -167,7 +167,8 @@ async function logConversation(
     telefono: normalizePhone(phone),
     perfil_id: perfilId,
     rol: "agente",
-    mensaje: `Plantilla enviada: puntos_compra_es | +${puntosGanados} pts | Total: ${puntosTotal} pts | Nivel: ${nivel} | ${success ? "OK" : "ERROR"}`,
+    mensaje: `Plantilla enviada: recibo_compra_es | Total: $${totalCompra.toLocaleString("es-CO")} | Ref: ${numeroVenta} | ${success ? "OK" : "ERROR"}`,
+
     tipo_mensaje: "template",
     intento: null,
   });
@@ -187,20 +188,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "JSON inválido" }, { status: 400 });
     }
 
-    const { perfil_id, telefono, puntos_ganados, puntos_totales, nivel } = body;
+    const { perfil_id, telefono, total_compra, numero_venta } = body;
 
-    if (!perfil_id || !telefono || !puntos_ganados || !puntos_totales || !nivel) {
+    if (!perfil_id || !telefono || !total_compra || !numero_venta) {
       return NextResponse.json(
-        { success: false, error: "Faltan campos: perfil_id, telefono, puntos_ganados, puntos_totales, nivel" },
+        { success: false, error: "Faltan campos: perfil_id, telefono, total_compra, numero_venta" },
         { status: 400 }
       );
     }
 
     const nombre = await getNombreCliente(perfil_id);
-    const result = await sendPuntosWhatsApp(telefono, nombre, puntos_ganados, puntos_totales, nivel);
+    const result = await sendReciboWhatsApp(telefono, nombre, total_compra, numero_venta);
 
     // Auditoría (no-throw)
-    logConversation(perfil_id, telefono, puntos_ganados, puntos_totales, nivel, result.success).catch(() => {});
+    logConversation(perfil_id, telefono, total_compra, numero_venta, result.success).catch(() => {});
 
     if (result.success) {
       return NextResponse.json({ success: true, message: "Mensaje de puntos enviado" });

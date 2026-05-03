@@ -551,22 +551,16 @@ export default function VentasPage() {
           }),
         }).catch(() => { /* no bloquea la venta */ });
 
-        // Notificación WhatsApp de puntos ganados (fire-and-forget, solo si tiene teléfono)
+        // Recibo WhatsApp (fire-and-forget, solo si tiene teléfono)
         if (clienteSeleccionado.telefono) {
-          const puntosTotal = Number(clienteSeleccionado.puntos_fidelidad || 0) + puntosGanados;
-          const nivelActual = getNivelFidelidad(puntosTotal);
           fetch("/api/whatsapp/send-puntos-compra", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              // La sesión de Supabase en cookies autentica este endpoint
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               perfil_id: clienteId,
               telefono: String(clienteSeleccionado.telefono).replace(/\D/g, ""),
-              puntos_ganados: puntosGanados,
-              puntos_totales: puntosTotal,
-              nivel: nivelActual,
+              total_compra: totalFinal,
+              numero_venta: `#${numeroVenta}`,
             }),
           }).catch(() => { /* no bloquea la venta */ });
         }

@@ -47,9 +47,9 @@ const template = {
   components: [
     {
       type: 'BODY',
-      // Texto aprobable por Meta: sin emojis de adorno excesivo, directo, ≤4 vars.
-      // La primera frase identifica claramente al remitente (La Cosmetikera).
-      text: 'Hola {{1}},\n\nGracias por tu compra en La Cosmetikera.\n\nPuntos ganados: +{{2}} pts\nTotal acumulado: {{3}} pts\nNivel: {{4}}\n\nSigue acumulando puntos para canjear descuentos exclusivos.',
+      // Texto puramente transaccional: informa sobre acción ya realizada.
+      // Sin frases promocionales para que Meta lo clasifique como UTILITY.
+      text: 'Hola {{1}},\n\nGracias por tu compra en La Cosmetikera.\n\nPuntos ganados: +{{2}} pts\nTotal acumulado: {{3}} pts\nNivel: {{4}}',
     },
     {
       type: 'FOOTER',
