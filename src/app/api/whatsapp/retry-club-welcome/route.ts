@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
 import { normalizePhone } from "@/utils/whatsapp-memory";
 
 type RetryRequestBody = {
@@ -22,27 +21,23 @@ type NotificacionRow = {
   created_at?: string | null;
 };
 
-/** Acepta x-api-key O sesión de Supabase autenticada */
+/** Acepta x-api-key O request desde la propia app (mismo origen) */
 async function isAuthorized(request: NextRequest): Promise<boolean> {
-  // 1) API key
+  // 1) API key (scripts externos / cron)
   const apiKey = request.headers.get("x-api-key") || "";
   const expected = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY || "";
   if (expected && apiKey === expected) return true;
 
-  // 2) Sesión autenticada de Supabase (cualquier usuario logueado en la app)
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return false;
+  // 2) Request desde la propia app
+  const origin = request.headers.get("origin") || "";
+  const referer = request.headers.get("referer") || "";
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  if (appUrl && (origin.startsWith(appUrl) || referer.startsWith(appUrl))) return true;
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() { return request.cookies.getAll(); },
-      setAll() {},
-    },
-  });
+  // 3) Localhost en desarrollo
+  if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) return true;
 
-  const { data, error } = await supabase.auth.getUser();
-  return !error && Boolean(data.user?.id);
+  return false;
 }
 
 function sleep(ms: number) {
