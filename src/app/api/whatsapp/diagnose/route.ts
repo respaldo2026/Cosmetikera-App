@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
 type CheckStatus = "ok" | "warn" | "fail";
@@ -44,38 +43,21 @@ function getAdminClient() {
 }
 
 async function validateRequest(request: NextRequest): Promise<boolean> {
+  // 1) x-api-key para scripts externos
   const apiKey = request.headers.get("x-api-key") || "";
   const expectedKey = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY || "";
-
   if (expectedKey && apiKey === expectedKey) return true;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return false;
+  // 2) Mismo origen que la app (request desde el navegador autenticado)
+  const origin = request.headers.get("origin") || "";
+  const referer = request.headers.get("referer") || "";
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  if (appUrl && (origin.startsWith(appUrl) || referer.startsWith(appUrl))) return true;
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll() {},
-    },
-  });
+  // 3) Localhost en desarrollo
+  if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) return true;
 
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user?.id) return false;
-
-  const admin = getAdminClient();
-  if (!admin) return false;
-
-  const { data: perfil } = await admin
-    .from("perfiles")
-    .select("rol")
-    .eq("auth_user_id", data.user.id)
-    .maybeSingle();
-
-  const rol = String((perfil as { rol?: string } | null)?.rol || "").toLowerCase();
-  return rol === "admin" || rol === "superadmin";
+  return false;
 }
 
 async function graphGet(path: string, accessToken: string) {
