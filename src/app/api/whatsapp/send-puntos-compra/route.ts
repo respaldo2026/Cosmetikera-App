@@ -1,10 +1,10 @@
 /**
  * POST /api/whatsapp/send-puntos-compra
  *
- * Envía plantilla WhatsApp "recibo_compra_es" (UTILITY aprobada por Meta)
+ * Envía plantilla WhatsApp "puntos_compra_es" (UTILITY aprobada por Meta)
  * al cliente cada vez que realiza una compra en el POS.
  *
- * Plantilla: recibo_compra_es
+ * Plantilla: puntos_compra_es
  *   {{1}} = nombre del cliente
  *   {{2}} = total de la compra (ej: "45.000")
  *   {{3}} = número de venta (ej: "#0042")
@@ -116,7 +116,7 @@ async function sendReciboWhatsApp(
         to: normalizedPhone,
         type: "template",
         template: {
-          name: "recibo_compra_es",
+          name: "puntos_compra_es",
           language: { code: "es" },
           components: [
             {
@@ -167,7 +167,7 @@ async function logConversation(
     telefono: normalizePhone(phone),
     perfil_id: perfilId,
     rol: "agente",
-    mensaje: `Plantilla enviada: recibo_compra_es | Total: $${totalCompra.toLocaleString("es-CO")} | Ref: ${numeroVenta} | ${success ? "OK" : "ERROR"}`,
+    mensaje: `Plantilla enviada: puntos_compra_es | Total: $${totalCompra.toLocaleString("es-CO")} | Ref: ${numeroVenta} | ${success ? "OK" : "ERROR"}`,
 
     tipo_mensaje: "template",
     intento: null,
