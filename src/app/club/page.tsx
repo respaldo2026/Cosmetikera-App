@@ -379,7 +379,14 @@ export default function ClubPage() {
   const abrirWhatsAppAsesora = useCallback((baseMessage: string) => {
     const cedula = String(cliente?.cedula || "").replace(/\D/g, "");
     const nombre = String(cliente?.nombre_completo || "").trim();
-    const nivelLabel = String(nivel?.label || "").trim();
+    const nivelRaw = String(cliente?.nivel_fidelidad || "").trim().toLowerCase();
+    const nivelMap: Record<string, string> = {
+      bronce: "Bronce",
+      plata: "Plata",
+      oro: "Oro",
+      diamante: "Diamante",
+    };
+    const nivelLabel = nivelMap[nivelRaw] || "";
     const puntos = Number(cliente?.puntos_fidelidad || 0);
 
     const contextoPartes = [
@@ -400,7 +407,7 @@ export default function ClubPage() {
     if (!whatsAppTargetNumber) {
       message.info("Se abrió WhatsApp. Selecciona el chat de La Cosmetikera para continuar.");
     }
-  }, [cliente?.cedula, cliente?.nombre_completo, cliente?.puntos_fidelidad, message, nivel?.label, whatsAppTargetNumber]);
+  }, [cliente?.cedula, cliente?.nivel_fidelidad, cliente?.nombre_completo, cliente?.puntos_fidelidad, message, whatsAppTargetNumber]);
 
   const aplicarCodigoReferido = useCallback(async () => {
     if (!cliente || !codigoReferidoIngresado.trim()) return;
