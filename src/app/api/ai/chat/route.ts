@@ -197,17 +197,6 @@ function collectRejectedDomains(
 }
 
 function responseMentionsDomain(text: string, domain: BeautyDomain): boolean {
-
-  function isBroadGenericBeautyAnswer(text: string): boolean {
-    const t = normalize(text);
-    if (!t) return false;
-    return (
-      /aqui\s+estoy\s+para\s+ayudarte\s+con\s+belleza/.test(t) ||
-      /te\s+asesoro\s+en\s+belleza/.test(t) ||
-      /piel,\s*cabello,\s*maquillaje/.test(t) ||
-      /cuentame\s+tu\s+necesidad\s+puntual/.test(t)
-    );
-  }
   const t = normalize(text);
   if (!t) return false;
 
@@ -223,6 +212,17 @@ function responseMentionsDomain(text: string, domain: BeautyDomain): boolean {
     default:
       return false;
   }
+}
+
+function isBroadGenericBeautyAnswer(text: string): boolean {
+  const t = normalize(text);
+  if (!t) return false;
+  return (
+    /aqui\s+estoy\s+para\s+ayudarte\s+con\s+belleza/.test(t) ||
+    /te\s+asesoro\s+en\s+belleza/.test(t) ||
+    /piel,\s*cabello,\s*maquillaje/.test(t) ||
+    /cuentame\s+tu\s+necesidad\s+puntual/.test(t)
+  );
 }
 
 function domainLabel(domain: BeautyDomain): string {
@@ -291,7 +291,6 @@ function enforceFinalResponseQuality(params: {
 
   const requestedDomain = detectBeautyDomain(message);
 
-  if (requestedDomain && finalText && !responseMentionsDomain(finalText, requestedDomain) && !isDateTimeQuestion(message)) {
   if (
     requestedDomain &&
     finalText &&
@@ -1047,7 +1046,6 @@ Estoy aquí para ayudarte en serio, paso a paso.
   3) *Puntos del club*`;
     }
 
-  if (isGreeting || isShortQuestion) {
   if (isShortQuestion && (hasHairConcern || hasSkinConcern || hasNailTechConcern || hasMakeupConcern || hasColorConcern)) {
     if (hasNailTechConcern) {
       return `💅 ${greeting}. Perfecto, seguimos con *uñas*. ¿Prefieres acabado natural, duración larga o diseño? Así te doy una recomendación exacta.`;
