@@ -102,6 +102,9 @@ function looksRepeatedAnswer(current: string, previous: string): boolean {
 function detectIntent(message: string): AgentIntent {
   const m = normalize(message);
   if (/precio|cuanto|valor|costo|vale|promocion|oferta|descuento|economico|barato/.test(m)) return "precio";
+  // Preguntas sobre cursos/clases se tratan como intención de inscripción para evitar
+  // que caigan en respuestas genéricas de horario.
+  if (/curso|cursos|clase|clases|modulo|modulos|inscripcion\s+al\s+curso|inicio\s+de\s+curso|comienzan\s+los\s+cursos/.test(m)) return "inscripcion";
   if (/hora|horario|cuando|dia|fecha|agenda|atienden|abren|cierran/.test(m)) return "horario";
   if (/rutina|pasos|orden|como usar|aplicar|primero|despues|protocolo/.test(m)) return "temario";
   if (/material|kit|insumo|herramienta|ingrediente|composicion|formula/.test(m)) return "materiales";
@@ -194,6 +197,17 @@ function collectRejectedDomains(
 }
 
 function responseMentionsDomain(text: string, domain: BeautyDomain): boolean {
+
+  function isBroadGenericBeautyAnswer(text: string): boolean {
+    const t = normalize(text);
+    if (!t) return false;
+    return (
+      /aqui\s+estoy\s+para\s+ayudarte\s+con\s+belleza/.test(t) ||
+      /te\s+asesoro\s+en\s+belleza/.test(t) ||
+      /piel,\s*cabello,\s*maquillaje/.test(t) ||
+      /cuentame\s+tu\s+necesidad\s+puntual/.test(t)
+    );
+  }
   const t = normalize(text);
   if (!t) return false;
 
@@ -278,6 +292,12 @@ function enforceFinalResponseQuality(params: {
   const requestedDomain = detectBeautyDomain(message);
 
   if (requestedDomain && finalText && !responseMentionsDomain(finalText, requestedDomain) && !isDateTimeQuestion(message)) {
+  if (
+    requestedDomain &&
+    finalText &&
+    (!responseMentionsDomain(finalText, requestedDomain) || isBroadGenericBeautyAnswer(finalText)) &&
+    !isDateTimeQuestion(message)
+  ) {
     finalText = buildDomainFocusedReply(requestedDomain, customerName, message, articles);
   }
 
@@ -771,6 +791,7 @@ function buildHeuristicFallbackResponse(params: {
   const asksPoints = /puntos|club|fidelizacion|canje|beneficio/.test(normalizedMessage);
   const asksName = /sabes\s+mi\s+nombre|cual\s+es\s+mi\s+nombre|mi\s+nombre\??/.test(normalizedMessage);
   const asksNails = /uñas|unas|nail|semipermanente|acrilicas/.test(normalizedMessage);
+  const asksCourseInfo = /curso|cursos|clase|clases|inscripcion|matricula|modulo|modulos|cuando\s+comienzan|inicio\s+del\s+curso/.test(normalizedContext);
   const asksSupport = /no puedo|no me deja|no funciona|iniciar sesion|inicio de sesion|contrasena|contraseña|acceso|ingresar|no entra|no abre|usuario|clave|registrar|registro|inscripcion|inscripcion|pague|pago|cobro|valor|costo\s+del\s+curso|precio\s+del\s+curso/.test(normalizedMessage);
   const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
   const isSimpleGreetingOnly = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey|que mas|q mas|todo bien)\s*[!.]*$/.test(normalizedMessage);
@@ -878,7 +899,7 @@ Estoy aquí para ayudarte en serio, paso a paso.
   }
 
   if (intent === "horario") {
-    return `${greeting}. Te ayudo con el horario de atención enseguida. Si quieres, de una vez te dejo preseleccionados productos según tu necesidad para que compres más rápido.`;
+    return `${greeting}. Te ayudo con el horario de atención. Si te refieres a *horario de cursos de uñas*, te confirmo también fechas de inicio y disponibilidad.`;
   }
 
   if (asksName) {
@@ -890,6 +911,10 @@ Estoy aquí para ayudarte en serio, paso a paso.
 
   if (asksSupport) {
     return `🔧 Para temas de *acceso, contraseñas o pagos* no tengo forma de gestionar eso desde aquí, ya que soy el asistente de belleza 😊\nPor favor contacta directamente a la tienda:\n📞 Escríbenos al número principal o visítanos para que un asesor te ayude.\nEn lo que puedo ayudarte hoy: ¿tienes alguna consulta sobre productos, cuidado de piel o cabello?`;
+  }
+
+  if (asksCourseInfo) {
+    return `${greeting}. Sobre *cursos de uñas*, te respondo directo: te puedo confirmar fecha de inicio, horario y valor del plan. ¿Quieres solo la *próxima fecha* o el *detalle completo*?`;
   }
 
   if (asksPoints) {
@@ -967,6 +992,22 @@ Estoy aquí para ayudarte en serio, paso a paso.
   2) *Rutina personalizada*
   3) *Puntos del club*`;
     }
+
+  if (isGreeting || isShortQuestion) {
+  if (isShortQuestion && (hasHairConcern || hasSkinConcern || hasNailTechConcern || hasMakeupConcern || hasColorConcern)) {
+    if (hasNailTechConcern) {
+      return `💅 ${greeting}. Perfecto, seguimos con *uñas*. ¿Prefieres acabado natural, duración larga o diseño? Así te doy una recomendación exacta.`;
+    }
+    if (hasColorConcern || hasHairConcern) {
+      return `💇 ${greeting}. Perfecto, seguimos con *cabello*. Si quieres tinturar, te guío según tu color base y estado actual del cabello.`;
+    }
+    if (hasSkinConcern) {
+      return `✨ ${greeting}. Perfecto, seguimos con *piel*. Dime tu tipo de piel (grasa, seca o mixta) y te doy rutina puntual.`;
+    }
+    if (hasMakeupConcern) {
+      return `💄 ${greeting}. Perfecto, seguimos con *maquillaje*. ¿Lo quieres para diario o evento?`;
+    }
+  }
 
   if (isGreeting || isShortQuestion) {
      return `👋 ${greeting}. Aquí estoy para ayudarte con *belleza* de forma práctica: piel, cabello, maquillaje, uñas y barba. Cuéntame tu necesidad puntual (ej: acné, resequedad, frizz, caída o presupuesto) y te respondo con pasos concretos.`;
@@ -1314,16 +1355,15 @@ ${catalogoTexto}`;
       const altAdvice = buildDeterministicInventoryAdvisory(customerName, message, articulos);
       responseText =
         altAdvice ||
-        `${buildHumanGreeting(greetingStyle, customerName)} Tomo otro enfoque para ayudarte mejor:\n` +
-          buildHeuristicFallbackResponse({
-            customerName,
-            message,
-            intent,
-            articles: articulos,
-            lastBotMessage: "",
-            businessContext: customerBusinessContext,
-            conversationHistory,
-          });
+        buildHeuristicFallbackResponse({
+          customerName,
+          message,
+          intent,
+          articles: articulos,
+          lastBotMessage: "",
+          businessContext: customerBusinessContext,
+          conversationHistory,
+        });
     }
 
     // ── 9. Asegurar precio real si Gemini fue genérico ────────────
