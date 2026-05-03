@@ -430,6 +430,7 @@ type CustomerBusinessContext = {
   puntos?: number;
   totalCompras?: number;
   ultimasCompras?: Array<{ fecha: string; total: number }>;
+  ultimosProductos?: Array<{ nombre: string; cantidad: number; fecha: string }>;
 };
 
 function buildStrictPriceMatches(articles: CatalogArticle[], message: string): CatalogArticle[] {
@@ -597,12 +598,41 @@ async function getCustomerBusinessContext(
 
     const { data: ventas } = await supabase
       .from("ventas")
-      .select("fecha,total")
+      .select("fecha,total,items")
       .eq("cliente_id", profile.id)
       .order("fecha", { ascending: false })
-      .limit(3);
+      .limit(8);
 
-    const ventasRows = (ventas || []) as Array<{ fecha?: string | null; total?: number | null }>;
+    const ventasRows = (ventas || []) as Array<{
+      fecha?: string | null;
+      total?: number | null;
+      items?: Array<{ nombre?: string | null; cantidad?: number | null }> | null;
+    }>;
+
+    const productMap = new Map<string, { nombre: string; cantidad: number; fecha: string }>();
+    for (const venta of ventasRows) {
+      const fecha = String(venta.fecha || "");
+      const items = Array.isArray(venta.items) ? venta.items : [];
+      for (const item of items) {
+        const nombre = String(item?.nombre || "").trim();
+        if (!nombre) continue;
+        const cantidad = Number(item?.cantidad || 0) || 1;
+        const key = normalize(nombre);
+        const existing = productMap.get(key);
+        if (!existing) {
+          productMap.set(key, { nombre, cantidad, fecha });
+        } else {
+          existing.cantidad += cantidad;
+          if (!existing.fecha || (fecha && new Date(fecha).getTime() > new Date(existing.fecha).getTime())) {
+            existing.fecha = fecha;
+          }
+        }
+      }
+    }
+
+    const ultimosProductos = Array.from(productMap.values())
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+      .slice(0, 5);
 
     return {
       perfilId: profile.id,
@@ -613,6 +643,7 @@ async function getCustomerBusinessContext(
         fecha: String(v.fecha || ""),
         total: Number(v.total || 0),
       })),
+      ultimosProductos,
     };
   } catch {
     return null;
@@ -789,6 +820,7 @@ function buildHeuristicFallbackResponse(params: {
   const hasAfroConcern = /afro|rizo tipo 3|rizo tipo 4|coily|crespo/.test(normalizedContext);
   const hasNailTechConcern = /acrilicas|acrilico|uñas en gel|unas en gel|semipermanente|polygel|gel x/.test(normalizedContext);
   const asksPoints = /puntos|club|fidelizacion|canje|beneficio/.test(normalizedMessage);
+  const asksBoughtProducts = /que\s+compre|que\s+he\s+comprado|que\s+compraba|productos\s+que\s+compre|historial\s+de\s+compras|mis\s+compras|ultima\s+compra|ultimas\s+compras/.test(normalizedMessage);
   const asksName = /sabes\s+mi\s+nombre|cual\s+es\s+mi\s+nombre|mi\s+nombre\??/.test(normalizedMessage);
   const asksNails = /uñas|unas|nail|semipermanente|acrilicas/.test(normalizedMessage);
   const asksCourseInfo = /curso|cursos|clase|clases|inscripcion|matricula|modulo|modulos|cuando\s+comienzan|inicio\s+del\s+curso/.test(normalizedContext);
@@ -930,6 +962,28 @@ Estoy aquí para ayudarte en serio, paso a paso.
       return `🎁 Te confirmo tus datos del Club:\n• *Puntos actuales*: ${puntos}\n• *Total acumulado en compras*: ${formatCOP(totalCompras)}${ultimaTxt}\n¿Quieres que te diga opciones de canje según tus puntos?`;
     }
     return `🎁 Te ayudo con tus *puntos del Club*. Para validarlos sin error, compárteme tu *cédula* y te indico saldo, nivel y opciones de canje.`;
+  }
+
+  if (asksBoughtProducts) {
+    if (params.businessContext?.perfilId) {
+      const productos = (params.businessContext.ultimosProductos || []).slice(0, 5);
+      const ultima = params.businessContext.ultimasCompras?.[0];
+
+      if (productos.length === 0) {
+        if (ultima) {
+          return `🧾 Te confirmo tu última compra: *${new Date(ultima.fecha).toLocaleDateString("es-CO")}* por *${formatCOP(Number(ultima.total || 0))}*. Si quieres, te comparto el detalle de productos cuando quede sincronizado.`;
+        }
+        return `🧾 Aún no veo compras registradas en tu historial. Si acabas de comprar, puede tardar un momento en reflejarse.`;
+      }
+
+      const lines = productos.map((p) => `• *${p.nombre}* x${p.cantidad}`);
+      return `🧾 Te comparto tus productos comprados recientemente:\n${lines.join("\n")}${
+        ultima
+          ? `\nÚltima compra: *${new Date(ultima.fecha).toLocaleDateString("es-CO")}* por *${formatCOP(Number(ultima.total || 0))}*.`
+          : ""
+      }`;
+    }
+    return `🧾 Puedo revisar tu historial de productos comprados, pero primero necesito identificar tu perfil. Compárteme tu *cédula* o número registrado.`;
   }
 
   if (asksNails) {
@@ -1197,6 +1251,10 @@ export async function POST(request: NextRequest) {
 
     // ── 5. Datos del cliente ──────────────────────────────────────
     const ultimaCompra = customerBusinessContext?.ultimasCompras?.[0];
+    const ultimosProductosTexto = (customerBusinessContext?.ultimosProductos || [])
+      .slice(0, 3)
+      .map((p) => `${p.nombre} x${p.cantidad}`)
+      .join(", ");
 
     const clienteTexto = customerBusinessContext?.perfilId
       ? [
@@ -1210,6 +1268,7 @@ export async function POST(request: NextRequest) {
                 Number(ultimaCompra.total || 0)
               )}`
             : "",
+          ultimosProductosTexto ? `Productos comprados recientes: ${ultimosProductosTexto}` : "",
         ]
           .filter(Boolean)
           .join(" | ")
