@@ -253,8 +253,8 @@ export default function VentasPage() {
     }
   }, [clienteId, voucherClub]);
 
-  const crearClienteRapido = async () => {
-    const values = await nuevoClienteForm.validateFields();
+  const crearClienteRapido = async (submittedValues?: any) => {
+    const values = submittedValues ?? await nuevoClienteForm.validateFields();
     setCreandoCliente(true);
     try {
       const { codigo_referido, cumple_dia, cumple_mes, ...clienteData } = values;
@@ -1353,14 +1353,14 @@ export default function VentasPage() {
         title={<Space><UserOutlined style={{ color: "#d81b87" }} />Nuevo cliente</Space>}
         open={nuevoClienteOpen}
         onCancel={() => { setNuevoClienteOpen(false); nuevoClienteForm.resetFields(); }}
-        onOk={crearClienteRapido}
+        onOk={() => nuevoClienteForm.submit()}
         confirmLoading={creandoCliente}
         okText="Crear cliente"
         cancelText="Cancelar"
         width={420}
         destroyOnHidden
       >
-        <Form form={nuevoClienteForm} layout="vertical" style={{ marginTop: 12 }}>
+        <Form form={nuevoClienteForm} layout="vertical" style={{ marginTop: 12 }} onFinish={crearClienteRapido}>
           <Form.Item
             name="nombre_completo"
             label="Nombre completo"
@@ -1405,6 +1405,8 @@ export default function VentasPage() {
                   <Select
                     placeholder="Mes"
                     options={MONTH_OPTIONS}
+                    showSearch
+                    optionFilterProp="label"
                     onChange={(monthValue) => {
                       const selectedDay = Number(nuevoClienteForm.getFieldValue("cumple_dia") || 0);
                       const maxDays = getDaysInMonth(monthValue);
@@ -1420,10 +1422,6 @@ export default function VentasPage() {
                   {() => {
                     const selectedMonth = Number(nuevoClienteForm.getFieldValue("cumple_mes") || 0);
                     const maxDays = getDaysInMonth(selectedMonth);
-                    const dayOptions = Array.from({ length: maxDays }, (_, i) => ({
-                      value: i + 1,
-                      label: String(i + 1).padStart(2, "0"),
-                    }));
 
                     return (
                       <Form.Item
@@ -1431,10 +1429,14 @@ export default function VentasPage() {
                         noStyle={false}
                         rules={[{ required: true, message: "Selecciona el día" }]}
                       >
-                        <Select
+                        <InputNumber
                           placeholder="Día"
-                          options={dayOptions}
+                          min={1}
+                          max={maxDays || 31}
+                          precision={0}
+                          style={{ width: "100%" }}
                           disabled={!selectedMonth}
+                          changeOnWheel
                         />
                       </Form.Item>
                     );
