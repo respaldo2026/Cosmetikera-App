@@ -53,7 +53,7 @@ const { useBreakpoint } = Grid;
 
 const BRAND_FUCHSIA = "#d81b87";
 const BRAND_FUCHSIA_SOFT = "#ff4fa3";
-const WHATSAPP_BOT_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER;
+const WHATSAPP_BOT_NUMBER_ENV = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER;
 
 const sectionCardStyle: React.CSSProperties = {
   borderRadius: 16,
@@ -63,11 +63,25 @@ const sectionCardStyle: React.CSSProperties = {
   boxShadow: "0 6px 16px rgba(216,27,135,0.08)",
 };
 
-function buildWhatsAppLink(text: string): string {
-  if (!WHATSAPP_BOT_NUMBER) {
-    return "#";
+function normalizeWhatsAppTarget(value: string | null | undefined): string {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const waMeMatch = raw.match(/wa\.me\/([0-9]{7,20})/i);
+  if (waMeMatch?.[1]) return waMeMatch[1];
+
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length >= 7) return digits;
+
+  return "";
+}
+
+function buildWhatsAppLink(text: string, targetNumber?: string): string {
+  const encoded = encodeURIComponent(text);
+  if (targetNumber) {
+    return `https://wa.me/${targetNumber}?text=${encoded}`;
   }
-  return `https://wa.me/${WHATSAPP_BOT_NUMBER}?text=${encodeURIComponent(text)}`;
+  return `https://wa.me/?text=${encoded}`;
 }
 
 type Cliente = {
@@ -188,6 +202,37 @@ export default function ClubPage() {
   const [loadingRecomendaciones, setLoadingRecomendaciones] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("unsupported");
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [whatsAppTargetNumber, setWhatsAppTargetNumber] = useState<string>(
+    normalizeWhatsAppTarget(WHATSAPP_BOT_NUMBER_ENV)
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    const loadPublicContact = async () => {
+      try {
+        const response = await fetch("/api/configuracion/contacto-publico", { cache: "no-store" });
+        if (!response.ok) return;
+
+        const json = await response.json();
+        const serverNumber = normalizeWhatsAppTarget(
+          json?.data?.whatsapp_number || json?.data?.whatsapp || json?.data?.telefono || ""
+        );
+
+        if (active && serverNumber) {
+          setWhatsAppTargetNumber(serverNumber);
+        }
+      } catch {
+        // Si falla esta consulta, se mantiene el valor de entorno o fallback genérico.
+      }
+    };
+
+    void loadPublicContact();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const cargarCanjes = useCallback(async (perfilId: string) => {
     const response = await fetch(`/api/club/canjes?perfil_id=${encodeURIComponent(perfilId)}`);
@@ -330,6 +375,32 @@ export default function ClubPage() {
     const texto = encodeURIComponent(getReferralShareMessage(cliente));
     window.open(`https://wa.me/?text=${texto}`, "_blank");
   }, [cliente]);
+
+  const abrirWhatsAppAsesora = useCallback((baseMessage: string) => {
+    const cedula = String(cliente?.cedula || "").replace(/\D/g, "");
+    const nombre = String(cliente?.nombre_completo || "").trim();
+    const nivelLabel = String(nivel?.label || "").trim();
+    const puntos = Number(cliente?.puntos_fidelidad || 0);
+
+    const contextoPartes = [
+      "Vengo del portal del Club La Cosmetikera.",
+      nombre ? `Nombre: ${nombre}.` : "",
+      cedula ? `Cédula: ${cedula}.` : "",
+      nivelLabel ? `Nivel: ${nivelLabel}.` : "",
+      `Puntos actuales: ${puntos.toLocaleString("es-CO")}.`,
+      "Continúa la conversación por aquí.",
+    ].filter(Boolean);
+
+    const contextoClub = `\n\n${contextoPartes.join(" ")}`;
+
+    const finalMessage = `${baseMessage}${contextoClub}`;
+    const link = buildWhatsAppLink(finalMessage, whatsAppTargetNumber);
+    window.open(link, "_blank", "noopener,noreferrer");
+
+    if (!whatsAppTargetNumber) {
+      message.info("Se abrió WhatsApp. Selecciona el chat de La Cosmetikera para continuar.");
+    }
+  }, [cliente?.cedula, cliente?.nombre_completo, cliente?.puntos_fidelidad, message, nivel?.label, whatsAppTargetNumber]);
 
   const aplicarCodigoReferido = useCallback(async () => {
     if (!cliente || !codigoReferidoIngresado.trim()) return;
@@ -1073,19 +1144,14 @@ export default function ClubPage() {
                               block
                               icon={<PhoneOutlined />}
                               style={{ background: "#25D366", borderColor: "#25D366", color: "#fff", textAlign: "left", height: "auto", padding: "10px 16px" }}
-                              onClick={() => window.open(buildWhatsAppLink(msg), "_blank")}
+                              onClick={() => abrirWhatsAppAsesora(msg)}
                             >
                               <span style={{ fontSize: 16, marginRight: 8 }}>{emoji}</span>{label}
                             </Button>
                           ))}
                           <Button
                             block
-                            onClick={() =>
-                              window.open(
-                                buildWhatsAppLink("Hola, quiero consultar mis puntos del Club La Cosmetikera y recibir recomendaciones personalizadas."),
-                                "_blank",
-                              )
-                            }
+                            onClick={() => abrirWhatsAppAsesora("Hola, quiero consultar mis puntos del Club La Cosmetikera y recibir recomendaciones personalizadas.")}
                           >
                             🏅 Consultar mis puntos del Club
                           </Button>
