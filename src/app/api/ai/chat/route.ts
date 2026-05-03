@@ -287,13 +287,16 @@ function enforceFinalResponseQuality(params: {
     finalText = directDateTime;
   }
 
+  const asksPrice = /precio|cuanto|cuánto|valor|costo|cuesta|vale/.test(normalize(message));
+
   const requestedDomain = detectBeautyDomain(message);
 
   if (
     requestedDomain &&
     finalText &&
     (!responseMentionsDomain(finalText, requestedDomain) || isBroadGenericBeautyAnswer(finalText)) &&
-    !isDateTimeQuestion(message)
+    !isDateTimeQuestion(message) &&
+    !asksPrice
   ) {
     finalText = buildDomainFocusedReply(requestedDomain, customerName, message, articles);
   }
@@ -479,6 +482,67 @@ function buildDeterministicPriceReply(customerName: string, message: string, art
   });
 
   return `${greeting}. Te paso precio real de sistema:\n${lines.join("\n")}\n¿Te cotizo también alternativas similares en ese rango?`;
+}
+
+function buildCategoryPriceReply(customerName: string, message: string, articles: CatalogArticle[]): string | null {
+  const m = normalize(message);
+  if (!m || articles.length === 0) return null;
+
+  const categoryRules: Array<{ test: RegExp; keywords: string[]; label: string }> = [
+    {
+      test: /shampoo|champu|acondicionador|mascarilla|capilar|cabello|pelo/,
+      keywords: ["shampoo", "champu", "acondicionador", "mascarilla", "capilar", "cabello"],
+      label: "cabello",
+    },
+    {
+      test: /serum|suero|hidratante|limpiador|protector solar|facial|acne|piel/,
+      keywords: ["serum", "suero", "hidratante", "limpiador", "facial", "protector", "piel"],
+      label: "piel",
+    },
+    {
+      test: /base|corrector|labial|rubor|primer|maquillaje/,
+      keywords: ["base", "corrector", "labial", "rubor", "primer", "maquillaje"],
+      label: "maquillaje",
+    },
+    {
+      test: /unas|uñas|esmalte|gel|semipermanente|acrilica|acrilicas|polygel/,
+      keywords: ["unas", "uña", "esmalte", "gel", "semipermanente", "acril"],
+      label: "uñas",
+    },
+  ];
+
+  const rule = categoryRules.find((r) => r.test.test(m));
+  if (!rule) return null;
+
+  const candidates = articles
+    .filter((a) => Number(a.stock || 0) > 0)
+    .map((a) => {
+      const searchable = normalize([a.nombre, a.categoria, a.descripcion, a.marca].filter(Boolean).join(" "));
+      let score = 0;
+      for (const k of rule.keywords) {
+        if (searchable.includes(normalize(k))) score += 2;
+      }
+      if (Number(a.descuento_porcentaje || 0) > 0) score += 1;
+      return { a, score };
+    })
+    .filter((row) => row.score > 0)
+    .sort((x, y) => {
+      if (y.score !== x.score) return y.score - x.score;
+      return Number(y.a.descuento_porcentaje || 0) - Number(x.a.descuento_porcentaje || 0);
+    })
+    .slice(0, 3)
+    .map((row) => row.a);
+
+  if (candidates.length === 0) return null;
+
+  const greeting = customerName ? `Hola ${customerName}` : "Hola";
+  const lines = candidates.map((p) => {
+    const price = formatCOP(Number(p.precio_venta || 0));
+    const discount = Number(p.descuento_porcentaje || 0) > 0 ? ` (${p.descuento_porcentaje}% OFF)` : "";
+    return `• *${p.nombre || "Producto"}*: ${price}${discount}`;
+  });
+
+  return `${greeting}. Te comparto precios reales de ${rule.label}:\n${lines.join("\n")}\nSi quieres, te filtro por presupuesto (económico / medio / premium).`;
 }
 
 function buildDeterministicInventoryAdvisory(
@@ -719,7 +783,29 @@ async function fetchCatalogArticles(supabase: any): Promise<CatalogArticle[]> {
       .order("created_at", { ascending: false })
       .range(from, to);
 
-    if (error || !data || data.length === 0) break;
+    if (error) {
+      console.warn(`[ai/chat] Error consultando articulos (page=${page}):`, error.message);
+      if (page === 0) {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("articulos")
+          .select("id,nombre,categoria,marca,descripcion,precio_venta,stock,activo,created_at")
+          .or("activo.is.null,activo.eq.true")
+          .order("created_at", { ascending: false })
+          .range(0, pageSize - 1);
+
+        if (fallbackError) {
+          console.warn("[ai/chat] Error fallback articulos:", fallbackError.message);
+          break;
+        }
+
+        if (fallbackData && fallbackData.length > 0) {
+          rows.push(...(fallbackData as CatalogArticle[]));
+        }
+      }
+      break;
+    }
+
+    if (!data || data.length === 0) break;
     rows.push(...(data as CatalogArticle[]));
     if (data.length < pageSize) break;
   }
@@ -1196,6 +1282,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const debugMode =
+      body?.debug === true ||
+      body?.debug_mode === true ||
+      body?.debug_mode === "1" ||
+      body?.debug_mode === 1;
     const message = String(
       body?.mensaje_whatsapp || body?.message_body || body?.message || body?.texto || ""
     ).trim();
@@ -1512,13 +1603,25 @@ ${catalogoTexto}`;
         message,
         articulos
       );
+      const categoryPriceReply = !deterministicPriceReply
+        ? buildCategoryPriceReply(customerName, message, articulos)
+        : null;
+
+      if (!deterministicPriceReply && !categoryPriceReply && articulos.length === 0) {
+        responseText = "En este momento no estoy logrando consultar el catálogo de productos en sistema. Intenta en unos minutos o dime marca y referencia para buscar de forma más precisa.";
+      }
+
       if (
-        deterministicPriceReply &&
+        (deterministicPriceReply || categoryPriceReply) &&
         (!responseText ||
           isGenericOffTopicAnswer(responseText) ||
           !hasPriceSignal(responseText))
       ) {
-        responseText = deterministicPriceReply;
+        responseText = deterministicPriceReply || categoryPriceReply || responseText;
+      }
+
+      if (!deterministicPriceReply && !categoryPriceReply && (!responseText || isGenericOffTopicAnswer(responseText))) {
+        responseText = `No encontré una coincidencia exacta para ese producto en este momento. Si me compartes *marca* o *referencia*, te doy el precio exacto al instante.`;
       }
     }
 
@@ -1572,6 +1675,22 @@ ${catalogoTexto}`;
     // ── 11. Sugerencia de imagen ──────────────────────────────────
     const mediaSuggestion = await getAgentImageSuggestion(supabase, { message, intent });
     const payload = withMediaSuggestion({ response: responseText, intent }, mediaSuggestion);
+
+    if (debugMode) {
+      return NextResponse.json({
+        ...payload,
+        debug: {
+          supabase: {
+            configured: Boolean(supabaseUrl && serviceKey),
+            catalog_count: articulos.length,
+            customer_context_found: Boolean(customerBusinessContext?.perfilId),
+            conversation_history_count: historyRows.length,
+            used_cedula_lookup: Boolean(cedulaForLookup),
+            intent,
+          },
+        },
+      });
+    }
 
     return NextResponse.json(payload);
   } catch (error: unknown) {
