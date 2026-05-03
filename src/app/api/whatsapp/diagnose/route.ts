@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
     if (phoneNumberId && accessToken) {
       const phoneCheck = await graphGet(
-        `${phoneNumberId}?fields=id,display_phone_number,verified_name,name_status,status_quality_rating`,
+        `${phoneNumberId}?fields=id,display_phone_number,verified_name,name_status`,
         accessToken,
       );
 
