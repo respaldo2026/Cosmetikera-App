@@ -22,14 +22,14 @@ type NotificacionRow = {
   created_at?: string | null;
 };
 
-/** Acepta x-api-key O sesión de Supabase con rol admin */
+/** Acepta x-api-key O sesión de Supabase autenticada */
 async function isAuthorized(request: NextRequest): Promise<boolean> {
   // 1) API key
   const apiKey = request.headers.get("x-api-key") || "";
   const expected = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY || "";
   if (expected && apiKey === expected) return true;
 
-  // 2) Sesión autenticada de Supabase (usuario admin en la app)
+  // 2) Sesión autenticada de Supabase (cualquier usuario logueado en la app)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) return false;
@@ -42,18 +42,7 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
   });
 
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user?.id) return false;
-
-  // Verificar que el usuario sea admin
-  const admin = getAdminClient();
-  if (!admin) return false;
-  const { data: perfil } = await admin
-    .from("perfiles")
-    .select("rol")
-    .eq("auth_user_id", data.user.id)
-    .maybeSingle();
-  const rol = String((perfil as { rol?: string } | null)?.rol || "").toLowerCase();
-  return rol === "admin" || rol === "superadmin";
+  return !error && Boolean(data.user?.id);
 }
 
 function sleep(ms: number) {
