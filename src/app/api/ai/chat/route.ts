@@ -7,8 +7,10 @@ import {
   type AgentIntent,
 } from "@/utils/agent-media-suggestions";
 import {
+  getCustomerContext,
   logConversationMessage,
   extractThemeFromMessage,
+  mergeCustomerPreferences,
   updateCustomerMemory,
   normalizePhone,
 } from "@/utils/whatsapp-memory";
@@ -176,28 +178,65 @@ function refineIntentWithContext(
   return baseIntent;
 }
 
-function buildDiagnosticQuestionFlow(customerName: string, message: string): string {
+function buildDiagnosticQuestionFlow(customerName: string, message: string, profile?: BeautyProfile): string {
   const greeting = buildHumanGreeting(detectGreetingStyle(message), customerName);
   const m = normalize(message);
+  const domain = detectBeautyDomain(m) || profile?.domain || "general";
+  const known = getBeautyProfileDomain(profile || {}, domain);
+
+  const missingHair = [
+    !(known.proceso || []).length && "¿Qué proceso tienes o te hiciste (natural, tinte, alisado, decoloración, keratina)?",
+    !(known.estado || []).length && "¿Cómo está hoy tu cabello: sano, reseco, poroso o quebradizo?",
+    !(known.objetivo || []).length && "¿Qué resultado quieres lograr exactamente?",
+    !(known.tipo || []).length && "¿Tu cabello es liso, ondulado, rizado o afro?",
+    !(known.presupuesto || []).length && "¿Buscas opción económica, media o premium?",
+  ].filter(Boolean);
+
+  const missingSkin = [
+    !(known.tipo || []).length && "¿Tu piel es grasa, seca, mixta o sensible?",
+    !(known.objetivo || []).length && "¿Qué quieres tratar primero?",
+    !(known.proceso || []).length && "¿Usas actualmente algún tratamiento o activo?",
+    !(known.presupuesto || []).length && "¿Tu presupuesto es básico, medio o premium?",
+  ].filter(Boolean);
+
+  const missingMakeup = [
+    !(known.proceso || []).length && "¿Lo necesitas para diario o evento?",
+    !(known.tipo || []).length && "¿Tu piel es grasa, seca o mixta?",
+    !(known.acabado || []).length && "¿Qué acabado buscas: natural, mate o glow?",
+    !(known.objetivo || []).length && "¿Qué producto te interesa primero?",
+  ].filter(Boolean);
+
+  const missingNails = [
+    !(known.objetivo || []).length && "¿Buscas fortalecer, duración o diseño?",
+    !(known.estado || []).length && "¿Tus uñas están sanas, débiles o quebradizas?",
+    !(known.proceso || []).length && "¿Quieres gel, semipermanente, acrílico o cuidado natural?",
+    !(known.acabado || []).length && "¿Prefieres algo natural, elegante o llamativo?",
+  ].filter(Boolean);
 
   if (/tinte|coloracion|decoloracion/.test(m) && /alisado|keratina|botox\s+capilar|planchado|repolarizacion/.test(m)) {
-    return `${greeting} Para orientarte bien con *tinte + alisado*, necesito 4 datos:\n1) ¿Qué tipo de alisado te hiciste y hace cuánto?\n2) ¿Tu cabello está sano, reseco o quebradizo?\n3) ¿Ya tiene tinte o decoloración previa?\n4) ¿Qué tono quieres lograr?`;
+    const targeted = [
+      !(known.proceso || []).length && "¿Qué tipo de alisado te hiciste y hace cuánto?",
+      !(known.estado || []).length && "¿Tu cabello está sano, reseco o quebradizo?",
+      !(known.proceso || []).some((item) => /tinte|decolor/.test(item)) && "¿Ya tiene tinte o decoloración previa?",
+      !(known.objetivo || []).length && "¿Qué tono quieres lograr?",
+    ].filter(Boolean);
+    return `${greeting} Para orientarte bien con *tinte + alisado*, necesito esto:\n${targeted.slice(0, 4).map((q, i) => `${i + 1}) ${q}`).join("\n")}`;
   }
 
-  if (/cabello|pelo|capilar|tinte|keratina|alisado|decoloracion|frizz|caida|caspa/.test(m)) {
-    return `${greeting} Para recomendarte bien en *cabello*, primero te hago un mini diagnóstico:\n1) ¿Cuál es tu objetivo principal?\n2) ¿Tu cabello es natural, tinturado, alisado o decolorado?\n3) ¿Cómo está hoy: sano, reseco, poroso o quebradizo?\n4) ¿Buscas opción profesional, casera o según presupuesto?`;
+  if (domain === "cabello" || /cabello|pelo|capilar|tinte|keratina|alisado|decoloracion|frizz|caida|caspa/.test(m)) {
+    return `${greeting} Para recomendarte bien en *cabello*, te pregunto solo lo que me falta:\n${missingHair.slice(0, 4).map((q, i) => `${i + 1}) ${q}`).join("\n")}`;
   }
 
-  if (/piel|acne|grano|espinilla|mancha|melasma|arruga|poro|serum|hidratante|facial|protector/.test(m)) {
-    return `${greeting} Para darte una recomendación acertada en *piel*, dime 4 cosas:\n1) ¿Tu piel es grasa, seca, mixta o sensible?\n2) ¿Qué quieres tratar primero?\n3) ¿Usas actualmente algún activo o tratamiento?\n4) ¿Tu presupuesto es básico, medio o premium?`;
+  if (domain === "piel" || /piel|acne|grano|espinilla|mancha|melasma|arruga|poro|serum|hidratante|facial|protector/.test(m)) {
+    return `${greeting} Para darte una recomendación acertada en *piel*, necesito esto:\n${missingSkin.slice(0, 4).map((q, i) => `${i + 1}) ${q}`).join("\n")}`;
   }
 
-  if (/maquillaje|base|corrector|labial|rubor|primer|sombras|cejas|pestanas/.test(m)) {
-    return `${greeting} Para asesorarte bien en *maquillaje*, cuéntame:\n1) ¿Lo quieres para diario o evento?\n2) ¿Tu piel es grasa, seca o mixta?\n3) ¿Qué acabado buscas: natural, mate o glow?\n4) ¿Qué producto te interesa primero?`;
+  if (domain === "maquillaje" || /maquillaje|base|corrector|labial|rubor|primer|sombras|cejas|pestanas/.test(m)) {
+    return `${greeting} Para asesorarte bien en *maquillaje*, dime:\n${missingMakeup.slice(0, 4).map((q, i) => `${i + 1}) ${q}`).join("\n")}`;
   }
 
-  if (/unas|uñas|esmalte|gel|semipermanente|acrilica|acrilicas|polygel|manicure/.test(m)) {
-    return `${greeting} Para recomendarte bien en *uñas*, dime:\n1) ¿Buscas fortalecer, duración o diseño?\n2) ¿Tus uñas están sanas o débiles?\n3) ¿Quieres uso en casa o acabado profesional?\n4) ¿Prefieres algo natural, elegante o llamativo?`;
+  if (domain === "unas" || /unas|uñas|esmalte|gel|semipermanente|acrilica|acrilicas|polygel|manicure/.test(m)) {
+    return `${greeting} Para recomendarte bien en *uñas*, dime:\n${missingNails.slice(0, 4).map((q, i) => `${i + 1}) ${q}`).join("\n")}`;
   }
 
   return `${greeting} Para darte una recomendación realmente útil, primero necesito un mini diagnóstico:\n1) ¿Qué quieres mejorar exactamente?\n2) ¿Cómo está tu proceso actual?\n3) ¿Qué productos o tratamientos has usado?\n4) ¿Buscas resultado rápido, cuidado progresivo o algo según presupuesto?`;
@@ -231,30 +270,32 @@ function buildReasonedBeautyRecommendation(params: {
   message: string;
   articles: CatalogArticle[];
   conversationHistory: Array<{ rol: string; mensaje: string }>;
+  beautyProfile?: BeautyProfile;
 }): string | null {
-  const { customerName, message, articles, conversationHistory } = params;
+  const { customerName, message, articles, conversationHistory, beautyProfile } = params;
   const context = getRecentClientBeautyContext(message, conversationHistory);
   const greeting = buildHumanGreeting(detectGreetingStyle(message), customerName);
   const diagnosticTokens = expandTokenVariants(getSearchTokens(context));
+  const profile = beautyProfile || {};
+  const domain = detectBeautyDomain(context) || detectBeautyDomain(message) || profile.domain || null;
+  const known = domain ? getBeautyProfileDomain(profile, domain) : {};
 
-  const hairProcess = /alisado|keratina|botox\s+capilar|decolorado|decoloracion|tinte|natural|virgen/.test(context);
-  const hairState = /reseco|quebradizo|poroso|sano|maltratado|frizz|caida|caspa/.test(context);
-  const hairGoal = /tono|rubio|castano|negro|rojizo|matiz|color|alisar|hidratar|reparar/.test(context);
-  const hairType = /liso|ondulado|rizado|afro|crespo/.test(context);
+  const hairProcess = /alisado|keratina|botox\s+capilar|decolorado|decoloracion|tinte|natural|virgen/.test(context) || Boolean((known.proceso || []).length);
+  const hairState = /reseco|quebradizo|poroso|sano|maltratado|frizz|caida|caspa/.test(context) || Boolean((known.estado || []).length);
+  const hairGoal = /tono|rubio|castano|negro|rojizo|matiz|color|alisar|hidratar|reparar/.test(context) || Boolean((known.objetivo || []).length);
+  const hairType = /liso|ondulado|rizado|afro|crespo/.test(context) || Boolean((known.tipo || []).length);
 
-  const skinType = /piel\s+grasa|piel\s+seca|piel\s+mixta|sensible|acneica|madura/.test(context);
-  const skinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|brillo|resequedad/.test(context);
-  const skinRoutine = /uso|uso actualmente|retinol|acido|niacinamida|protector|limpiador|hidratante/.test(context);
+  const skinType = /piel\s+grasa|piel\s+seca|piel\s+mixta|sensible|acneica|madura/.test(context) || Boolean((known.tipo || []).length);
+  const skinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|brillo|resequedad/.test(context) || Boolean((known.objetivo || []).length);
+  const skinRoutine = /uso|uso actualmente|retinol|acido|niacinamida|protector|limpiador|hidratante/.test(context) || Boolean((known.proceso || []).length);
 
-  const makeupUsage = /diario|evento|fiesta|novia|trabajo/.test(context);
-  const makeupFinish = /mate|glow|natural|alta cobertura|ligero/.test(context);
-  const makeupBase = /piel\s+grasa|piel\s+seca|mixta|tono|subtono/.test(context);
+  const makeupUsage = /diario|evento|fiesta|novia|trabajo/.test(context) || Boolean((known.proceso || []).length);
+  const makeupFinish = /mate|glow|natural|alta cobertura|ligero/.test(context) || Boolean((known.acabado || []).length);
+  const makeupBase = /piel\s+grasa|piel\s+seca|mixta|tono|subtono/.test(context) || Boolean((known.tipo || []).length);
 
-  const nailsGoal = /fortalecer|duracion|dise[oñ]|natural|elegante|llamativo/.test(context);
-  const nailsState = /debiles|quebradizas|sanas|maltratadas/.test(context);
-  const nailsProcess = /gel|semipermanente|acrilica|acrilicas|polygel|manicure/.test(context);
-
-  const domain = detectBeautyDomain(context) || detectBeautyDomain(message);
+  const nailsGoal = /fortalecer|duracion|dise[oñ]|natural|elegante|llamativo/.test(context) || Boolean((known.objetivo || []).length);
+  const nailsState = /debiles|quebradizas|sanas|maltratadas/.test(context) || Boolean((known.estado || []).length);
+  const nailsProcess = /gel|semipermanente|acrilica|acrilicas|polygel|manicure/.test(context) || Boolean((known.proceso || []).length);
 
   if (domain === "cabello" && [hairProcess, hairState, hairGoal || hairType].filter(Boolean).length >= 2) {
     const top = rankArticles(articles, diagnosticTokens, "general")
@@ -657,6 +698,108 @@ type CustomerBusinessContext = {
   ultimasCompras?: Array<{ fecha: string; total: number }>;
   ultimosProductos?: Array<{ nombre: string; cantidad: number; fecha: string }>;
 };
+
+type BeautyProfileDomain = {
+  tipo?: string[];
+  estado?: string[];
+  objetivo?: string[];
+  proceso?: string[];
+  acabado?: string[];
+  presupuesto?: string[];
+};
+
+type BeautyProfile = {
+  domain?: BeautyDomain | "general";
+  cabello?: BeautyProfileDomain;
+  piel?: BeautyProfileDomain;
+  maquillaje?: BeautyProfileDomain;
+  unas?: BeautyProfileDomain;
+  general?: BeautyProfileDomain;
+};
+
+function uniqueTerms(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function extractMatches(text: string, regex: RegExp): string[] {
+  const out = new Set<string>();
+  for (const match of text.matchAll(new RegExp(regex.source, regex.flags.includes("g") ? regex.flags : `${regex.flags}g`))) {
+    const value = String(match[0] || "").trim();
+    if (value) out.add(value);
+  }
+  return Array.from(out);
+}
+
+function getStoredBeautyProfile(preferences: Record<string, any> | null | undefined): BeautyProfile {
+  const raw = preferences?.beauty_profile;
+  if (!raw || typeof raw !== "object") return {};
+  return raw as BeautyProfile;
+}
+
+function mergeBeautyProfile(existing: BeautyProfile, patch: BeautyProfile): BeautyProfile {
+  const result: BeautyProfile = { ...existing };
+  const domains: Array<BeautyDomain | "general"> = ["cabello", "piel", "maquillaje", "unas", "general"];
+
+  if (patch.domain) result.domain = patch.domain;
+
+  for (const domain of domains) {
+    const current = (result[domain] || {}) as BeautyProfileDomain;
+    const incoming = (patch[domain] || {}) as BeautyProfileDomain;
+    if (!result[domain] && Object.keys(incoming).length === 0) continue;
+
+    result[domain] = {
+      tipo: uniqueTerms([...(current.tipo || []), ...(incoming.tipo || [])]),
+      estado: uniqueTerms([...(current.estado || []), ...(incoming.estado || [])]),
+      objetivo: uniqueTerms([...(current.objetivo || []), ...(incoming.objetivo || [])]),
+      proceso: uniqueTerms([...(current.proceso || []), ...(incoming.proceso || [])]),
+      acabado: uniqueTerms([...(current.acabado || []), ...(incoming.acabado || [])]),
+      presupuesto: uniqueTerms([...(current.presupuesto || []), ...(incoming.presupuesto || [])]),
+    };
+  }
+
+  return result;
+}
+
+function extractBeautyProfilePatch(message: string, history: Array<{ rol: string; mensaje: string }>): BeautyProfile {
+  const context = getRecentClientBeautyContext(message, history);
+  const domain = detectBeautyDomain(context) || detectBeautyDomain(message) || "general";
+  const base: BeautyProfileDomain = {
+    tipo: [],
+    estado: [],
+    objetivo: [],
+    proceso: [],
+    acabado: [],
+    presupuesto: [],
+  };
+
+  base.tipo = uniqueTerms([
+    ...extractMatches(context, /\b(liso|ondulado|rizado|afro|crespo|grasa|seca|mixta|sensible|natural)\b/g),
+  ]);
+  base.estado = uniqueTerms([
+    ...extractMatches(context, /\b(reseco|reseca|quebradizo|quebradiza|poroso|porosa|sano|sana|maltratado|maltratada|debil|debiles|graso|grasa)\b/g),
+  ]);
+  base.objetivo = uniqueTerms([
+    ...extractMatches(context, /\b(hidratar|hidratarlo|reparar|alisar|alisarlo|fortalecer|definir|cubrir\s+canas|cambio\s+total|correccion\s+de\s+color|acne|manchas|duracion|diseno|diseño)\b/g),
+  ]);
+  base.proceso = uniqueTerms([
+    ...extractMatches(context, /\b(alisado|keratina|botox\s+capilar|decoloracion|decolorado|tinte|tinturado|semipermanente|gel|acrilicas|acrilicas|maquillaje\s+diario|evento)\b/g),
+  ]);
+  base.acabado = uniqueTerms([
+    ...extractMatches(context, /\b(natural|mate|glow|elegante|llamativo|profesional)\b/g),
+  ]);
+  base.presupuesto = uniqueTerms([
+    ...extractMatches(context, /\b(economico|económico|medio|premium|barato)\b/g),
+  ]);
+
+  return {
+    domain,
+    [domain]: base,
+  } as BeautyProfile;
+}
+
+function getBeautyProfileDomain(profile: BeautyProfile, domain: BeautyDomain | "general"): BeautyProfileDomain {
+  return (profile[domain] || {}) as BeautyProfileDomain;
+}
 
 function buildStrictPriceMatches(articles: CatalogArticle[], message: string): CatalogArticle[] {
   const tokens = expandTokenVariants(getSearchTokens(message));
@@ -1187,6 +1330,7 @@ function buildHeuristicFallbackResponse(params: {
   lastBotMessage?: string;
   businessContext?: CustomerBusinessContext | null;
   conversationHistory?: Array<{ rol: string; mensaje: string }>;
+  beautyProfile?: BeautyProfile;
 }): string {
   const { customerName, message, intent, articles } = params;
   const greetingStyle = detectGreetingStyle(message);
@@ -1247,6 +1391,7 @@ function buildHeuristicFallbackResponse(params: {
       message,
       articles,
       conversationHistory: params.conversationHistory || [],
+      beautyProfile: params.beautyProfile,
     });
 
     if (recoveredRecommendation) {
@@ -1255,7 +1400,7 @@ function buildHeuristicFallbackResponse(params: {
 
     return `🙏 Tienes toda la razón, y gracias por decírmelo. Me equivoqué interpretando tu mensaje anterior.
 Arranquemos bien: te respondo directo y con lógica, sin rodeos.
-${buildDiagnosticQuestionFlow(customerName, message)}`;
+${buildDiagnosticQuestionFlow(customerName, message, params.beautyProfile)}`;
   }
 
   if (intent === "diagnostico") {
@@ -1264,13 +1409,14 @@ ${buildDiagnosticQuestionFlow(customerName, message)}`;
       message,
       articles,
       conversationHistory: params.conversationHistory || [],
+      beautyProfile: params.beautyProfile,
     });
 
     if (reasonedRecommendation) {
       return reasonedRecommendation;
     }
 
-    return buildDiagnosticQuestionFlow(customerName, normalizedContext);
+    return buildDiagnosticQuestionFlow(customerName, normalizedContext, params.beautyProfile);
   }
 
   if (isSimpleGreetingOnly) {
@@ -1610,7 +1756,7 @@ export async function POST(request: NextRequest) {
     const greetingStyle = detectGreetingStyle(message);
 
     // ── 1. Cargar datos en paralelo ───────────────────────────────
-    const [articulos, historyRes, perfilRes] = await Promise.all([
+    const [articulos, historyRes, perfilRes, customerContext] = await Promise.all([
       fetchCatalogArticles(supabase),
       // Historial real de conversación (últimos 20 mensajes, desc)
       telefono
@@ -1636,6 +1782,7 @@ export async function POST(request: NextRequest) {
             .limit(1)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      telefono ? getCustomerContext(supabase, telefono) : Promise.resolve(null),
     ]);
 
     // ── 2. Resolver nombre del cliente ────────────────────────────
@@ -1654,6 +1801,11 @@ export async function POST(request: NextRequest) {
     const conversationHistory = historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje }));
     const rejectedDomains = collectRejectedDomains(message, conversationHistory);
     const intent = refineIntentWithContext(detectIntent(message), message, conversationHistory);
+    const storedBeautyProfile = getStoredBeautyProfile(customerContext?.preferencias as Record<string, any> | undefined);
+    const currentBeautyProfile = mergeBeautyProfile(
+      storedBeautyProfile,
+      extractBeautyProfilePatch(message, conversationHistory),
+    );
     const clubContextActive = isClubRelatedText(message) || hasRecentClubContext(conversationHistory);
     const cedulaForLookup = cedulaPayload || (clubContextActive ? cedulaMessage : "");
 
@@ -1864,6 +2016,7 @@ ${catalogoTexto}`;
         lastBotMessage: lastAgentMsg,
         businessContext: customerBusinessContext,
         conversationHistory,
+        beautyProfile: currentBeautyProfile,
       });
     }
 
@@ -1879,6 +2032,7 @@ ${catalogoTexto}`;
           lastBotMessage: "",
           businessContext: customerBusinessContext,
           conversationHistory,
+          beautyProfile: currentBeautyProfile,
         });
     }
 
@@ -1934,6 +2088,7 @@ ${catalogoTexto}`;
         await Promise.all([
           logConversationMessage(supabase, telefono, perfil_id || undefined, "cliente", message),
           logConversationMessage(supabase, telefono, perfil_id || undefined, "agente", responseText),
+          mergeCustomerPreferences(supabase, telefono, { beauty_profile: currentBeautyProfile }, perfil_id || undefined, customerName || undefined),
           updateCustomerMemory(
             supabase,
             telefono,

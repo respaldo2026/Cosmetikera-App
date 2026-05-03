@@ -25,6 +25,35 @@ function safeParseJsonb(value: unknown, fallback: unknown = []): unknown {
   return value; // ya es objeto
 }
 
+function mergePreferenceValues(existing: unknown, patch: unknown): unknown {
+  if (Array.isArray(existing) && Array.isArray(patch)) {
+    return Array.from(new Set([...existing, ...patch].map((item) => JSON.stringify(item)))).map((item) => {
+      try {
+        return JSON.parse(item);
+      } catch {
+        return item;
+      }
+    });
+  }
+
+  if (
+    existing &&
+    patch &&
+    typeof existing === "object" &&
+    typeof patch === "object" &&
+    !Array.isArray(existing) &&
+    !Array.isArray(patch)
+  ) {
+    const result: Record<string, unknown> = { ...(existing as Record<string, unknown>) };
+    for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
+      result[key] = key in result ? mergePreferenceValues(result[key], value) : value;
+    }
+    return result;
+  }
+
+  return patch ?? existing;
+}
+
 export interface CustomerContext {
   nombre?: string;
   nivelConfianza: "nuevo" | "conocido" | "leal";
@@ -240,6 +269,68 @@ export async function updateCustomerMemory(
     } catch (fallbackErr) {
       console.error("[Memory] Fallback exception:", fallbackErr);
     }
+  }
+}
+
+export async function mergeCustomerPreferences(
+  supabase: any,
+  telefono: string,
+  patch: Record<string, unknown>,
+  perfilId?: string,
+  nombre?: string,
+): Promise<void> {
+  const phone = normalizePhone(telefono);
+  if (!phone || !patch || Object.keys(patch).length === 0) return;
+
+  try {
+    const { data: existing } = await supabase
+      .from("whatsapp_customer_memory")
+      .select("id,nombre,preferencias")
+      .eq("telefono", phone)
+      .limit(1)
+      .maybeSingle();
+
+    const currentPreferences = safeParseJsonb(existing?.preferencias, {}) as Record<string, unknown>;
+    const mergedPreferences = mergePreferenceValues(currentPreferences, patch) as Record<string, unknown>;
+    const now = new Date().toISOString();
+
+    if (existing?.id) {
+      const { error } = await supabase
+        .from("whatsapp_customer_memory")
+        .update({
+          perfil_id: perfilId || null,
+          nombre: nombre || existing.nombre || null,
+          preferencias: mergedPreferences,
+          ultima_interaccion: now,
+          updated_at: now,
+        })
+        .eq("id", existing.id);
+
+      if (error) {
+        console.error("[Memory] Error actualizando preferencias:", error);
+      }
+      return;
+    }
+
+    const { error } = await supabase
+      .from("whatsapp_customer_memory")
+      .insert({
+        perfil_id: perfilId || null,
+        telefono: phone,
+        nombre: nombre || null,
+        primer_contacto: now,
+        ultima_interaccion: now,
+        total_mensajes: 0,
+        nivel_confianza: "nuevo",
+        preferencias: mergedPreferences,
+        updated_at: now,
+      });
+
+    if (error) {
+      console.error("[Memory] Error insertando preferencias:", error);
+    }
+  } catch (err) {
+    console.error("[Memory] Exception guardando preferencias:", err);
   }
 }
 
