@@ -383,22 +383,34 @@ async function logConversationTemplate(perfilId: string, phone: string, cedula: 
   });
 
   const normalizedPhone = normalizePhone(phone);
+  const mensajeEnviado = `Plantilla enviada: ${CLUB_WELCOME_TEMPLATE_NAME} | Cédula: ${cedula}`;
+
   const { data: existing } = await service
     .from("whatsapp_conversation_history")
-    .select("id")
+    .select("id,mensaje")
     .eq("perfil_id", perfilId)
     .eq("tipo_mensaje", "template")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (existing?.id) return;
+  if (existing?.id) {
+    // Actualizar si el mensaje aún dice "pendiente"
+    const msgLower = String(existing.mensaje || "").toLowerCase();
+    if (msgLower.includes("pendiente")) {
+      await service
+        .from("whatsapp_conversation_history")
+        .update({ mensaje: mensajeEnviado })
+        .eq("id", existing.id);
+    }
+    return;
+  }
 
   await service.from("whatsapp_conversation_history").insert({
     telefono: normalizedPhone,
     perfil_id: perfilId,
     rol: "agente",
-    mensaje: `Plantilla enviada: ${CLUB_WELCOME_TEMPLATE_NAME} | Cédula: ${cedula}`,
+    mensaje: mensajeEnviado,
     tipo_mensaje: "template",
     intento: null,
   });
