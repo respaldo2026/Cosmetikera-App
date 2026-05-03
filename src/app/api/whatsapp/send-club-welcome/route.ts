@@ -117,8 +117,10 @@ async function wasWelcomeAlreadySentBroad(
     const rowPhone = normalizePhone(String(row?.telefono || ""));
     const samePhone = Boolean(normalizedPhone) && rowPhone === normalizedPhone;
     const hasCedula = cedulaNeedle ? mensaje.includes(cedulaNeedle) : false;
-    const isWelcomeTemplate = mensaje.toLowerCase().includes("club_welcome") || mensaje.toLowerCase().includes("bienvenida");
-    return samePhone && hasCedula && isWelcomeTemplate;
+    const msgLower = mensaje.toLowerCase();
+    const isWelcomeTemplate = msgLower.includes("club_welcome") || msgLower.includes("bienvenida");
+    const confirmsSent = msgLower.includes("plantilla enviada") || msgLower.includes("estado: enviado");
+    return samePhone && hasCedula && isWelcomeTemplate && confirmsSent;
   });
 
   return alreadyInConversation;
@@ -200,6 +202,7 @@ async function acquireWelcomeSendLock(
  * Valida autenticación (API key o sesión autenticada)
  */
 async function validateRequest(request: NextRequest): Promise<boolean> {
+  // 1) x-api-key para llamadas internas/scripts
   const apiKey = request.headers.get("x-api-key");
   const expectedKey = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY;
 
@@ -207,6 +210,20 @@ async function validateRequest(request: NextRequest): Promise<boolean> {
     return apiKey === expectedKey;
   }
 
+  // 2) Request desde la propia app (origen/referer)
+  const origin = request.headers.get("origin") || "";
+  const referer = request.headers.get("referer") || "";
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  if (appUrl && (origin.startsWith(appUrl) || referer.startsWith(appUrl))) {
+    return true;
+  }
+
+  // 3) Localhost para desarrollo
+  if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
+    return true;
+  }
+
+  // 4) Sesión supabase (fallback)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) {

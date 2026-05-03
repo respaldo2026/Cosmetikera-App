@@ -80,6 +80,8 @@ async function triggerClubWelcomeTemplate(args: {
 }) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    origin: args.origin,
+    referer: `${args.origin}/ventas`,
   };
 
   const apiKey = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY;
