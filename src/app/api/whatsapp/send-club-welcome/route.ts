@@ -196,7 +196,7 @@ async function acquireWelcomeSendLock(
  */
 async function validateRequest(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get("x-api-key");
-  const expectedKey = process.env.WHATSAPP_API_KEY;
+  const expectedKey = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY;
 
   if (apiKey) {
     return apiKey === expectedKey;

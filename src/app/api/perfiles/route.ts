@@ -82,7 +82,7 @@ async function triggerClubWelcomeTemplate(args: {
     "Content-Type": "application/json",
   };
 
-  const apiKey = process.env.WHATSAPP_API_KEY;
+  const apiKey = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY;
   if (apiKey) {
     headers["x-api-key"] = apiKey;
   }
@@ -313,6 +313,12 @@ export async function POST(request: Request) {
       }
     }
 
+    let welcomeWhatsappStatus: {
+      sent: boolean;
+      already_sent: boolean;
+      error?: string;
+    } | null = null;
+
     if (rol === "cliente") {
       const telefonoWhatsApp = normalizarTelefonoWhatsApp(telefonoNormalizado);
       const perfilId = String((data as any)?.id || "").trim();
@@ -325,6 +331,15 @@ export async function POST(request: Request) {
           cedula: cedulaNormalizada,
           telefono: telefonoWhatsApp,
         });
+
+        welcomeWhatsappStatus = {
+          sent: trigger.ok || trigger.alreadySent,
+          already_sent: trigger.alreadySent,
+          error:
+            !trigger.ok && !trigger.alreadySent
+              ? trigger.error || trigger.message || "No se pudo enviar bienvenida"
+              : undefined,
+        };
 
         if (!trigger.ok && !trigger.alreadySent) {
           console.warn("[POST /api/perfiles] Falló trigger de plantilla bienvenida, se crea fallback visible", trigger.error || trigger.message);
@@ -340,10 +355,22 @@ export async function POST(request: Request) {
             console.warn("[POST /api/perfiles] Falló fallback para monitor WhatsApp", fallbackError);
           }
         }
+      } else {
+        welcomeWhatsappStatus = {
+          sent: false,
+          already_sent: false,
+          error: "Datos insuficientes para enviar bienvenida (perfil/telefono/cedula)",
+        };
       }
     }
 
-    return NextResponse.json({ data }, { status: 201 });
+    return NextResponse.json(
+      {
+        data,
+        ...(rol === "cliente" ? { welcome_whatsapp: welcomeWhatsappStatus } : {}),
+      },
+      { status: 201 }
+    );
   } catch (err) {
     console.error("[POST /api/perfiles] unexpected", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
