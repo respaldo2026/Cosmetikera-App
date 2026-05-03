@@ -801,6 +801,39 @@ function getBeautyProfileDomain(profile: BeautyProfile, domain: BeautyDomain | "
   return (profile[domain] || {}) as BeautyProfileDomain;
 }
 
+function buildBeautyProfileContext(profile: BeautyProfile): string {
+  if (!profile || Object.keys(profile).length === 0) return "Sin datos previos del cliente";
+
+  const lines: string[] = [];
+  const domain = profile.domain;
+  if (domain) lines.push(`Área principal: ${domain}`);
+
+  const domains: Array<BeautyDomain | "general"> = ["cabello", "piel", "maquillaje", "unas", "general"];
+  const labels: Record<string, string> = {
+    cabello: "Cabello",
+    piel: "Piel",
+    maquillaje: "Maquillaje",
+    unas: "Uñas",
+    general: "General",
+  };
+
+  for (const d of domains) {
+    const p = (profile[d] || {}) as BeautyProfileDomain;
+    const parts: string[] = [];
+    if ((p.tipo || []).length) parts.push(`tipo: ${p.tipo!.join(", ")}`);
+    if ((p.proceso || []).length) parts.push(`proceso: ${p.proceso!.join(", ")}`);
+    if ((p.estado || []).length) parts.push(`estado: ${p.estado!.join(", ")}`);
+    if ((p.objetivo || []).length) parts.push(`objetivo: ${p.objetivo!.join(", ")}`);
+    if ((p.acabado || []).length) parts.push(`acabado: ${p.acabado!.join(", ")}`);
+    if ((p.presupuesto || []).length) parts.push(`presupuesto: ${p.presupuesto!.join(", ")}`);
+    if (parts.length) lines.push(`${labels[d]}: ${parts.join(" | ")}`);
+  }
+
+  if (lines.length === 0) return "Sin datos previos del cliente";
+  return lines.join("\n") +
+    "\n⚠️ NO preguntes de nuevo lo que ya está aquí. Solo pregunta lo que aún falta para completar el diagnóstico.";
+}
+
 function buildStrictPriceMatches(articles: CatalogArticle[], message: string): CatalogArticle[] {
   const tokens = expandTokenVariants(getSearchTokens(message));
   if (tokens.length === 0) return [];
@@ -1904,6 +1937,9 @@ ${clienteTexto}
 ## CATEGORÍAS RECHAZADAS POR CLIENTE
 ${rejectedDomains.size > 0 ? Array.from(rejectedDomains).map(domainLabel).join(", ") : "ninguna"}
 
+## PERFIL DIAGNÓSTICO DEL CLIENTE (sesiones anteriores)
+${buildBeautyProfileContext(currentBeautyProfile)}
+
 ## CATÁLOGO LA COSMETIKERA (${articulos.length} productos cargados — usa estos precios reales)
 ${catalogoTexto}`;
 
@@ -2129,6 +2165,9 @@ ${catalogoTexto}`;
             used_cedula_lookup: Boolean(cedulaForLookup),
             intent,
           },
+          beauty_profile: currentBeautyProfile,
+          beauty_profile_stored: storedBeautyProfile,
+          beauty_profile_this_turn: extractBeautyProfilePatch(message, conversationHistory),
         },
       });
     }
