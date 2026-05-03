@@ -10,6 +10,10 @@ import {
   Typography,
   Tooltip,
   Tag,
+  Button,
+  Modal,
+  InputNumber,
+  Alert,
 } from "antd";
 import {
   SearchOutlined,
@@ -17,6 +21,7 @@ import {
   RobotOutlined,
   LeftOutlined,
   ReloadOutlined,
+  SendOutlined,
 } from "@ant-design/icons";
 
 const { Text } = Typography;
@@ -278,6 +283,52 @@ export default function WhatsAppMonitorPage() {
   const isResizingPanelRef = useRef(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(360);
 
+  // ── Estado modal retry bienvenida ────────────────────────────
+  const [retryModalOpen, setRetryModalOpen] = useState(false);
+  const [retryStep, setRetryStep] = useState<"idle" | "checked" | "sent">("idle");
+  const [retryLimit, setRetryLimit] = useState<number>(100);
+  const [retryLoading, setRetryLoading] = useState(false);
+  type RetryResult = {
+    dry_run: boolean;
+    sent: number;
+    failed: number;
+    already_sent: number;
+    skipped_invalid: number;
+    details: Array<{ telefono: string; nombre: string; status: string; error?: string }>;
+  };
+  const [retryResult, setRetryResult] = useState<RetryResult | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+
+  const callRetryEndpoint = async (dryRun: boolean) => {
+    setRetryLoading(true);
+    setRetryError(null);
+    try {
+      const res = await fetch("/api/whatsapp/retry-club-welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dry_run: dryRun, limit: retryLimit }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setRetryError(json?.error || `Error ${res.status}`);
+      } else {
+        setRetryResult(json as RetryResult);
+        setRetryStep(dryRun ? "checked" : "sent");
+      }
+    } catch (e) {
+      setRetryError(String(e));
+    } finally {
+      setRetryLoading(false);
+    }
+  };
+
+  const openRetryModal = () => {
+    setRetryModalOpen(true);
+    setRetryStep("idle");
+    setRetryResult(null);
+    setRetryError(null);
+  };
+
   type LoadOptions = {
     silent?: boolean;
   };
@@ -493,12 +544,20 @@ export default function WhatsAppMonitorPage() {
               {conversations.length} conversación(es)
             </Text>
           </div>
-          <Tooltip title="Actualizar">
-            <ReloadOutlined
-              style={{ color: "#fff", cursor: "pointer", fontSize: 16 }}
-              onClick={() => loadConversations(search)}
-            />
-          </Tooltip>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Tooltip title="Reenviar bienvenida club a clientes pendientes">
+              <SendOutlined
+                style={{ color: "#fff", cursor: "pointer", fontSize: 16 }}
+                onClick={() => openRetryModal()}
+              />
+            </Tooltip>
+            <Tooltip title="Actualizar">
+              <ReloadOutlined
+                style={{ color: "#fff", cursor: "pointer", fontSize: 16 }}
+                onClick={() => loadConversations(search)}
+              />
+            </Tooltip>
+          </div>
         </div>
 
         {/* Buscador */}
@@ -627,6 +686,150 @@ export default function WhatsAppMonitorPage() {
           )}
         </div>
       </div>
+
+      {/* ── Modal retry bienvenida club ───────────────────────── */}
+      <Modal
+        title="Bienvenida del Club — Pendientes"
+        open={retryModalOpen}
+        onCancel={() => setRetryModalOpen(false)}
+        footer={null}
+        width={520}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Paso 0: verificar */}
+          {retryStep === "idle" && (
+            <>
+              <Alert
+                message="Primero verifica cuántos clientes no han recibido aún el mensaje de bienvenida del club."
+                type="info"
+                showIcon
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span>Revisar hasta:</span>
+                <InputNumber
+                  min={1}
+                  max={500}
+                  value={retryLimit}
+                  onChange={(v) => setRetryLimit(v ?? 100)}
+                  style={{ width: 100 }}
+                  addonAfter="clientes"
+                />
+              </div>
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                loading={retryLoading}
+                onClick={() => callRetryEndpoint(true)}
+              >
+                Verificar pendientes
+              </Button>
+            </>
+          )}
+
+          {/* Paso 1: resultado verificación */}
+          {retryStep === "checked" && retryResult && (
+            <>
+              <Alert
+                type={retryResult.sent === 0 ? "success" : "warning"}
+                message={
+                  retryResult.sent === 0
+                    ? `✅ Todos los clientes ya tienen su bienvenida enviada.`
+                    : `⚠️ ${retryResult.sent} cliente(s) aún no han recibido la bienvenida.`
+                }
+                description={`Ya enviados: ${retryResult.already_sent}  |  Sin teléfono válido: ${retryResult.skipped_invalid}`}
+                showIcon={false}
+              />
+
+              {retryResult.details.filter(d => d.status === "would_send").length > 0 && (
+                <div
+                  style={{
+                    maxHeight: 180,
+                    overflowY: "auto",
+                    fontSize: 12,
+                    background: "#fffbe6",
+                    borderRadius: 6,
+                    padding: "8px 12px",
+                    border: "1px solid #ffe58f",
+                  }}
+                >
+                  {retryResult.details
+                    .filter(d => d.status === "would_send")
+                    .map((d, i, arr) => (
+                      <div
+                        key={i}
+                        style={{
+                          padding: "3px 0",
+                          borderBottom: i < arr.length - 1 ? "1px solid #ffd666" : "none",
+                          color: "#614700",
+                        }}
+                      >
+                        {d.nombre || d.telefono} — {d.telefono}
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <Button onClick={() => { setRetryStep("idle"); setRetryResult(null); }}>
+                  Volver
+                </Button>
+                {retryResult.sent > 0 && (
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    loading={retryLoading}
+                    onClick={() => callRetryEndpoint(false)}
+                    style={{ background: "#128C7E", borderColor: "#128C7E" }}
+                  >
+                    Enviar bienvenida a {retryResult.sent} cliente(s)
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Paso 2: resultado envío */}
+          {retryStep === "sent" && retryResult && (
+            <>
+              <Alert
+                type="success"
+                message={`Proceso completado`}
+                description={`Enviados: ${retryResult.sent}  |  Fallidos: ${retryResult.failed}  |  Ya tenían: ${retryResult.already_sent}`}
+                showIcon
+              />
+              {retryResult.failed > 0 && (
+                <div
+                  style={{
+                    maxHeight: 150,
+                    overflowY: "auto",
+                    fontSize: 12,
+                    background: "#fff2f0",
+                    borderRadius: 6,
+                    padding: "8px 12px",
+                    border: "1px solid #ffccc7",
+                  }}
+                >
+                  {retryResult.details
+                    .filter(d => d.status === "failed")
+                    .map((d, i) => (
+                      <div key={i} style={{ padding: "3px 0", color: "#cf1322" }}>
+                        {d.nombre || d.telefono}: {d.error}
+                      </div>
+                    ))}
+                </div>
+              )}
+              <Button onClick={() => setRetryModalOpen(false)}>
+                Cerrar
+              </Button>
+            </>
+          )}
+
+          {retryError && (
+            <Alert message={retryError} type="error" showIcon />
+          )}
+        </div>
+      </Modal>
 
       {!isMobile && (
         <div
