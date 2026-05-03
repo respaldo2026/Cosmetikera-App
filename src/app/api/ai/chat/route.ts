@@ -7,9 +7,7 @@ import {
   type AgentIntent,
 } from "@/utils/agent-media-suggestions";
 import {
-  getCustomerContext,
   logConversationMessage,
-  buildContextualPrompt,
   extractThemeFromMessage,
   updateCustomerMemory,
   normalizePhone,
@@ -554,14 +552,61 @@ function hasPriceSignal(text: string): boolean {
   return /\$|cop|\d{2,3}(?:[\.,]\d{3})+|\d+\s*off|%\s*off/i.test(t);
 }
 
+function extractCedulaCandidate(message: string): string {
+  const raw = String(message || "").trim();
+  if (!raw) return "";
+
+  const compact = raw.replace(/[\s\.-]/g, "");
+  if (/^\d{4,15}$/.test(compact)) return compact;
+
+  const normalized = normalize(raw);
+  const hasCedulaKeyword = /\bcedula\b|\bcc\b|\bdocumento\b|\bidentificacion\b/.test(normalized);
+  const digits = raw.replace(/\D/g, "");
+
+  if (hasCedulaKeyword && /^\d{4,15}$/.test(digits)) return digits;
+  return "";
+}
+
+function isClubRelatedText(message: string): boolean {
+  const m = normalize(message);
+  return /puntos|club|fidelizacion|canje|beneficio|cedula|cc|identificacion/.test(m);
+}
+
+function didAgentAskForCedula(message: string): boolean {
+  const m = normalize(message);
+  return /comparte.*cedula|necesito.*cedula|dame.*cedula|tu.*cedula/.test(m);
+}
+
+function hasRecentClubContext(history: Array<{ rol: string; mensaje: string }>): boolean {
+  const recent = history.slice(-8);
+  return recent.some((row) => {
+    if (row.rol === "cliente") return isClubRelatedText(row.mensaje);
+    return isClubRelatedText(row.mensaje) || didAgentAskForCedula(row.mensaje);
+  });
+}
+
+function buildClubSummaryReply(context: CustomerBusinessContext): string {
+  const puntos = Number(context.puntos || 0);
+  const totalCompras = Number(context.totalCompras || 0);
+  const ultima = context.ultimasCompras?.[0];
+  const ultimaTxt =
+    ultima && ultima.fecha
+      ? `\nÚltima compra registrada: *${new Date(ultima.fecha).toLocaleDateString("es-CO")}* por *${formatCOP(Number(ultima.total || 0))}*.`
+      : "";
+
+  return `🎁 Te confirmo tus datos del Club:\n• *Puntos actuales*: ${puntos}\n• *Total acumulado en compras*: ${formatCOP(totalCompras)}${ultimaTxt}\n¿Quieres que te diga opciones de canje según tus puntos?`;
+}
+
 async function getCustomerBusinessContext(
   supabase: any,
   perfilIdRaw: string,
   telefonoRaw: string,
+  cedulaRaw?: string,
 ): Promise<CustomerBusinessContext | null> {
   try {
     const perfilId = String(perfilIdRaw || "").trim();
     const telefono = normalizePhone(telefonoRaw || "");
+    const cedula = String(cedulaRaw || "").replace(/\D/g, "").trim();
 
     type ProfileCRM = {
       id?: string;
@@ -573,7 +618,17 @@ async function getCustomerBusinessContext(
 
     let profile: ProfileCRM | null = null;
 
-    if (perfilId) {
+    if (cedula && /^\d{4,15}$/.test(cedula)) {
+      const { data } = await supabase
+        .from("perfiles")
+        .select("id,nombre_completo,puntos_fidelidad,total_compras,telefono")
+        .or(`cedula.eq.${cedula},identificacion.eq.${cedula}`)
+        .limit(1)
+        .maybeSingle();
+      if (data) profile = data as ProfileCRM;
+    }
+
+    if (!profile && perfilId) {
       const { data } = await supabase
         .from("perfiles")
         .select("id,nombre_completo,puntos_fidelidad,total_compras,telefono")
@@ -1150,6 +1205,12 @@ export async function POST(request: NextRequest) {
     }
 
     const perfil_id = body?.perfil_id || body?.customer_id || "";
+    const cedulaPayload = String(
+      body?.cedula || body?.identificacion || body?.documento || ""
+    )
+      .replace(/\D/g, "")
+      .trim();
+    const cedulaMessage = extractCedulaCandidate(message);
     const nameFromPayload = toDisplayName(
       String(body?.nombre || body?.contact_name || body?.profile_name || "").trim()
     );
@@ -1175,9 +1236,8 @@ export async function POST(request: NextRequest) {
     const greetingStyle = detectGreetingStyle(message);
 
     // ── 1. Cargar datos en paralelo ───────────────────────────────
-    const [articulos, customerBusinessContext, historyRes, perfilRes] = await Promise.all([
+    const [articulos, historyRes, perfilRes] = await Promise.all([
       fetchCatalogArticles(supabase),
-      getCustomerBusinessContext(supabase, String(perfil_id || ""), telefono),
       // Historial real de conversación (últimos 20 mensajes, desc)
       telefono
         ? supabase
@@ -1219,6 +1279,15 @@ export async function POST(request: NextRequest) {
 
     const conversationHistory = historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje }));
     const rejectedDomains = collectRejectedDomains(message, conversationHistory);
+    const clubContextActive = isClubRelatedText(message) || hasRecentClubContext(conversationHistory);
+    const cedulaForLookup = cedulaPayload || (clubContextActive ? cedulaMessage : "");
+
+    const customerBusinessContext = await getCustomerBusinessContext(
+      supabase,
+      String(perfil_id || ""),
+      telefono,
+      cedulaForLookup,
+    );
 
     // ── 4. Construir catálogo relevante ───────────────────────────
     const tokens = getSearchTokens(message);
@@ -1325,6 +1394,22 @@ ${catalogoTexto}`;
       const _humanGreeting = buildHumanGreeting(_style, customerName);
       const _welcome = customerName ? "Qué bueno leerte de nuevo 😊" : "Bienvenid@ a *La Cosmetikera* 💄";
       responseText = `${_humanGreeting} ${_welcome}\nSoy *Dany*, tu asesora virtual. ¿En qué te puedo ayudar hoy?\n👉 *Productos y precios* · *Rutinas de belleza* · *Club de puntos* · *Cursos*`;
+    }
+
+    // ── 6c. Short-circuit para consultas de Club/puntos ─────────
+    const shouldResolveClubNow =
+      !responseText &&
+      (isClubRelatedText(message) || (Boolean(cedulaMessage || cedulaPayload) && clubContextActive));
+
+    if (shouldResolveClubNow) {
+      if (customerBusinessContext?.perfilId) {
+        responseText = buildClubSummaryReply(customerBusinessContext);
+      } else if (cedulaForLookup) {
+        responseText = `🔎 Revisé en el Club y no encontré una cuenta activa con la cédula *${cedulaForLookup}*.
+¿Me confirmas el número correcto o el teléfono registrado para validarte puntos?`;
+      } else {
+        responseText = `🎁 Te ayudo con tus *puntos del Club*. Para validarlos sin error, compárteme tu *cédula* y te indico saldo, nivel y opciones de canje.`;
+      }
     }
 
     // ── 7. Llamar a Gemini con historial real (multi-turn) ────────
