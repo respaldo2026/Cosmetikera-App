@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 import { normalizePhone } from "@/utils/whatsapp-memory";
 
 type RetryRequestBody = {
@@ -21,11 +22,42 @@ type NotificacionRow = {
   created_at?: string | null;
 };
 
-function isAuthorized(request: NextRequest): boolean {
+/** Acepta x-api-key O sesión de Supabase con rol admin */
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  // 1) API key
   const apiKey = request.headers.get("x-api-key") || "";
   const expected = process.env.WHATSAPP_API_KEY || process.env.AGENT_API_KEY || "";
-  if (!expected) return false;
-  return apiKey === expected;
+  if (expected && apiKey === expected) return true;
+
+  // 2) Sesión autenticada de Supabase (usuario admin en la app)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return false;
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() { return request.cookies.getAll(); },
+      setAll() {},
+    },
+  });
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user?.id) return false;
+
+  // Verificar que el usuario sea admin
+  const admin = getAdminClient();
+  if (!admin) return false;
+  const { data: perfil } = await admin
+    .from("perfiles")
+    .select("rol")
+    .eq("auth_user_id", data.user.id)
+    .maybeSingle();
+  const rol = String((perfil as { rol?: string } | null)?.rol || "").toLowerCase();
+  return rol === "admin" || rol === "superadmin";
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 function getAdminClient() {
@@ -41,7 +73,7 @@ function normalizeCedula(value: unknown): string {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isAuthorized(request)) {
+    if (!(await isAuthorized(request))) {
       return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
     }
 
@@ -145,6 +177,11 @@ export async function POST(request: NextRequest) {
           status: "would_send",
         });
         continue;
+      }
+
+      // Pausa entre envíos para respetar rate-limits de Meta (~1 template/600ms en lotes)
+      if (summary.sent + summary.failed > 0) {
+        await sleep(600);
       }
 
       const res = await fetch(`${origin}/api/whatsapp/send-club-welcome`, {
