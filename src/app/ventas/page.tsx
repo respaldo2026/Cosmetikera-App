@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } fr
 import {
   Card, Button, Typography, Space, Input, Select, Tag, App, Spin,
   Row, Col, Statistic, Divider, Grid, Tooltip, Avatar, Badge,
-  InputNumber, Modal, Form, Radio, Table, Empty, message as antdMessage,
+  InputNumber, Modal, Form, Radio, Table, Empty, DatePicker, message as antdMessage,
 } from "antd";
 import {
   ShoppingCartOutlined, SearchOutlined, UserOutlined, PlusOutlined,
@@ -166,6 +166,7 @@ export default function VentasPage() {
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
   const [nuevoClienteForm] = Form.useForm();
   const [creandoCliente, setCreandoCliente] = useState(false);
+  const [cumpleDiaPickerOpen, setCumpleDiaPickerOpen] = useState(false);
   const [clientesFiltrados, setClientesFiltrados] = useState<Cliente[]>([]);
   const { reglas: reglasClub } = useClubConfig();
 
@@ -298,6 +299,7 @@ export default function VentasPage() {
       }
 
       setNuevoClienteOpen(false);
+      setCumpleDiaPickerOpen(false);
       nuevoClienteForm.resetFields();
       const r = await fetch("/api/perfiles?rol=cliente");
       const rj = await r.json();
@@ -1352,7 +1354,11 @@ export default function VentasPage() {
       <Modal
         title={<Space><UserOutlined style={{ color: "#d81b87" }} />Nuevo cliente</Space>}
         open={nuevoClienteOpen}
-        onCancel={() => { setNuevoClienteOpen(false); nuevoClienteForm.resetFields(); }}
+        onCancel={() => {
+          setNuevoClienteOpen(false);
+          setCumpleDiaPickerOpen(false);
+          nuevoClienteForm.resetFields();
+        }}
         onOk={() => nuevoClienteForm.submit()}
         confirmLoading={creandoCliente}
         okText="Crear cliente"
@@ -1413,6 +1419,9 @@ export default function VentasPage() {
                       if (selectedDay > maxDays) {
                         nuevoClienteForm.setFieldValue("cumple_dia", undefined);
                       }
+                      if (monthValue) {
+                        setTimeout(() => setCumpleDiaPickerOpen(true), 0);
+                      }
                     }}
                   />
                 </Form.Item>
@@ -1428,15 +1437,29 @@ export default function VentasPage() {
                         name="cumple_dia"
                         noStyle={false}
                         rules={[{ required: true, message: "Selecciona el día" }]}
+                        getValueProps={(value) => ({
+                          value: (selectedMonth && value)
+                            ? dayjs(`2000-${String(selectedMonth).padStart(2, "0")}-${String(value).padStart(2, "0")}`, "YYYY-MM-DD", true)
+                            : null,
+                        })}
+                        getValueFromEvent={(date: dayjs.Dayjs | null) => (date ? date.date() : undefined)}
                       >
-                        <InputNumber
+                        <DatePicker
                           placeholder="Día"
-                          min={1}
-                          max={maxDays || 31}
-                          precision={0}
+                          picker="date"
+                          format="DD"
+                          inputReadOnly
+                          allowClear
                           style={{ width: "100%" }}
+                          open={cumpleDiaPickerOpen && !!selectedMonth}
+                          onOpenChange={setCumpleDiaPickerOpen}
+                          onChange={() => setCumpleDiaPickerOpen(false)}
+                          defaultPickerValue={selectedMonth ? dayjs(`2000-${String(selectedMonth).padStart(2, "0")}-01`, "YYYY-MM-DD", true) : undefined}
+                          disabledDate={(current) => {
+                            if (!selectedMonth || !current) return true;
+                            return current.month() + 1 !== selectedMonth;
+                          }}
                           disabled={!selectedMonth}
-                          changeOnWheel
                         />
                       </Form.Item>
                     );
