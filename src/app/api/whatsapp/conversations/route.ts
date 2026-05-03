@@ -282,7 +282,12 @@ export async function GET(request: NextRequest) {
     }
 
     const templateMessages = await getTemplateMessagesByPhone(supabase, normalizedPhone, phone);
-    if (templateMessages.length > 0) {
+    // Solo mezclar notificaciones_enviadas si whatsapp_conversation_history
+    // NO tiene ya registros de tipo template para este número. Evita mensajes dobles.
+    const historyHasTemplate = (data || []).some(
+      (m: any) => String(m.tipo_mensaje || "") === "template"
+    );
+    if (templateMessages.length > 0 && !historyHasTemplate) {
       const merged = dedupeNearDuplicateMessages([
         ...((data || []) as ConversationMessage[]),
         ...templateMessages,

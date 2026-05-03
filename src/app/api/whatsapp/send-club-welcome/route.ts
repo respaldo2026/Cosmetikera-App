@@ -438,9 +438,10 @@ async function logConversationTemplate(perfilId: string, phone: string, cedula: 
     .maybeSingle();
 
   if (existing?.id) {
-    // Actualizar si el mensaje aún dice "pendiente"
+    // Actualizar el registro existente si NO confirma ya un envío exitoso
     const msgLower = String(existing.mensaje || "").toLowerCase();
-    if (msgLower.includes("pendiente")) {
+    const yaConfirmado = msgLower.includes("plantilla enviada");
+    if (!yaConfirmado) {
       await service
         .from("whatsapp_conversation_history")
         .update({ mensaje: mensajeEnviado })
