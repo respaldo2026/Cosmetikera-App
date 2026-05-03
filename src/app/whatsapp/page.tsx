@@ -22,6 +22,10 @@ import {
   LeftOutlined,
   ReloadOutlined,
   SendOutlined,
+  BugOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 
 const { Text } = Typography;
@@ -329,6 +333,46 @@ export default function WhatsAppMonitorPage() {
     setRetryError(null);
   };
 
+  // ── Estado modal diagnóstico ───────────────────────────
+  const [diagnoseModalOpen, setDiagnoseModalOpen] = useState(false);
+  const [diagnoseLoading, setDiagnoseLoading] = useState(false);
+  type DiagnoseCheck = {
+    name: string;
+    status: "ok" | "warn" | "fail";
+    detail: string;
+    action?: string;
+    data?: Record<string, unknown>;
+  };
+  type DiagnoseResult = {
+    success: boolean;
+    summary: { fail: number; warn: number; ok: number };
+    config: { template_name: string; template_language: string; phone_number_id: string; waba_id: string };
+    checks: DiagnoseCheck[];
+    generated_at: string;
+    error?: string;
+  };
+  const [diagnoseResult, setDiagnoseResult] = useState<DiagnoseResult | null>(null);
+  const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
+
+  const runDiagnose = async () => {
+    setDiagnoseLoading(true);
+    setDiagnoseResult(null);
+    setDiagnoseError(null);
+    try {
+      const res = await fetch("/api/whatsapp/diagnose", { method: "GET", cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) {
+        setDiagnoseError(json?.error || `Error ${res.status}`);
+      } else {
+        setDiagnoseResult(json as DiagnoseResult);
+      }
+    } catch (e) {
+      setDiagnoseError(String(e));
+    } finally {
+      setDiagnoseLoading(false);
+    }
+  };
+
   type LoadOptions = {
     silent?: boolean;
   };
@@ -545,6 +589,12 @@ export default function WhatsAppMonitorPage() {
             </Text>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Tooltip title="Diagnóstico de WhatsApp">
+              <BugOutlined
+                style={{ color: "#fff", cursor: "pointer", fontSize: 16 }}
+                onClick={() => { setDiagnoseModalOpen(true); setDiagnoseResult(null); setDiagnoseError(null); }}
+              />
+            </Tooltip>
             <Tooltip title="Reenviar bienvenida club a clientes pendientes">
               <SendOutlined
                 style={{ color: "#fff", cursor: "pointer", fontSize: 16 }}
@@ -687,7 +737,91 @@ export default function WhatsAppMonitorPage() {
         </div>
       </div>
 
-      {/* ── Modal retry bienvenida club ───────────────────────── */}
+      {/* ── Modal diagnóstico WhatsApp ─────────────────────── */}
+      <Modal
+        title="Diagnóstico WhatsApp"
+        open={diagnoseModalOpen}
+        onCancel={() => setDiagnoseModalOpen(false)}
+        footer={null}
+        width={600}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Alert
+            message="Verifica en tiempo real si el token, las plantillas y la base de datos están funcionando correctamente."
+            type="info"
+            showIcon
+          />
+          <Button
+            type="primary"
+            icon={<BugOutlined />}
+            loading={diagnoseLoading}
+            onClick={runDiagnose}
+            style={{ alignSelf: "flex-start" }}
+          >
+            {diagnoseLoading ? "Analizando..." : "Ejecutar diagnóstico"}
+          </Button>
+
+          {diagnoseError && <Alert message={diagnoseError} type="error" showIcon />}
+
+          {diagnoseResult && (() => {
+            const { summary, config, checks, generated_at } = diagnoseResult;
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {/* Resumen */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <Tag color="success" icon={<CheckCircleOutlined />}>{summary.ok} OK</Tag>
+                  {summary.warn > 0 && <Tag color="warning" icon={<WarningOutlined />}>{summary.warn} Advertencia</Tag>}
+                  {summary.fail > 0 && <Tag color="error" icon={<CloseCircleOutlined />}>{summary.fail} Error</Tag>}
+                </div>
+                {/* Config usada */}
+                <div style={{ background: "#f6f8fa", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "#555" }}>
+                  <b>Plantilla:</b> {config.template_name} &nbsp;|&nbsp;
+                  <b>Idioma:</b> {config.template_language} &nbsp;|&nbsp;
+                  <b>Phone ID:</b> {config.phone_number_id}
+                </div>
+                {/* Checks */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {checks.map((c, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        borderRadius: 6,
+                        padding: "8px 12px",
+                        background: c.status === "ok" ? "#f6ffed" : c.status === "warn" ? "#fffbe6" : "#fff2f0",
+                        border: `1px solid ${c.status === "ok" ? "#b7eb8f" : c.status === "warn" ? "#ffe58f" : "#ffccc7"}`,
+                        fontSize: 13,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: c.action || c.data ? 4 : 0 }}>
+                        {c.status === "ok" && <CheckCircleOutlined style={{ color: "#52c41a" }} />}
+                        {c.status === "warn" && <WarningOutlined style={{ color: "#faad14" }} />}
+                        {c.status === "fail" && <CloseCircleOutlined style={{ color: "#ff4d4f" }} />}
+                        <b style={{ color: "#333" }}>{c.name}</b>
+                        <span style={{ color: "#555", fontWeight: 400 }}>{c.detail}</span>
+                      </div>
+                      {c.action && (
+                        <div style={{ color: "#856404", fontSize: 12, marginLeft: 22, marginTop: 2 }}>
+                          → {c.action}
+                        </div>
+                      )}
+                      {c.data && Object.keys(c.data).length > 0 && (
+                        <div style={{ fontSize: 11, color: "#888", marginLeft: 22, marginTop: 2 }}>
+                          {Object.entries(c.data).map(([k, v]) => (
+                            <span key={k} style={{ marginRight: 10 }}><b>{k}:</b> {String(v ?? "-")}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: "#aaa", textAlign: "right" }}>generado: {new Date(generated_at).toLocaleString("es-CO")}</div>
+              </div>
+            );
+          })()}
+        </div>
+      </Modal>
+
+      {/* ── Modal retry bienvenida club ─────────────────────── */}
       <Modal
         title="Bienvenida del Club — Pendientes"
         open={retryModalOpen}
