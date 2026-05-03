@@ -76,12 +76,14 @@ function normalizeWhatsAppTarget(value: string | null | undefined): string {
   return "";
 }
 
-function buildWhatsAppLink(text: string, targetNumber?: string): string {
+function buildWhatsAppLink(text: string, targetNumber: string): string {
   const encoded = encodeURIComponent(text);
-  if (targetNumber) {
-    return `https://wa.me/${targetNumber}?text=${encoded}`;
-  }
-  return `https://wa.me/?text=${encoded}`;
+  return `https://api.whatsapp.com/send?phone=${targetNumber}&text=${encoded}`;
+}
+
+function buildWhatsAppAppLink(text: string, targetNumber: string): string {
+  const encoded = encodeURIComponent(text);
+  return `whatsapp://send?phone=${targetNumber}&text=${encoded}`;
 }
 
 type Cliente = {
@@ -377,6 +379,11 @@ export default function ClubPage() {
   }, [cliente]);
 
   const abrirWhatsAppAsesora = useCallback((baseMessage: string) => {
+    if (!whatsAppTargetNumber) {
+      message.error("No está configurado el número de WhatsApp del bot. Configúralo en Configuración > WhatsApp Agente.");
+      return;
+    }
+
     const cedula = String(cliente?.cedula || "").replace(/\D/g, "");
     const nombre = String(cliente?.nombre_completo || "").trim();
     const nivelRaw = String(cliente?.nivel_fidelidad || "").trim().toLowerCase();
@@ -401,13 +408,20 @@ export default function ClubPage() {
     const contextoClub = `\n\n${contextoPartes.join(" ")}`;
 
     const finalMessage = `${baseMessage}${contextoClub}`;
-    const link = buildWhatsAppLink(finalMessage, whatsAppTargetNumber);
-    window.open(link, "_blank", "noopener,noreferrer");
+    const webLink = buildWhatsAppLink(finalMessage, whatsAppTargetNumber);
 
-    if (!whatsAppTargetNumber) {
-      message.info("Se abrió WhatsApp. Selecciona el chat de La Cosmetikera para continuar.");
+    // En móvil intentamos abrir la app de WhatsApp directamente y dejamos fallback web.
+    if (isMobile) {
+      const appLink = buildWhatsAppAppLink(finalMessage, whatsAppTargetNumber);
+      window.location.href = appLink;
+      window.setTimeout(() => {
+        window.open(webLink, "_blank", "noopener,noreferrer");
+      }, 800);
+      return;
     }
-  }, [cliente?.cedula, cliente?.nivel_fidelidad, cliente?.nombre_completo, cliente?.puntos_fidelidad, message, whatsAppTargetNumber]);
+
+    window.open(webLink, "_blank", "noopener,noreferrer");
+  }, [cliente?.cedula, cliente?.nivel_fidelidad, cliente?.nombre_completo, cliente?.puntos_fidelidad, isMobile, message, whatsAppTargetNumber]);
 
   const aplicarCodigoReferido = useCallback(async () => {
     if (!cliente || !codigoReferidoIngresado.trim()) return;
