@@ -825,7 +825,8 @@ function buildHeuristicFallbackResponse(params: {
   const asksCourseInfo = /curso|cursos|clase|clases|inscripcion|matricula|modulo|modulos|cuando\s+comienzan|inicio\s+del\s+curso/.test(normalizedContext);
   const asksSupport = /no puedo|no me deja|no funciona|iniciar sesion|inicio de sesion|contrasena|contraseña|acceso|ingresar|no entra|no abre|usuario|clave|registrar|registro|inscripcion|inscripcion|pague|pago|cobro|valor|costo\s+del\s+curso|precio\s+del\s+curso/.test(normalizedMessage);
   const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
-  const isSimpleGreetingOnly = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey|que mas|q mas|todo bien)\s*[!.]*$/.test(normalizedMessage);
+  const isSimpleGreetingOnly =
+    /^(?:(?:hola|holi|hello|hey)(?:\s+(?:buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|amig[ao]))?|buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|que\s*mas|q\s*mas|todo\s*bien)\s*[!¡.?¿]*$/.test(normalizedMessage);
   const isCustomerComplaint = /por que me dices|por que dices|eso no|no me estas|no es una asesoria|no es asesoria|no me ayudas|me respondes lo mismo|repite|no entiendes|solo te estoy saludando|solo saludaba|te estoy saludando|te saludo/.test(normalizedMessage);
   const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
   const asksRecommendation = /cual\s+me\s+recomiendas|que\s+me\s+recomiendas|producto\s+me\s+recomiendas|de\s+los\s+productos|cual\s+producto/.test(normalizedMessage);
@@ -849,9 +850,10 @@ Cuéntame en una frase qué necesitas hoy (precio, producto, rutina o puntos del
   }
 
   if (isSimpleGreetingOnly) {
-    return `${greeting} 👋 Qué bueno leerte.
-Estoy aquí para ayudarte en serio, paso a paso.
-¿Qué necesitas hoy exactamente: *precio de un producto*, *recomendación para cabello/piel/uñas* o *consulta del club*?`;
+    const welcomeBack = customerName ? "Qué bueno leerte de nuevo 😊" : "Bienvenid@ a *La Cosmetikera* 💄";
+    return `${greeting} ${welcomeBack}
+Soy *Dany*, tu asesora virtual. ¿En qué te puedo ayudar hoy?
+👉 *Productos y precios* · *Rutinas de belleza* · *Club de puntos* · *Cursos*`;
   }
 
   // --- Respuesta de seguimiento: solo si el mensaje es MUY corto Y no tiene pregunta propia ---
@@ -1220,7 +1222,7 @@ export async function POST(request: NextRequest) {
 
     // ── 4. Construir catálogo relevante ───────────────────────────
     const tokens = getSearchTokens(message);
-    const relevantArticles = rankArticles(articulos, tokens, intent).slice(0, 25);
+    const relevantArticles = rankArticles(articulos, tokens, intent).slice(0, 15);
 
     const catalogoTexto =
       relevantArticles.length > 0
@@ -1228,22 +1230,19 @@ export async function POST(request: NextRequest) {
             .map((p) => {
               const precio = formatCOP(Number(p.precio_venta || 0));
               const stock = Number(p.stock || 0);
-              const stockTxt = stock > 0 ? `stock:${stock}` : "agotado";
+              const stockTxt = stock > 0 ? `s:${stock}` : "agotado";
               const dto =
                 Number(p.descuento_porcentaje || 0) > 0
-                  ? ` dto:${p.descuento_porcentaje}%`
+                  ? ` -${p.descuento_porcentaje}%`
                   : "";
-              const desc = p.descripcion
-                ? ` | "${String(p.descripcion).slice(0, 80)}"`
-                : "";
-              return `• ${p.nombre} | ${p.marca || "N/A"} | ${p.categoria || "general"} | ${precio} | ${stockTxt}${dto}${desc}`;
+              return `• ${p.nombre} | ${p.marca || "N/A"} | ${precio} | ${stockTxt}${dto}`;
             })
             .join("\n")
         : articulos
-            .slice(0, 20)
+            .slice(0, 15)
             .map((p) => {
               const precio = formatCOP(Number(p.precio_venta || 0));
-              return `• ${p.nombre} | ${p.marca || "N/A"} | ${p.categoria || "general"} | ${precio}`;
+              return `• ${p.nombre} | ${p.marca || "N/A"} | ${precio}`;
             })
             .join("\n");
 
@@ -1317,6 +1316,17 @@ ${catalogoTexto}`;
       responseText = directDateTimeReply;
     }
 
+    // ── 6b. Short-circuit para saludos puros ─────────────────────
+    const _greetingOnlyMsg = normalize(message);
+    const isGreetingOnly =
+      /^(?:(?:hola|holi|hello|hey)(?:\s+(?:buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|amig[ao]))?|buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|que\s*mas|q\s*mas|todo\s*bien)\s*[!¡.?¿]*$/.test(_greetingOnlyMsg);
+    if (!responseText && isGreetingOnly) {
+      const _style = detectGreetingStyle(message);
+      const _humanGreeting = buildHumanGreeting(_style, customerName);
+      const _welcome = customerName ? "Qué bueno leerte de nuevo 😊" : "Bienvenid@ a *La Cosmetikera* 💄";
+      responseText = `${_humanGreeting} ${_welcome}\nSoy *Dany*, tu asesora virtual. ¿En qué te puedo ayudar hoy?\n👉 *Productos y precios* · *Rutinas de belleza* · *Club de puntos* · *Cursos*`;
+    }
+
     // ── 7. Llamar a Gemini con historial real (multi-turn) ────────
     if (!responseText && geminiKey) {
       const genAI = new GoogleGenerativeAI(geminiKey);
@@ -1363,7 +1373,7 @@ ${catalogoTexto}`;
           const result = await Promise.race([
             chat.sendMessage(message),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error(`timeout-${modelName}`)), 9000)
+              setTimeout(() => reject(new Error(`timeout-${modelName}`)), 13000)
             ),
           ]);
 
@@ -1373,21 +1383,8 @@ ${catalogoTexto}`;
             break;
           }
         } catch (err) {
-          const msg = String((err as Error)?.message || "").toLowerCase();
-          if (
-            msg.includes("404") ||
-            msg.includes("not found") ||
-            msg.includes("429") ||
-            msg.includes("quota") ||
-            msg.includes("rate limit") ||
-            msg.includes("resource exhausted") ||
-            msg.includes("timeout-") ||
-            msg.includes("unsupported")
-          ) {
-            continue;
-          }
-          console.warn(`[ai/chat] Error modelo ${modelName}:`, err);
-          break;
+          console.warn(`[ai/chat] Error modelo ${modelName}:`, String((err as Error)?.message || "").slice(0, 120));
+          continue;
         }
       }
     }
