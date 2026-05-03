@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } fr
 import dynamic from "next/dynamic";
 import {
   Card, Typography, Space, Tag, Row, Col, Statistic,
-  Table, Empty, Grid, Button, Avatar, Badge, Modal, Input, Form, App,
+  Table, Empty, Grid, Button, Avatar, Badge, Modal, Input, Form, App, Select,
 } from "antd";
 import {
   UserOutlined, SearchOutlined, ReloadOutlined, EditOutlined,
@@ -67,6 +67,31 @@ function getProgreso(puntos: number) {
   return { siguiente: sig, pct, faltantes: sig.min - puntos };
 }
 
+const MONTH_OPTIONS = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
+
+function getDaysInMonth(month?: number): number {
+  if (!month || month < 1 || month > 12) return 31;
+  return dayjs(`2000-${String(month).padStart(2, "0")}-01`, "YYYY-MM-DD", true).daysInMonth();
+}
+
+function buildDiaMes(day?: number, month?: number): string {
+  if (!day || !month) return "";
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
+}
+
 function parseDiaMesToIso(diaMes: string): string | null {
   const match = /^(\d{2})\/(\d{2})$/.exec(String(diaMes || "").trim());
   if (!match) return null;
@@ -79,12 +104,6 @@ function parseDiaMesToIso(diaMes: string): string | null {
   if (!base.isValid() || base.date() !== day || base.month() + 1 !== month) return null;
 
   return base.format("YYYY-MM-DD");
-}
-
-function formatDiaMesInput(value: string): string {
-  const digits = String(value || "").replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 }
 
 // ─── Página principal ────────────────────────────────────────────────────
@@ -156,13 +175,19 @@ export default function ClientesPage() {
     try {
       const values = await formNuevo.validateFields();
       setGuardando(true);
+      const cumpleDiaMes = buildDiaMes(values.cumple_dia, values.cumple_mes);
+      const fechaNacimiento = parseDiaMesToIso(cumpleDiaMes);
+      if (!fechaNacimiento) {
+        throw new Error("Selecciona un cumpleaños válido (día y mes)");
+      }
+
       const datosParaGuardar = {
         nombre_completo: values.nombre_completo,
         cedula: values.cedula || null,
         telefono: values.telefono || null,
         telefono_2: values.telefono_2 || null,
         email: values.email || null,
-        fecha_nacimiento: parseDiaMesToIso(values.cumple_dia_mes || ""),
+        fecha_nacimiento: fechaNacimiento,
       };
       const datosNormalizados = normalizarDatosFormulario(datosParaGuardar);
       const res = await fetch("/api/perfiles", {
@@ -490,24 +515,54 @@ export default function ClientesPage() {
           <Form.Item name="email" label="Email">
             <Input prefix={<MailOutlined />} placeholder="correo@ejemplo.com" />
           </Form.Item>
-          <Form.Item
-            name="cumple_dia_mes"
-            label="Cumpleaños (día/mes)"
-            getValueFromEvent={(e) => formatDiaMesInput(e?.target?.value)}
-            rules={[
-              { required: true, message: "El cumpleaños (día/mes) es obligatorio" },
-              { pattern: /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])$/, message: "Usa formato DD/MM" },
-            ]}
-          >
-            <Input
-              placeholder="Ej: 07/11"
-              maxLength={5}
-              inputMode="numeric"
-              onPressEnter={() => {
-                const v = formNuevo.getFieldValue("cumple_dia_mes");
-                if (typeof v === "string" && v.length === 5) crearCliente();
-              }}
-            />
+          <Form.Item label="Cumpleaños (día/mes)" required>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  name="cumple_mes"
+                  noStyle={false}
+                  rules={[{ required: true, message: "Selecciona el mes" }]}
+                >
+                  <Select
+                    placeholder="Mes"
+                    options={MONTH_OPTIONS}
+                    onChange={(monthValue) => {
+                      const selectedDay = Number(formNuevo.getFieldValue("cumple_dia") || 0);
+                      const maxDays = getDaysInMonth(monthValue);
+                      if (selectedDay > maxDays) {
+                        formNuevo.setFieldValue("cumple_dia", undefined);
+                      }
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item shouldUpdate noStyle>
+                  {() => {
+                    const selectedMonth = Number(formNuevo.getFieldValue("cumple_mes") || 0);
+                    const maxDays = getDaysInMonth(selectedMonth);
+                    const dayOptions = Array.from({ length: maxDays }, (_, i) => ({
+                      value: i + 1,
+                      label: String(i + 1).padStart(2, "0"),
+                    }));
+
+                    return (
+                      <Form.Item
+                        name="cumple_dia"
+                        noStyle={false}
+                        rules={[{ required: true, message: "Selecciona el día" }]}
+                      >
+                        <Select
+                          placeholder="Día"
+                          options={dayOptions}
+                          disabled={!selectedMonth}
+                        />
+                      </Form.Item>
+                    );
+                  }}
+                </Form.Item>
+              </Col>
+            </Row>
           </Form.Item>
           <div style={{ background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
             <Text style={{ fontSize: 12 }}>🌟 El cliente iniciará con <strong>0 puntos</strong></Text>

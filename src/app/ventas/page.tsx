@@ -96,6 +96,31 @@ function getVentaNumero(venta?: { numero_ticket?: number | null; id?: string | n
 const toCents = (valor: number) => Math.round(Number(valor || 0) * 100);
 const moneyEquals = (a: number, b: number) => toCents(a) === toCents(b);
 
+const MONTH_OPTIONS = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
+
+function getDaysInMonth(month?: number): number {
+  if (!month || month < 1 || month > 12) return 31;
+  return dayjs(`2000-${String(month).padStart(2, "0")}-01`, "YYYY-MM-DD", true).daysInMonth();
+}
+
+function buildDiaMes(day?: number, month?: number): string {
+  if (!day || !month) return "";
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
+}
+
 function parseDiaMesToIso(diaMes: string): string | null {
   const match = /^(\d{2})\/(\d{2})$/.exec(String(diaMes || "").trim());
   if (!match) return null;
@@ -108,12 +133,6 @@ function parseDiaMesToIso(diaMes: string): string | null {
   if (!base.isValid() || base.date() !== day || base.month() + 1 !== month) return null;
 
   return base.format("YYYY-MM-DD");
-}
-
-function formatDiaMesInput(value: string): string {
-  const digits = String(value || "").replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 }
 
 export default function VentasPage() {
@@ -238,10 +257,10 @@ export default function VentasPage() {
     const values = await nuevoClienteForm.validateFields();
     setCreandoCliente(true);
     try {
-      const { codigo_referido, cumple_dia_mes, ...clienteData } = values;
-      const fecha_nacimiento = parseDiaMesToIso(cumple_dia_mes || "");
+      const { codigo_referido, cumple_dia, cumple_mes, ...clienteData } = values;
+      const fecha_nacimiento = parseDiaMesToIso(buildDiaMes(cumple_dia, cumple_mes));
       if (!fecha_nacimiento) {
-        throw new Error("El cumpleaños (día/mes) es obligatorio y debe tener formato DD/MM");
+        throw new Error("Selecciona un cumpleaños válido (día y mes)");
       }
 
       const datosNormalizados = normalizarDatosFormulario({
@@ -1361,24 +1380,54 @@ export default function VentasPage() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item
-            name="cumple_dia_mes"
-            label="Cumpleaños (día/mes)"
-            getValueFromEvent={(e) => formatDiaMesInput(e?.target?.value)}
-            rules={[
-              { required: true, message: "El cumpleaños (día/mes) es obligatorio" },
-              { pattern: /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])$/, message: "Usa formato DD/MM" },
-            ]}
-          >
-            <Input
-              placeholder="Ej: 07/11"
-              maxLength={5}
-              inputMode="numeric"
-              onPressEnter={() => {
-                const v = nuevoClienteForm.getFieldValue("cumple_dia_mes");
-                if (typeof v === "string" && v.length === 5) crearClienteRapido();
-              }}
-            />
+          <Form.Item label="Cumpleaños (día/mes)" required>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item
+                  name="cumple_mes"
+                  noStyle={false}
+                  rules={[{ required: true, message: "Selecciona el mes" }]}
+                >
+                  <Select
+                    placeholder="Mes"
+                    options={MONTH_OPTIONS}
+                    onChange={(monthValue) => {
+                      const selectedDay = Number(nuevoClienteForm.getFieldValue("cumple_dia") || 0);
+                      const maxDays = getDaysInMonth(monthValue);
+                      if (selectedDay > maxDays) {
+                        nuevoClienteForm.setFieldValue("cumple_dia", undefined);
+                      }
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item shouldUpdate noStyle>
+                  {() => {
+                    const selectedMonth = Number(nuevoClienteForm.getFieldValue("cumple_mes") || 0);
+                    const maxDays = getDaysInMonth(selectedMonth);
+                    const dayOptions = Array.from({ length: maxDays }, (_, i) => ({
+                      value: i + 1,
+                      label: String(i + 1).padStart(2, "0"),
+                    }));
+
+                    return (
+                      <Form.Item
+                        name="cumple_dia"
+                        noStyle={false}
+                        rules={[{ required: true, message: "Selecciona el día" }]}
+                      >
+                        <Select
+                          placeholder="Día"
+                          options={dayOptions}
+                          disabled={!selectedMonth}
+                        />
+                      </Form.Item>
+                    );
+                  }}
+                </Form.Item>
+              </Col>
+            </Row>
           </Form.Item>
           <Form.Item
             name="codigo_referido"

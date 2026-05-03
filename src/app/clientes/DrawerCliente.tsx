@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   Col,
-  DatePicker,
   Descriptions,
   Drawer,
   Empty,
@@ -45,6 +44,26 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 
 const { Text } = Typography;
+
+const MONTH_OPTIONS = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
+
+function getDaysInMonth(month?: number): number {
+  if (!month || month < 1 || month > 12) return 31;
+  return dayjs(`2000-${String(month).padStart(2, "0")}-01`, "YYYY-MM-DD", true).daysInMonth();
+}
 
 type Cliente = {
   id: string;
@@ -130,13 +149,15 @@ export default function DrawerCliente({
     if (!cliente) return;
     setTab("datos");
     setPuntosAgregar(0);
+    const d = cliente.fecha_nacimiento ? dayjs(cliente.fecha_nacimiento) : null;
     form.setFieldsValue({
       nombre_completo: cliente.nombre_completo,
       cedula: cliente.cedula,
       telefono: cliente.telefono,
       telefono_2: cliente.telefono_2,
       email: cliente.email,
-      fecha_nacimiento: cliente.fecha_nacimiento ? dayjs(cliente.fecha_nacimiento) : null,
+      cumple_mes: d?.isValid() ? d.month() + 1 : undefined,
+      cumple_dia: d?.isValid() ? d.date() : undefined,
       activo: cliente.activo ?? true,
     });
   }, [cliente, form]);
@@ -163,14 +184,23 @@ export default function DrawerCliente({
     try {
       const values = await form.validateFields();
       setGuardando(true);
+      let fechaNacimiento: string | null = null;
+      if (values.cumple_mes && values.cumple_dia) {
+        const d = dayjs(
+          `2000-${String(values.cumple_mes).padStart(2, "0")}-${String(values.cumple_dia).padStart(2, "0")}`,
+          "YYYY-MM-DD",
+          true
+        );
+        fechaNacimiento = d.isValid() ? d.format("YYYY-MM-DD") : null;
+      }
+
       const datosParaGuardar = {
         nombre_completo: values.nombre_completo,
         cedula: values.cedula || null,
         telefono: values.telefono || null,
         telefono_2: values.telefono_2 || null,
         email: values.email || null,
-        fecha_nacimiento: values.fecha_nacimiento
-          ? dayjs(values.fecha_nacimiento).format("YYYY-MM-DD") : null,
+        fecha_nacimiento: fechaNacimiento,
         activo: values.activo,
       };
       const datosNormalizados = normalizarDatosFormulario(datosParaGuardar);
@@ -328,9 +358,48 @@ export default function DrawerCliente({
                     </Col>
                   </Row>
                   <Row gutter={12}>
-                    <Col span={12}>
-                      <Form.Item name="fecha_nacimiento" label="Fecha de nacimiento">
-                        <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                    <Col span={24}>
+                      <Form.Item label="Cumpleaños (día/mes)">
+                        <Row gutter={12}>
+                          <Col span={12}>
+                            <Form.Item name="cumple_mes" noStyle={false}>
+                              <Select
+                                placeholder="Mes"
+                                options={MONTH_OPTIONS}
+                                allowClear
+                                onChange={(monthValue) => {
+                                  const selectedDay = Number(form.getFieldValue("cumple_dia") || 0);
+                                  const maxDays = getDaysInMonth(monthValue);
+                                  if (selectedDay > maxDays) {
+                                    form.setFieldValue("cumple_dia", undefined);
+                                  }
+                                }}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item shouldUpdate noStyle>
+                              {() => {
+                                const selectedMonth = Number(form.getFieldValue("cumple_mes") || 0);
+                                const maxDays = getDaysInMonth(selectedMonth);
+                                const dayOptions = Array.from({ length: maxDays }, (_, i) => ({
+                                  value: i + 1,
+                                  label: String(i + 1).padStart(2, "0"),
+                                }));
+                                return (
+                                  <Form.Item name="cumple_dia" noStyle={false}>
+                                    <Select
+                                      placeholder="Día"
+                                      options={dayOptions}
+                                      allowClear
+                                      disabled={!selectedMonth}
+                                    />
+                                  </Form.Item>
+                                );
+                              }}
+                            </Form.Item>
+                          </Col>
+                        </Row>
                       </Form.Item>
                     </Col>
                   </Row>
