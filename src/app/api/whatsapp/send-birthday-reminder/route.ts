@@ -40,6 +40,12 @@ interface BirthdayReminderResponse {
   }>;
 }
 
+const BIRTHDAY_TEMPLATE_BY_OFFSET: Record<-2 | -1 | 0, string> = {
+  [-2]: process.env.WHATSAPP_TEMPLATE_CUMPLEANOS_2D || "cumpleanos_recordatorio_2d_es",
+  [-1]: process.env.WHATSAPP_TEMPLATE_CUMPLEANOS_1D || "cumpleanos_recordatorio_1d_es",
+  [0]: process.env.WHATSAPP_TEMPLATE_CUMPLEANOS_HOY || "cumpleanos_celebracion_es",
+};
+
 /**
  * Valida autenticación (API key o sesión autenticada)
  */
@@ -74,16 +80,7 @@ async function validateRequest(request: NextRequest): Promise<boolean> {
  * Obtiene el nombre de la plantilla según el offset de días
  */
 function getTemplateName(diasOffset: -2 | -1 | 0): string {
-  switch (diasOffset) {
-    case -2:
-      return "cumpleanos_recordatorio_2d_es";
-    case -1:
-      return "cumpleanos_recordatorio_1d_es";
-    case 0:
-      return "cumpleanos_celebracion_es";
-    default:
-      return "";
-  }
+  return BIRTHDAY_TEMPLATE_BY_OFFSET[diasOffset] || "";
 }
 
 /**
