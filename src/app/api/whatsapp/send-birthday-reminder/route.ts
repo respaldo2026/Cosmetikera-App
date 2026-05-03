@@ -250,7 +250,7 @@ export async function POST(
     // mientras este endpoint acepta payload en formato negocio (-2,-1,0).
     const diasParaConsulta = body.dias_offset === 0 ? 0 : Math.abs(body.dias_offset);
     const { data: clientes, error: fetchError } = await supabase.rpc(
-      "get_clientes_cumpleaños_proximos",
+      "get_clientes_cumpleanos_proximos",
       { dias_offset: diasParaConsulta }
     );
 
