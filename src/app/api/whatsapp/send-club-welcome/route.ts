@@ -284,52 +284,78 @@ async function sendWhatsAppMessage(
     const url = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
     const normalizedPhone = phone.replace(/\D/g, "");
 
+    const buildTemplatePayload = (includeVariable: boolean) => ({
+      messaging_product: "whatsapp",
+      to: normalizedPhone,
+      type: "template",
+      template: {
+        name: CLUB_WELCOME_TEMPLATE_NAME,
+        language: {
+          code: CLUB_WELCOME_TEMPLATE_LANGUAGE,
+        },
+        ...(includeVariable
+          ? {
+              components: [
+                {
+                  type: "body",
+                  parameters: [
+                    {
+                      type: "text",
+                      text: cedula,
+                    },
+                  ],
+                },
+              ],
+            }
+          : {}),
+      },
+    });
+
+    const callMeta = async (includeVariable: boolean) => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify(buildTemplatePayload(includeVariable)),
+      });
+
+      const data = await response.json();
+      return { ok: response.ok, data };
+    };
+
     // Usar plantilla pre-aprobada en Meta
     // Nombre: WHATSAPP_TEMPLATE_CLUB_WELCOME (fallback: club_welcome_es)
     // Idioma: WHATSAPP_TEMPLATE_CLUB_WELCOME_LANG (fallback: es_ES)
     // Variable {{1}}: cedula
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: normalizedPhone,
-        type: "template",
-        template: {
-          name: CLUB_WELCOME_TEMPLATE_NAME,
-          language: {
-            code: CLUB_WELCOME_TEMPLATE_LANGUAGE,
-          },
-          components: [
-            {
-              type: "body",
-              parameters: [
-                {
-                  type: "text",
-                  text: cedula, // {{1}} en la plantilla
-                },
-              ],
-            },
-          ],
-        },
-      }),
-    });
+    const firstTry = await callMeta(true);
 
-    const data = await response.json();
+    if (!firstTry.ok) {
+      const errorCode = Number((firstTry.data as any)?.error?.code || 0);
+      // Compatibilidad con cambios de plantilla: reintenta sin parámetros si Meta reporta mismatch.
+      if (errorCode === 132000) {
+        const secondTry = await callMeta(false);
+        if (secondTry.ok) {
+          return { success: true, response: secondTry.data };
+        }
+        console.error("[Club Welcome] Error WhatsApp (retry sin variable):", secondTry.data);
+        return {
+          success: false,
+          error: (secondTry.data as any)?.error?.message || "Error enviando mensaje",
+          response: secondTry.data,
+        };
+      }
 
-    if (!response.ok) {
-      console.error("[Club Welcome] Error WhatsApp:", data);
+      console.error("[Club Welcome] Error WhatsApp:", firstTry.data);
       return {
         success: false,
-        error: data.error?.message || "Error enviando mensaje",
-        response: data,
+        error: (firstTry.data as any)?.error?.message || "Error enviando mensaje",
+        response: firstTry.data,
       };
     }
 
-    return { success: true, response: data };
+    return { success: true, response: firstTry.data };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error("[Club Welcome] Exception:", errorMsg);
