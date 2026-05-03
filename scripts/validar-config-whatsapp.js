@@ -48,7 +48,7 @@ console.log('\n🧪 Prueba 1: Validar Access Token\n');
 function checkToken() {
   return new Promise((resolve) => {
     const options = {
-      hostname: 'graph.instagram.com',
+      hostname: 'graph.facebook.com',
       path: '/me?fields=id,name,email&access_token=' + ACCESS_TOKEN,
       method: 'GET',
       timeout: 5000,
@@ -98,7 +98,7 @@ function checkToken() {
 function checkWABA() {
   return new Promise((resolve) => {
     const options = {
-      hostname: 'graph.instagram.com',
+      hostname: 'graph.facebook.com',
       path: `/${WABA_ID}?fields=id,name,currency&access_token=${ACCESS_TOKEN}`,
       method: 'GET',
       timeout: 5000,

@@ -43,6 +43,8 @@ interface SendClubWelcomeResponse {
 
 const CLUB_WELCOME_TEMPLATE_NAME =
   process.env.WHATSAPP_TEMPLATE_CLUB_WELCOME || "club_welcome_es";
+const CLUB_WELCOME_TEMPLATE_LANGUAGE =
+  process.env.WHATSAPP_TEMPLATE_CLUB_WELCOME_LANG || "es_ES";
 
 type WelcomeLockResult = {
   acquired: boolean;
@@ -267,6 +269,7 @@ async function sendWhatsAppMessage(
 
     // Usar plantilla pre-aprobada en Meta
     // Nombre: WHATSAPP_TEMPLATE_CLUB_WELCOME (fallback: club_welcome_es)
+    // Idioma: WHATSAPP_TEMPLATE_CLUB_WELCOME_LANG (fallback: es_ES)
     // Variable {{1}}: cedula
     const response = await fetch(url, {
       method: "POST",
@@ -281,7 +284,7 @@ async function sendWhatsAppMessage(
         template: {
           name: CLUB_WELCOME_TEMPLATE_NAME,
           language: {
-            code: "es", // Español
+            code: CLUB_WELCOME_TEMPLATE_LANGUAGE,
           },
           components: [
             {
