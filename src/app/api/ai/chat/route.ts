@@ -99,11 +99,13 @@ function looksRepeatedAnswer(current: string, previous: string): boolean {
 
 function detectIntent(message: string): AgentIntent {
   const m = normalize(message);
+  if (detectCustomerCorrection(message)) return "diagnostico";
   if (/precio|cuanto|valor|costo|vale|promocion|oferta|descuento|economico|barato/.test(m)) return "precio";
+  if (detectBeautyDiagnosticIntent(message)) return "diagnostico";
   // Preguntas sobre cursos/clases se tratan como intención de inscripción para evitar
   // que caigan en respuestas genéricas de horario.
   if (/curso|cursos|clase|clases|modulo|modulos|inscripcion\s+al\s+curso|inicio\s+de\s+curso|comienzan\s+los\s+cursos/.test(m)) return "inscripcion";
-  if (/hora|horario|cuando|dia|fecha|agenda|atienden|abren|cierran/.test(m)) return "horario";
+  if (/\bhora\b|\bhorario\b|\bcuando\b|\bdia\b|\bfecha\b|\bagenda\b|\batienden\b|\babren\b|\bcierran\b/.test(m)) return "horario";
   if (/rutina|pasos|orden|como usar|aplicar|primero|despues|protocolo/.test(m)) return "temario";
   if (/material|kit|insumo|herramienta|ingrediente|composicion|formula/.test(m)) return "materiales";
   if (/inscripcion|matricula|registr|cupo|reserv|agendar|cita/.test(m)) return "inscripcion";
@@ -115,6 +117,208 @@ function detectIntent(message: string): AgentIntent {
   if (/maquillaje|base|corrector|labial|pestanas|cejas|uñas|unas|acrilicas|acrilico|gel|semipermanente|esmalte|perfume|fragancia|duracion|transferencia|oxidacion/.test(m)) return "general";
 
   return "general";
+}
+
+function detectCustomerCorrection(message: string): boolean {
+  const m = normalize(message);
+  return /deberias\s+pregunt|deberia[s]?\s+pregunt|eso\s+no\s+responde|no\s+responde|no\s+entendiste|no\s+me\s+entendiste|preguntame\s+mas|falta\s+diagnostico|falta\s+pregunt|necesitas\s+pregunt|seguro\s+deberias/.test(m);
+}
+
+function detectBeautyDiagnosticIntent(message: string): boolean {
+  const m = normalize(message);
+  const asksPrice = /precio|cuanto|valor|costo|vale|promocion|oferta|descuento/.test(m);
+  const asksClub = /puntos|club|fidelizacion|canje|cedula/.test(m);
+  const asksCourse = /curso|cursos|clase|clases|matricula|inscripcion/.test(m);
+  if (asksPrice || asksClub || asksCourse) return false;
+
+  const beautyNeed = /que\s+me\s+puedo\s+aplicar|que\s+me\s+recomiendas|que\s+puedo\s+usar|me\s+he\s+alisado|me\s+hice|mi\s+cabello|mi\s+piel|mis\s+unas|quiero\s+mejorar|quiero\s+cuidar|rutina|cuidado|uso|diagnostico|asesoria|asesorame/.test(m);
+  const beautyDomain = /cabello|pelo|capilar|tinte|keratina|alisado|decoloracion|piel|acne|mancha|serum|maquillaje|base|labial|unas|uñas|gel|semipermanente|esmalte/.test(m);
+
+  return beautyNeed && beautyDomain;
+}
+
+function historySuggestsBeautyDiagnostic(history: Array<{ rol: string; mensaje: string }>): boolean {
+  const recentClientText = normalize(
+    history
+      .filter((row) => row.rol === "cliente")
+      .slice(-4)
+      .map((row) => row.mensaje)
+      .join(" "),
+  );
+
+  return /cabello|pelo|capilar|tinte|keratina|alisado|decoloracion|piel|acne|mancha|serum|maquillaje|base|labial|unas|uñas|gel|semipermanente|esmalte|rutina|cuidado/.test(recentClientText);
+}
+
+function refineIntentWithContext(
+  baseIntent: AgentIntent,
+  message: string,
+  history: Array<{ rol: string; mensaje: string }>,
+): AgentIntent {
+  if (detectCustomerCorrection(message)) return "diagnostico";
+
+  const m = normalize(message);
+  const shortFollowUp = m.split(/\s+/).filter(Boolean).length <= 12;
+  const beautyContext = historySuggestsBeautyDiagnostic(history);
+
+  if (beautyContext && shortFollowUp) {
+    if (/\bhora\b|\bhorario\b|\bcuando\b|\bdia\b|\bfecha\b/.test(m)) {
+      return "diagnostico";
+    }
+    if (baseIntent === "horario") {
+      return "diagnostico";
+    }
+  }
+
+  if (baseIntent === "general" && detectBeautyDiagnosticIntent(message)) {
+    return "diagnostico";
+  }
+
+  return baseIntent;
+}
+
+function buildDiagnosticQuestionFlow(customerName: string, message: string): string {
+  const greeting = buildHumanGreeting(detectGreetingStyle(message), customerName);
+  const m = normalize(message);
+
+  if (/tinte|coloracion|decoloracion/.test(m) && /alisado|keratina|botox\s+capilar|planchado|repolarizacion/.test(m)) {
+    return `${greeting} Para orientarte bien con *tinte + alisado*, necesito 4 datos:\n1) ¿Qué tipo de alisado te hiciste y hace cuánto?\n2) ¿Tu cabello está sano, reseco o quebradizo?\n3) ¿Ya tiene tinte o decoloración previa?\n4) ¿Qué tono quieres lograr?`;
+  }
+
+  if (/cabello|pelo|capilar|tinte|keratina|alisado|decoloracion|frizz|caida|caspa/.test(m)) {
+    return `${greeting} Para recomendarte bien en *cabello*, primero te hago un mini diagnóstico:\n1) ¿Cuál es tu objetivo principal?\n2) ¿Tu cabello es natural, tinturado, alisado o decolorado?\n3) ¿Cómo está hoy: sano, reseco, poroso o quebradizo?\n4) ¿Buscas opción profesional, casera o según presupuesto?`;
+  }
+
+  if (/piel|acne|grano|espinilla|mancha|melasma|arruga|poro|serum|hidratante|facial|protector/.test(m)) {
+    return `${greeting} Para darte una recomendación acertada en *piel*, dime 4 cosas:\n1) ¿Tu piel es grasa, seca, mixta o sensible?\n2) ¿Qué quieres tratar primero?\n3) ¿Usas actualmente algún activo o tratamiento?\n4) ¿Tu presupuesto es básico, medio o premium?`;
+  }
+
+  if (/maquillaje|base|corrector|labial|rubor|primer|sombras|cejas|pestanas/.test(m)) {
+    return `${greeting} Para asesorarte bien en *maquillaje*, cuéntame:\n1) ¿Lo quieres para diario o evento?\n2) ¿Tu piel es grasa, seca o mixta?\n3) ¿Qué acabado buscas: natural, mate o glow?\n4) ¿Qué producto te interesa primero?`;
+  }
+
+  if (/unas|uñas|esmalte|gel|semipermanente|acrilica|acrilicas|polygel|manicure/.test(m)) {
+    return `${greeting} Para recomendarte bien en *uñas*, dime:\n1) ¿Buscas fortalecer, duración o diseño?\n2) ¿Tus uñas están sanas o débiles?\n3) ¿Quieres uso en casa o acabado profesional?\n4) ¿Prefieres algo natural, elegante o llamativo?`;
+  }
+
+  return `${greeting} Para darte una recomendación realmente útil, primero necesito un mini diagnóstico:\n1) ¿Qué quieres mejorar exactamente?\n2) ¿Cómo está tu proceso actual?\n3) ¿Qué productos o tratamientos has usado?\n4) ¿Buscas resultado rápido, cuidado progresivo o algo según presupuesto?`;
+}
+
+function getRecentClientBeautyContext(
+  message: string,
+  history: Array<{ rol: string; mensaje: string }>,
+): string {
+  const recentClientText = history
+    .filter((row) => row.rol === "cliente")
+    .slice(-6)
+    .map((row) => String(row.mensaje || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return normalize(`${recentClientText} ${message}`);
+}
+
+function buildProductLines(products: CatalogArticle[]): string[] {
+  return products.slice(0, 3).map((p) => {
+    const price = formatCOP(Number(p.precio_venta || 0));
+    const stock = Number(p.stock || 0);
+    const stockText = stock > 0 ? `stock ${stock}` : "agotado";
+    return `• *${p.nombre || "Producto"}*: ${price} (${stockText})`;
+  });
+}
+
+function buildReasonedBeautyRecommendation(params: {
+  customerName: string;
+  message: string;
+  articles: CatalogArticle[];
+  conversationHistory: Array<{ rol: string; mensaje: string }>;
+}): string | null {
+  const { customerName, message, articles, conversationHistory } = params;
+  const context = getRecentClientBeautyContext(message, conversationHistory);
+  const greeting = buildHumanGreeting(detectGreetingStyle(message), customerName);
+  const diagnosticTokens = expandTokenVariants(getSearchTokens(context));
+
+  const hairProcess = /alisado|keratina|botox\s+capilar|decolorado|decoloracion|tinte|natural|virgen/.test(context);
+  const hairState = /reseco|quebradizo|poroso|sano|maltratado|frizz|caida|caspa/.test(context);
+  const hairGoal = /tono|rubio|castano|negro|rojizo|matiz|color|alisar|hidratar|reparar/.test(context);
+  const hairType = /liso|ondulado|rizado|afro|crespo/.test(context);
+
+  const skinType = /piel\s+grasa|piel\s+seca|piel\s+mixta|sensible|acneica|madura/.test(context);
+  const skinConcern = /acne|grano|espinilla|mancha|melasma|arruga|poro|brillo|resequedad/.test(context);
+  const skinRoutine = /uso|uso actualmente|retinol|acido|niacinamida|protector|limpiador|hidratante/.test(context);
+
+  const makeupUsage = /diario|evento|fiesta|novia|trabajo/.test(context);
+  const makeupFinish = /mate|glow|natural|alta cobertura|ligero/.test(context);
+  const makeupBase = /piel\s+grasa|piel\s+seca|mixta|tono|subtono/.test(context);
+
+  const nailsGoal = /fortalecer|duracion|dise[oñ]|natural|elegante|llamativo/.test(context);
+  const nailsState = /debiles|quebradizas|sanas|maltratadas/.test(context);
+  const nailsProcess = /gel|semipermanente|acrilica|acrilicas|polygel|manicure/.test(context);
+
+  const domain = detectBeautyDomain(context) || detectBeautyDomain(message);
+
+  if (domain === "cabello" && [hairProcess, hairState, hairGoal || hairType].filter(Boolean).length >= 2) {
+    const top = rankArticles(articles, diagnosticTokens, "general")
+      .filter((a) => Number(a.stock || 0) > 0)
+      .slice(0, 3);
+    const diagnostico = hairProcess && /tinte/.test(context) && /alisado|keratina/.test(context)
+      ? "Veo un proceso químico combinado: coloración sobre cabello con alisado, así que la prioridad es proteger fibra y duración del color."
+      : hairState
+      ? "Por lo que me cuentas, tu cabello necesita equilibrio entre resultado estético y protección de la fibra."
+      : "Con tu contexto actual, conviene elegir productos que respeten el proceso químico y cuiden la salud capilar.";
+    const recommendation = top.length > 0
+      ? `Te recomiendo empezar con ${top[0]?.nombre || "una línea de cuidado capilar"} y complementar con ${top[1]?.nombre || "tratamiento nutritivo"}.`
+      : "Te recomiendo una rutina enfocada en protección de color, limpieza suave y nutrición progresiva.";
+    const usage = /tinte/.test(context)
+      ? "Modo de uso: primero prueba de mechón, luego aplica color según instrucciones y después sella con tratamiento hidratante."
+      : "Modo de uso: usa limpieza suave, luego tratamiento según necesidad y finaliza con protector térmico o sellador si aplicas calor.";
+    const care = "Cuidados: evita calor excesivo 72 horas, usa shampoo sin sal/sulfatos si vienes de alisado y mantén hidratación 1-2 veces por semana.";
+    const products = top.length > 0 ? `Productos sugeridos:\n${buildProductLines(top).join("\n")}` : "";
+    return `${greeting} Diagnóstico breve: ${diagnostico}\nRecomendación: ${recommendation}\n${usage}\n${care}${products ? `\n${products}` : ""}`;
+  }
+
+  if (domain === "piel" && [skinType, skinConcern, skinRoutine].filter(Boolean).length >= 2) {
+    const top = rankArticles(articles, diagnosticTokens, "general")
+      .filter((a) => Number(a.stock || 0) > 0)
+      .slice(0, 3);
+    const diagnostico = "Por lo que me cuentas, tu piel necesita una rutina que trate el problema principal sin sobrecargarla ni irritarla.";
+    const recommendation = top.length > 0
+      ? `Te recomiendo construir la rutina alrededor de ${top[0]?.nombre || "un activo principal"} y complementar con hidratación/protección.`
+      : "Te recomiendo una rutina corta: limpieza, tratamiento específico e hidratación con fotoprotección diaria.";
+    const usage = "Modo de uso: introduce los activos poco a poco, primero en noches alternas si son fuertes, y mantén protector solar cada mañana.";
+    const care = "Cuidados: no mezcles demasiados activos al mismo tiempo y observa tolerancia de la piel durante la primera semana.";
+    const products = top.length > 0 ? `Productos sugeridos:\n${buildProductLines(top).join("\n")}` : "";
+    return `${greeting} Diagnóstico breve: ${diagnostico}\nRecomendación: ${recommendation}\n${usage}\n${care}${products ? `\n${products}` : ""}`;
+  }
+
+  if (domain === "maquillaje" && [makeupUsage, makeupFinish, makeupBase].filter(Boolean).length >= 2) {
+    const top = rankArticles(articles, diagnosticTokens, "general")
+      .filter((a) => Number(a.stock || 0) > 0)
+      .slice(0, 3);
+    const diagnostico = "Ya con lo que me cuentas, puedo orientarte hacia un maquillaje coherente con tu ocasión, acabado y tipo de piel.";
+    const recommendation = top.length > 0
+      ? `Te recomiendo priorizar ${top[0]?.nombre || "la base adecuada"} y complementar con productos que sostengan el acabado que buscas.`
+      : "Te recomiendo definir primero base/acabado y luego completar con corrector, sellado y color según la ocasión.";
+    const usage = "Modo de uso: prepara la piel, aplica capas delgadas y sella solo donde realmente lo necesites para evitar exceso de producto.";
+    const care = "Cuidados: siempre retira el maquillaje al final del día y elige texturas acordes a tu tipo de piel para mejor duración.";
+    const products = top.length > 0 ? `Productos sugeridos:\n${buildProductLines(top).join("\n")}` : "";
+    return `${greeting} Diagnóstico breve: ${diagnostico}\nRecomendación: ${recommendation}\n${usage}\n${care}${products ? `\n${products}` : ""}`;
+  }
+
+  if (domain === "unas" && [nailsGoal, nailsState, nailsProcess].filter(Boolean).length >= 2) {
+    const top = rankArticles(articles, diagnosticTokens, "general")
+      .filter((a) => Number(a.stock || 0) > 0)
+      .slice(0, 3);
+    const diagnostico = "Con lo que describes, conviene escoger una opción que equilibre acabado, duración y cuidado de la uña natural.";
+    const recommendation = top.length > 0
+      ? `Te recomiendo empezar con ${top[0]?.nombre || "una base o sistema adecuado"} y complementar según el acabado que quieres.`
+      : "Te recomiendo definir si priorizas duración, estructura o fortalecimiento antes de elegir el sistema.";
+    const usage = "Modo de uso: prepara suavemente la superficie, aplica en capas finas y respeta los tiempos de secado o curado.";
+    const care = "Cuidados: evita remover agresivamente el producto y usa aceite o tratamiento para mantener la uña flexible e hidratada.";
+    const products = top.length > 0 ? `Productos sugeridos:\n${buildProductLines(top).join("\n")}` : "";
+    return `${greeting} Diagnóstico breve: ${diagnostico}\nRecomendación: ${recommendation}\n${usage}\n${care}${products ? `\n${products}` : ""}`;
+  }
+
+  return null;
 }
 
 function detectBeautyDomain(message: string): BeautyDomain | null {
@@ -1021,7 +1225,7 @@ function buildHeuristicFallbackResponse(params: {
   const isGreeting = /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hello|hey)\b/.test(normalizedMessage);
   const isSimpleGreetingOnly =
     /^(?:(?:hola|holi|hello|hey)(?:\s+(?:buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|amig[ao]))?|buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|que\s*mas|q\s*mas|todo\s*bien)\s*[!¡.?¿]*$/.test(normalizedMessage);
-  const isCustomerComplaint = /por que me dices|por que dices|eso no|no me estas|no es una asesoria|no es asesoria|no me ayudas|me respondes lo mismo|repite|no entiendes|solo te estoy saludando|solo saludaba|te estoy saludando|te saludo/.test(normalizedMessage);
+  const isCustomerComplaint = detectCustomerCorrection(message) || /por que me dices|por que dices|eso no|no me estas|no es una asesoria|no es asesoria|no me ayudas|me respondes lo mismo|repite|no entiendes|solo te estoy saludando|solo saludaba|te estoy saludando|te saludo/.test(normalizedMessage);
   const isShortQuestion = normalizedMessage.split(/\s+/).filter(Boolean).length <= 2;
   const asksRecommendation = /cual\s+me\s+recomiendas|que\s+me\s+recomiendas|producto\s+me\s+recomiendas|de\s+los\s+productos|cual\s+producto/.test(normalizedMessage);
   const asksAvailability = /tienes|hay|disponible|stock|manejas|vendes/.test(normalizedMessage);
@@ -1038,9 +1242,35 @@ function buildHeuristicFallbackResponse(params: {
   const isShortFollowUp = msgWords <= 6 && lastBot.length > 10;
 
   if (isCustomerComplaint) {
+    const recoveredRecommendation = buildReasonedBeautyRecommendation({
+      customerName,
+      message,
+      articles,
+      conversationHistory: params.conversationHistory || [],
+    });
+
+    if (recoveredRecommendation) {
+      return `🙏 Tienes toda la razón, y gracias por decírmelo. ${recoveredRecommendation}`;
+    }
+
     return `🙏 Tienes toda la razón, y gracias por decírmelo. Me equivoqué interpretando tu mensaje anterior.
 Arranquemos bien: te respondo directo y con lógica, sin rodeos.
-Cuéntame en una frase qué necesitas hoy (precio, producto, rutina o puntos del club) y te doy una respuesta puntual.`;
+${buildDiagnosticQuestionFlow(customerName, message)}`;
+  }
+
+  if (intent === "diagnostico") {
+    const reasonedRecommendation = buildReasonedBeautyRecommendation({
+      customerName,
+      message,
+      articles,
+      conversationHistory: params.conversationHistory || [],
+    });
+
+    if (reasonedRecommendation) {
+      return reasonedRecommendation;
+    }
+
+    return buildDiagnosticQuestionFlow(customerName, normalizedContext);
   }
 
   if (isSimpleGreetingOnly) {
@@ -1377,7 +1607,6 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const intent = detectIntent(message);
     const greetingStyle = detectGreetingStyle(message);
 
     // ── 1. Cargar datos en paralelo ───────────────────────────────
@@ -1424,6 +1653,7 @@ export async function POST(request: NextRequest) {
 
     const conversationHistory = historyRows.map((r) => ({ rol: r.rol, mensaje: r.mensaje }));
     const rejectedDomains = collectRejectedDomains(message, conversationHistory);
+    const intent = refineIntentWithContext(detectIntent(message), message, conversationHistory);
     const clubContextActive = isClubRelatedText(message) || hasRecentClubContext(conversationHistory);
     const cedulaForLookup = cedulaPayload || (clubContextActive ? cedulaMessage : "");
 
@@ -1507,6 +1737,8 @@ Responder EXACTAMENTE lo que el cliente preguntó, usando el catálogo real de l
 11. Si recomiendas productos, prioriza inventario con stock > 0.
 12. RESPUESTA DIRECTA PRIMERO: si preguntan fecha/hora, responde la fecha/hora en la primera línea.
 13. Si el cliente dijo que NO quiere una categoría, NO la menciones de nuevo salvo que el cliente la pida explícitamente.
+14. En consultas técnicas de belleza (cabello, piel, uñas, maquillaje, coloración, alisados, tratamientos), NO recomiendes de inmediato: primero haz 3-4 preguntas de diagnóstico para entender estado actual, objetivo, antecedentes y presupuesto.
+15. Si el cliente corrige al agente o dice que falta diagnóstico, corrige el rumbo y haz preguntas más inteligentes antes de volver a recomendar.
 
 ## ESPECIALIDADES
 Cabello (tintes, decoloración, alisados, afro/rizado), piel (acné, manchas, hidratación), uñas (acrílicas, gel, semipermanente), maquillaje, barba.

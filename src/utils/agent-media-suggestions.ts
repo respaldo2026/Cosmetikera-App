@@ -1,4 +1,4 @@
-export type AgentIntent = "precio" | "horario" | "temario" | "materiales" | "inscripcion" | "requisitos" | "general";
+export type AgentIntent = "precio" | "horario" | "temario" | "materiales" | "inscripcion" | "requisitos" | "diagnostico" | "general";
 
 export interface AgentImageSuggestion {
   type: "image";
@@ -58,6 +58,7 @@ function getIntentCategoryHints(intent: AgentIntent): string[] {
   if (intent === "inscripcion") return ["inscripción", "promocional"];
   if (intent === "temario") return ["informativo"];
   if (intent === "materiales") return ["informativo"];
+  if (intent === "diagnostico") return ["informativo"];
   return ["informativo", "promocional"];
 }
 
@@ -67,6 +68,7 @@ function getIntentKeywordHints(intent: AgentIntent): string[] {
   if (intent === "inscripcion") return ["inscripcion", "matricula", "admisiones", "cupo"];
   if (intent === "temario") return ["temario", "contenido", "ciclos", "modulos", "curso"];
   if (intent === "materiales") return ["materiales", "kit", "insumos", "implementos"];
+  if (intent === "diagnostico") return ["diagnostico", "rutina", "uso", "cuidado", "recomendacion"];
   return ["academia", "clases", "estudiantes"];
 }
 
