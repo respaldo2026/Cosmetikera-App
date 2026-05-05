@@ -227,6 +227,7 @@ const METODO_TAG: Record<string, string> = {
   efectivo: "green",
   tarjeta: "blue",
   transferencia: "purple",
+  sistecredito: "gold",
   mixto: "orange",
 };
 
@@ -272,10 +273,14 @@ function parseMetodoPago(value?: string | null) {
     return { base: "mixto", label: "Mixto", detail: detail || null };
   }
 
-  if (raw === "efectivo" || raw === "tarjeta" || raw === "transferencia" || raw === "mixto") {
+  if (raw === "efectivo" || raw === "tarjeta" || raw === "transferencia" || raw === "sistecredito" || raw === "mixto") {
+    const label = raw === "sistecredito"
+      ? "SisteCredito"
+      : raw.charAt(0).toUpperCase() + raw.slice(1);
+
     return {
       base: raw,
-      label: raw.charAt(0).toUpperCase() + raw.slice(1),
+      label,
       detail: null,
     };
   }

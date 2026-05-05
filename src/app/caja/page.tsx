@@ -258,7 +258,23 @@ export default function CajaPage() {
         .order("orden", { ascending: true });
 
       if (!error && data) {
-        setMediosPago(data);
+        const lista = Array.isArray(data) ? [...data] : [];
+        const existeSistecredito = lista.some(
+          (medio) => String(medio?.codigo || "").trim().toLowerCase() === "sistecredito"
+        );
+
+        if (!existeSistecredito) {
+          lista.push({
+            id: "fallback-sistecredito",
+            nombre: "SisteCredito",
+            codigo: "sistecredito",
+            activo: true,
+            orden: 999,
+          });
+        }
+
+        lista.sort((a, b) => Number(a?.orden || 0) - Number(b?.orden || 0));
+        setMediosPago(lista);
       }
     } catch (error) {
       console.error("Error cargando métodos de pago:", error);
