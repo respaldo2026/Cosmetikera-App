@@ -20,6 +20,9 @@ import {
   InputNumber,
   Spin,
   Alert,
+  Switch,
+  List,
+  Popconfirm,
 } from "antd";
 import {
   DollarOutlined,
@@ -38,6 +41,8 @@ import { abrirCajon } from "@utils/pos-hardware";
 let ticketUtilsPromise: Promise<typeof import("@utils/pago-ticket")> | null = null;
 let ticketStoragePromise: Promise<typeof import("@utils/ticket-storage")> | null = null;
 let movimientosServicePromise: Promise<typeof import("@modules/finanzas/movimientos.service")> | null = null;
+const VENTAS_APARCADAS_STORAGE_KEY = "pos_ventas_aparcadas_v1";
+const MAX_VENTAS_APARCADAS = 20;
 
 const loadTicketUtils = () => {
   if (!ticketUtilsPromise) {
@@ -93,6 +98,26 @@ interface Cuota {
   estado: string;
   matricula_id?: string;
   es_virtual?: boolean;
+}
+
+interface VentaAparcada {
+  id: string;
+  creadoEn: string;
+  clienteId: string;
+  clienteNombre: string;
+  totalAproximado: number;
+  cuotas: Array<{
+    id: string;
+    matricula_id?: string;
+    numero_cuota?: number;
+  }>;
+  formValues: {
+    metodo_pago?: MetodoPago;
+    observaciones?: string;
+    referencia?: string;
+    imprimir_ticket: boolean;
+  };
+  valorEntregado: number | null;
 }
 
 const formatCurrency = (value?: number | null) => {
@@ -161,6 +186,9 @@ export default function CajaPage() {
   const [configuracion, setConfiguracion] = useState<any>(null);
   const [valorEntregado, setValorEntregado] = useState<number | null>(null);
   const [mediosPago, setMediosPago] = useState<any[]>([]);
+  const [ventasAparcadas, setVentasAparcadas] = useState<VentaAparcada[]>([]);
+  const [restaurandoVentaId, setRestaurandoVentaId] = useState<string | null>(null);
+  const [filtroVentasAparcadas, setFiltroVentasAparcadas] = useState("");
 
   const totalAPagar = useMemo(
     () =>
@@ -174,6 +202,17 @@ export default function CajaPage() {
     if (!valorEntregado || valorEntregado < totalAPagar) return 0;
     return valorEntregado - totalAPagar;
   }, [valorEntregado, totalAPagar]);
+
+  const ventasAparcadasFiltradas = useMemo(() => {
+    const filtro = filtroVentasAparcadas.trim().toLowerCase();
+    if (!filtro) return ventasAparcadas;
+    return ventasAparcadas.filter((venta) => venta.clienteNombre.toLowerCase().includes(filtro));
+  }, [ventasAparcadas, filtroVentasAparcadas]);
+
+  const persistirVentasAparcadas = useCallback((ventas: VentaAparcada[]) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(VENTAS_APARCADAS_STORAGE_KEY, JSON.stringify(ventas));
+  }, []);
 
   const cargarClientes = useCallback(async () => {
     try {
@@ -232,6 +271,20 @@ export default function CajaPage() {
     cargarMediosPago();
   }, [cargarClientes, cargarConfiguracion, cargarMediosPago]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(VENTAS_APARCADAS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as VentaAparcada[];
+      if (Array.isArray(parsed)) {
+        setVentasAparcadas(parsed);
+      }
+    } catch (error) {
+      console.error("Error leyendo ventas aparcadas:", error);
+    }
+  }, []);
+
   // Generar número de factura cuando se selecciona una cuota
   useEffect(() => {
     if (cuotasSeleccionadas.length > 0) {
@@ -242,6 +295,7 @@ export default function CajaPage() {
 
   const handleClienteChange = useCallback(
     async (clienteId: string) => {
+      let cuotasCargadas: Cuota[] = [];
       setLoading(true);
       try {
         const cliente = clientes.find((e) => e.id === clienteId);
@@ -483,8 +537,10 @@ export default function CajaPage() {
             }
           });
 
-          setCuotas(Array.from(cuotasDedupe.values()));
+          cuotasCargadas = Array.from(cuotasDedupe.values());
+          setCuotas(cuotasCargadas);
         } else {
+          cuotasCargadas = [];
           setCuotas([]);
         }
 
@@ -493,11 +549,139 @@ export default function CajaPage() {
       } catch (error) {
         console.error("Error cargando datos del cliente:", error);
         messageApi.error("Error al cargar datos del cliente");
+        return [];
       } finally {
         setLoading(false);
       }
+
+      return cuotasCargadas;
     },
     [clientes, form, messageApi]
+  );
+
+  const limpiarVentaActual = useCallback(() => {
+    form.resetFields();
+    form.setFieldValue("imprimir_ticket", true);
+    setCuotasSeleccionadas([]);
+    setClienteSeleccionado(null);
+    setMatriculas([]);
+    setCuotas([]);
+    setValorEntregado(null);
+  }, [form]);
+
+  const aparcarVentaActual = useCallback(() => {
+    if (!clienteSeleccionado) {
+      messageApi.warning("Seleccione un cliente antes de aparcar");
+      return;
+    }
+
+    if (cuotasSeleccionadas.length === 0) {
+      messageApi.warning("Seleccione al menos una cuota para aparcar la venta");
+      return;
+    }
+
+    const values = form.getFieldsValue();
+    const cuotasAPagar = cuotas.filter((c) => cuotasSeleccionadas.includes(c.id));
+    const ventaAparcada: VentaAparcada = {
+      id: `venta-${Date.now()}`,
+      creadoEn: dayjs().toISOString(),
+      clienteId: clienteSeleccionado.id,
+      clienteNombre: clienteSeleccionado.nombre_completo,
+      totalAproximado: cuotasAPagar.reduce((acc, cuota) => acc + Number(cuota.monto || 0), 0),
+      cuotas: cuotasAPagar.map((cuota) => ({
+        id: cuota.id,
+        matricula_id: cuota.matricula_id,
+        numero_cuota: cuota.numero_cuota,
+      })),
+      formValues: {
+        metodo_pago: values.metodo_pago as MetodoPago | undefined,
+        observaciones: values.observaciones || "",
+        referencia: values.referencia || "",
+        imprimir_ticket: values.imprimir_ticket !== false,
+      },
+      valorEntregado,
+    };
+
+    let aparcada = false;
+    setVentasAparcadas((prev) => {
+      if (prev.length >= MAX_VENTAS_APARCADAS) {
+        return prev;
+      }
+      const next = [ventaAparcada, ...prev];
+      persistirVentasAparcadas(next);
+      aparcada = true;
+      return next;
+    });
+
+    if (!aparcada) {
+      messageApi.warning(`Solo se permiten ${MAX_VENTAS_APARCADAS} ventas aparcadas. Reanude o elimine una para continuar.`);
+      return;
+    }
+
+    limpiarVentaActual();
+    messageApi.success("Venta aparcada. Puede atender otra operación.");
+  }, [clienteSeleccionado, cuotasSeleccionadas, form, cuotas, valorEntregado, persistirVentasAparcadas, limpiarVentaActual, messageApi]);
+
+  const eliminarVentaAparcada = useCallback(
+    (ventaId: string) => {
+      setVentasAparcadas((prev) => {
+        const next = prev.filter((venta) => venta.id !== ventaId);
+        persistirVentasAparcadas(next);
+        return next;
+      });
+      messageApi.success("Venta aparcada eliminada");
+    },
+    [messageApi, persistirVentasAparcadas]
+  );
+
+  const restaurarVentaAparcada = useCallback(
+    async (venta: VentaAparcada) => {
+      setRestaurandoVentaId(venta.id);
+      try {
+        form.setFieldValue("estudiante_id", venta.clienteId);
+        const cuotasDisponibles = await handleClienteChange(venta.clienteId);
+
+        const cuotasSeleccionables = new Set(cuotasDisponibles.map((cuota) => cuota.id));
+        let idsSeleccionados = venta.cuotas
+          .map((item) => item.id)
+          .filter((id) => cuotasSeleccionables.has(id));
+
+        if (idsSeleccionados.length === 0) {
+          idsSeleccionados = cuotasDisponibles
+            .filter((cuota) =>
+              venta.cuotas.some(
+                (item) =>
+                  String(item.matricula_id || "") === String(cuota.matricula_id || "") &&
+                  Number(item.numero_cuota || 0) === Number(cuota.numero_cuota || 0)
+              )
+            )
+            .map((cuota) => cuota.id);
+        }
+
+        setCuotasSeleccionadas(idsSeleccionados);
+        form.setFieldsValue({
+          metodo_pago: venta.formValues.metodo_pago,
+          observaciones: venta.formValues.observaciones,
+          referencia: venta.formValues.referencia,
+          imprimir_ticket: venta.formValues.imprimir_ticket,
+        });
+        setValorEntregado(venta.valorEntregado);
+
+        setVentasAparcadas((prev) => {
+          const next = prev.filter((item) => item.id !== venta.id);
+          persistirVentasAparcadas(next);
+          return next;
+        });
+
+        messageApi.success("Venta restaurada al carrito");
+      } catch (error) {
+        console.error("Error restaurando venta aparcada:", error);
+        messageApi.error("No se pudo restaurar la venta aparcada");
+      } finally {
+        setRestaurandoVentaId(null);
+      }
+    },
+    [form, handleClienteChange, messageApi, persistirVentasAparcadas]
   );
 
   const handleRegistrarPago = useCallback(async () => {
@@ -528,6 +712,7 @@ export default function CajaPage() {
       const pagosActualizados = [];
       const metodoPago = values.metodo_pago as MetodoPago;
       const referenciaPago = values.referencia || `FAC-${generarNumeroFactura()}`;
+      const imprimirTicket = values.imprimir_ticket !== false;
       const { registrarIngresoDesdePago } = await loadMovimientosService();
 
       // Actualizar cada cuota seleccionada
@@ -584,83 +769,85 @@ export default function CajaPage() {
         }
       }
 
-      // Generar ticket
-      const { data: configActual } = await supabaseBrowserClient
-        .from("configuracion")
-        .select("*")
-        .order("updated_at", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false, nullsFirst: false })
-        .limit(1)
-        .maybeSingle();
+      if (imprimirTicket) {
+        // Generar ticket
+        const { data: configActual } = await supabaseBrowserClient
+          .from("configuracion")
+          .select("*")
+          .order("updated_at", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle();
 
-      const configTicket = configActual || configuracion;
+        const configTicket = configActual || configuracion;
 
-      const ticketData = {
-        academia: {
-          nombre: configTicket?.nombre_academia || "La Cosmetikera",
-          ruc: configTicket?.ruc || undefined,
-          logoUrl: configTicket?.logo_url || undefined,
-          telefono: configTicket?.telefono || "",
-          direccion: configTicket?.direccion || "",
-          email: configTicket?.email || "",
-          ticketTitulo: configTicket?.ticket_titulo || "RECIBO DE PAGO",
-          ticketNota: configTicket?.ticket_nota || "",
-          ticketPie: configTicket?.ticket_pie || "Gracias por su pago",
-          ticketCampos: configTicket?.ticket_campos || undefined,
-        },
-        estudiante: {
-          nombre: clienteSeleccionado?.nombre_completo || "",
-          telefono: clienteSeleccionado?.telefono || "",
-        },
-        pago: {
-          monto: totalAPagar,
-          metodo: metodoPagoLabels[metodoPago],
-          fecha: dayjs().format("DD/MM/YYYY HH:mm"),
-          referencia: referenciaPago,
-          concepto: cuotasAPagar.map((c) => c.periodo_pagado || `Cuota ${c.numero_cuota ?? ""}`.trim()).join(", "),
-          numeroCuota: cuotasAPagar.length === 1 ? cuotasAPagar[0]?.numero_cuota : undefined,
-          periodo: cuotasAPagar.map((c) => c.periodo_pagado).join(", "),
-          valorEntregado: valorEntregado || undefined,
-          cambio: cambio || undefined,
-        },
-      };
+        const ticketData = {
+          academia: {
+            nombre: configTicket?.nombre_academia || "La Cosmetikera",
+            ruc: configTicket?.ruc || undefined,
+            logoUrl: configTicket?.logo_url || undefined,
+            telefono: configTicket?.telefono || "",
+            direccion: configTicket?.direccion || "",
+            email: configTicket?.email || "",
+            ticketTitulo: configTicket?.ticket_titulo || "RECIBO DE PAGO",
+            ticketNota: configTicket?.ticket_nota || "",
+            ticketPie: configTicket?.ticket_pie || "Gracias por su pago",
+            ticketCampos: configTicket?.ticket_campos || undefined,
+          },
+          estudiante: {
+            nombre: clienteSeleccionado?.nombre_completo || "",
+            telefono: clienteSeleccionado?.telefono || "",
+          },
+          pago: {
+            monto: totalAPagar,
+            metodo: metodoPagoLabels[metodoPago],
+            fecha: dayjs().format("DD/MM/YYYY HH:mm"),
+            referencia: referenciaPago,
+            concepto: cuotasAPagar.map((c) => c.periodo_pagado || `Cuota ${c.numero_cuota ?? ""}`.trim()).join(", "),
+            numeroCuota: cuotasAPagar.length === 1 ? cuotasAPagar[0]?.numero_cuota : undefined,
+            periodo: cuotasAPagar.map((c) => c.periodo_pagado).join(", "),
+            valorEntregado: valorEntregado || undefined,
+            cambio: cambio || undefined,
+          },
+        };
 
-      // Generar y abrir ticket
-      const { generarTicketPagoBlob, abrirTicketPagoDesdeBlob, imprimirTicketPagoDesdeBlob } = await loadTicketUtils();
-      const blob = await generarTicketPagoBlob(ticketData);
-      const placeholder = window.open("", "_blank");
-      
-      if (placeholder) {
-        await imprimirTicketPagoDesdeBlob(blob, placeholder);
-      } else {
-        abrirTicketPagoDesdeBlob(blob);
-      }
+        // Generar y abrir ticket
+        const { generarTicketPagoBlob, abrirTicketPagoDesdeBlob, imprimirTicketPagoDesdeBlob } = await loadTicketUtils();
+        const blob = await generarTicketPagoBlob(ticketData);
+        const placeholder = window.open("", "_blank");
 
-      // Subir ticket a storage y asociarlo a todos los pagos del lote
-      if (pagosActualizados.length > 0) {
-        try {
-          const { subirTicketPago } = await loadTicketStorage();
-          const { publicUrl } = await subirTicketPago({
-            blob,
-            pagoId: pagosActualizados[0].id,
-            estudianteId: clienteSeleccionado?.id,
-          });
+        if (placeholder) {
+          await imprimirTicketPagoDesdeBlob(blob, placeholder);
+        } else {
+          abrirTicketPagoDesdeBlob(blob);
+        }
 
-          const pagoIds = pagosActualizados.map((p) => p.id);
+        // Subir ticket a storage y asociarlo a todos los pagos del lote
+        if (pagosActualizados.length > 0) {
+          try {
+            const { subirTicketPago } = await loadTicketStorage();
+            const { publicUrl } = await subirTicketPago({
+              blob,
+              pagoId: pagosActualizados[0].id,
+              estudianteId: clienteSeleccionado?.id,
+            });
 
-          // Actualizar URL del ticket en todos los pagos del lote
-          await supabaseBrowserClient
-            .from("pagos")
-            .update({ ticket_url: publicUrl })
-            .in("id", pagoIds);
+            const pagoIds = pagosActualizados.map((p) => p.id);
 
-          // Actualizar URL del ticket en movimientos financieros asociados
-          await supabaseBrowserClient
-            .from("movimientos_financieros")
-            .update({ ticket_url: publicUrl })
-            .in("pago_id", pagoIds);
-        } catch (storageError) {
-          console.error("Error guardando ticket:", storageError);
+            // Actualizar URL del ticket en todos los pagos del lote
+            await supabaseBrowserClient
+              .from("pagos")
+              .update({ ticket_url: publicUrl })
+              .in("id", pagoIds);
+
+            // Actualizar URL del ticket en movimientos financieros asociados
+            await supabaseBrowserClient
+              .from("movimientos_financieros")
+              .update({ ticket_url: publicUrl })
+              .in("pago_id", pagoIds);
+          } catch (storageError) {
+            console.error("Error guardando ticket:", storageError);
+          }
         }
       }
 
@@ -706,15 +893,12 @@ export default function CajaPage() {
         }
       }
 
-      messageApi.success(`Pago registrado exitosamente. Total: ${formatCurrency(totalAPagar)}`);
+      messageApi.success(
+        `Pago registrado exitosamente. Total: ${formatCurrency(totalAPagar)}${imprimirTicket ? "" : " (sin impresión)"}`
+      );
       
       // Limpiar formulario y recargar datos
-      form.resetFields();
-      setCuotasSeleccionadas([]);
-      setClienteSeleccionado(null);
-      setMatriculas([]);
-      setCuotas([]);
-      setValorEntregado(null);
+      limpiarVentaActual();
       
     } catch (error) {
       console.error("Error registrando pago:", error);
@@ -722,7 +906,18 @@ export default function CajaPage() {
     } finally {
       setProcesando(false);
     }
-  }, [cuotasSeleccionadas, cuotas, form, messageApi, clienteSeleccionado, totalAPagar, configuracion]);
+  }, [
+    cuotasSeleccionadas,
+    cuotas,
+    form,
+    messageApi,
+    clienteSeleccionado,
+    totalAPagar,
+    configuracion,
+    valorEntregado,
+    cambio,
+    limpiarVentaActual,
+  ]);
 
   const abrirCajonRegistrador = () => {
     if (!permiteCajon) return;
@@ -973,6 +1168,16 @@ export default function CajaPage() {
                 <Input.TextArea rows={2} placeholder="Notas adicionales..." />
               </Form.Item>
 
+              <Form.Item
+                name="imprimir_ticket"
+                label="Imprimir ticket"
+                valuePropName="checked"
+                initialValue={true}
+                tooltip="Active si desea generar e imprimir ticket al registrar el cobro"
+              >
+                <Switch checkedChildren="Sí" unCheckedChildren="No" />
+              </Form.Item>
+
               <Divider />
 
               <Space direction="vertical" style={{ width: "100%" }} size="middle">
@@ -991,6 +1196,19 @@ export default function CajaPage() {
                   }}
                 >
                   Registrar cobro
+                </Button>
+
+                <Button
+                  size="large"
+                  block
+                  disabled={cuotasSeleccionadas.length === 0 || !clienteSeleccionado}
+                  onClick={aparcarVentaActual}
+                  style={{
+                    height: 48,
+                    fontWeight: 600,
+                  }}
+                >
+                  Aparcar venta
                 </Button>
 
                 <Button
@@ -1060,6 +1278,57 @@ export default function CajaPage() {
                 >
                   Vista Previa
                 </Button>
+
+                {ventasAparcadas.length > 0 && (
+                  <Card
+                    size="small"
+                    title={`Ventas aparcadas (${ventasAparcadas.length})`}
+                    styles={{ body: { padding: 8 } }}
+                  >
+                    <Input.Search
+                      allowClear
+                      value={filtroVentasAparcadas}
+                      onChange={(e) => setFiltroVentasAparcadas(e.target.value)}
+                      placeholder="Buscar por cliente"
+                      style={{ marginBottom: 8 }}
+                    />
+                    <List
+                      size="small"
+                      dataSource={ventasAparcadasFiltradas}
+                      locale={{ emptyText: "No hay ventas que coincidan con la búsqueda" }}
+                      renderItem={(venta) => (
+                        <List.Item
+                          actions={[
+                            <Button
+                              key="restaurar"
+                              type="link"
+                              loading={restaurandoVentaId === venta.id}
+                              onClick={() => restaurarVentaAparcada(venta)}
+                            >
+                              Reanudar
+                            </Button>,
+                            <Popconfirm
+                              key="eliminar"
+                              title="¿Eliminar venta aparcada?"
+                              okText="Sí"
+                              cancelText="No"
+                              onConfirm={() => eliminarVentaAparcada(venta.id)}
+                            >
+                              <Button type="link" danger>
+                                Eliminar
+                              </Button>
+                            </Popconfirm>,
+                          ]}
+                        >
+                          <List.Item.Meta
+                            title={venta.clienteNombre}
+                            description={`${formatCurrency(venta.totalAproximado)} • ${dayjs(venta.creadoEn).format("DD/MM HH:mm")}`}
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                )}
               </Space>
             </Form>
           </Card>
