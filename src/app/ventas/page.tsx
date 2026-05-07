@@ -802,20 +802,36 @@ export default function VentasPage() {
       agregarAlCarrito(art);
       message.success(`${art.nombre} agregado al carrito`);
     } else {
-      // Si no se encuentra, poner el código en el buscador
+      // Si no hay match exacto, priorizar búsqueda parcial por nombre/marca/códigos
+      // para no interrumpir la operación con modal cuando el usuario aún está escribiendo.
+      const query = cleanedCodigo.toLowerCase();
+      const coincidenciasParciales = articulos.some((item) =>
+        item.nombre.toLowerCase().includes(query) ||
+        String(item.marca || "").toLowerCase().includes(query) ||
+        String(item.referencia || "").toLowerCase().includes(query) ||
+        String(item.codigo_barras || "").toLowerCase().includes(query) ||
+        String(item.codigo_secundario || "").toLowerCase().includes(query)
+      );
+
       setSearch(cleanedCodigo);
-      modal.confirm({
-        title: "Producto no encontrado",
-        icon: <ExclamationCircleOutlined style={{ color: "#faad14" }} />,
-        content: `No existe un artículo con código ${cleanedCodigo}.`,
-        okText: "Crear artículo rápido",
-        cancelText: "Cancelar",
-        onOk: () => {
-          router.push(`/articulos?quickCode=${encodeURIComponent(cleanedCodigo)}`);
-        },
-      });
+
+      // Solo mostrar modal si parece un código final (no búsqueda parcial)
+      // y no existe ninguna coincidencia parcial.
+      const pareceCodigoFinal = /^\d{6,}$/.test(cleanedCodigo);
+      if (!coincidenciasParciales && pareceCodigoFinal) {
+        modal.confirm({
+          title: "Producto no encontrado",
+          icon: <ExclamationCircleOutlined style={{ color: "#faad14" }} />,
+          content: `No existe un artículo con código ${cleanedCodigo}.`,
+          okText: "Crear artículo rápido",
+          cancelText: "Cancelar",
+          onOk: () => {
+            router.push(`/articulos?quickCode=${encodeURIComponent(cleanedCodigo)}`);
+          },
+        });
+      }
     }
-  }, [codigoArticuloIndex, message, modal, router]);
+  }, [codigoArticuloIndex, articulos, message, modal, router]);
 
   const handleCobrar = () => {
     if (!clienteId && carrito.length > 0) {

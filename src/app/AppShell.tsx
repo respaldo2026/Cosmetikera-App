@@ -237,6 +237,7 @@ const CustomSider: React.FC<CustomSiderProps> = ({
   activeItemDisabled = false,
   siderItemsAreCollapsed = true,
 }) => {
+  const pathname = usePathname();
   const { token } = theme.useToken();
   const {
     siderCollapsed,
@@ -356,6 +357,13 @@ const CustomSider: React.FC<CustomSiderProps> = ({
 
     return menuItems.map(({ key }) => key);
   }, [menuItems, siderItemsAreCollapsed]);
+
+  useEffect(() => {
+    const esRutaCaja = pathname?.startsWith("/ventas") || pathname?.startsWith("/caja");
+    if (esRutaCaja && !siderCollapsed) {
+      setSiderCollapsed(true);
+    }
+  }, [pathname, siderCollapsed, setSiderCollapsed]);
 
   const onMenuClick = useCallback(
     (info: MenuClickEvent) => {
