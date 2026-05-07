@@ -23,10 +23,12 @@ import {
   Timeline,
   Tooltip,
   Typography,
+  theme,
 } from "antd";
 import {
   CopyOutlined,
   BellOutlined,
+  EditOutlined,
   GiftOutlined,
   LockOutlined,
   PhoneOutlined,
@@ -90,6 +92,7 @@ type Cliente = {
   id: string;
   nombre_completo: string;
   telefono?: string;
+  telefono_masked?: string;
   cedula?: string;
   puntos_fidelidad?: number;
   puntos_canjeados?: number;
@@ -184,8 +187,10 @@ function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
 
 export default function ClubPage() {
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const screens = useBreakpoint();
   const isMobile = !screens.md;
+  const [profileForm] = Form.useForm();
   const [acceso, setAcceso] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [canjeando, setCanjeando] = useState<string | null>(null);
@@ -204,6 +209,8 @@ export default function ClubPage() {
   const [loadingRecomendaciones, setLoadingRecomendaciones] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("unsupported");
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [whatsAppTargetNumber, setWhatsAppTargetNumber] = useState<string>(
     normalizeWhatsAppTarget(WHATSAPP_BOT_NUMBER_ENV)
   );
@@ -445,6 +452,51 @@ export default function ClubPage() {
       setAplicandoReferido(false);
     }
   }, [cliente, codigoReferidoIngresado, message]);
+
+  const abrirModalPerfil = useCallback(() => {
+    if (!cliente) return;
+    profileForm.setFieldsValue({
+      nombre_completo: cliente.nombre_completo || "",
+      telefono: cliente.telefono || "",
+    });
+    setProfileModalOpen(true);
+  }, [cliente, profileForm]);
+
+  const guardarPerfil = useCallback(async () => {
+    if (!cliente) return;
+
+    try {
+      const values = await profileForm.validateFields();
+      setSavingProfile(true);
+
+      const response = await fetch("/api/club", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          perfilId: cliente.id,
+          acceso: cliente.cedula || acceso,
+          nombre_completo: values.nombre_completo,
+          telefono: values.telefono,
+        }),
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || "No se pudo actualizar tu perfil");
+      }
+
+      setCliente((current) => current ? { ...current, ...json.data } : current);
+      setProfileModalOpen(false);
+      message.success("Tus datos fueron actualizados");
+    } catch (profileError: unknown) {
+      const errorMessage = profileError instanceof Error
+        ? profileError.message
+        : "No se pudo actualizar tu perfil";
+      message.error(errorMessage);
+    } finally {
+      setSavingProfile(false);
+    }
+  }, [acceso, cliente, message, profileForm]);
 
   const { recompensas: catalogoDinamico, reglas, loading: loadingConfig } = useClubConfig();
 
@@ -721,6 +773,17 @@ export default function ClubPage() {
                     <Tag style={{ background: nivel.color, color: "#fff", border: "none", fontSize: isMobile ? 11 : 13, padding: isMobile ? "0 8px" : "2px 12px", marginInlineEnd: 0 }}>{nivel.icon} {nivel.label}</Tag>
                   </Space>
                   {cliente.cedula && <Text type="secondary" style={{ fontSize: 12 }}>CC: {cliente.cedula}</Text>}
+                  <Space size={8} wrap>
+                    {cliente.telefono_masked ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        <PhoneOutlined style={{ marginRight: 6, color: token.colorPrimary }} />
+                        {cliente.telefono_masked}
+                      </Text>
+                    ) : null}
+                    <Button size="small" icon={<EditOutlined />} onClick={abrirModalPerfil}>
+                      Actualizar mis datos
+                    </Button>
+                  </Space>
                   <Button
                     size="small"
                     onClick={() => {
@@ -1184,6 +1247,48 @@ export default function ClubPage() {
               },
             ]}
           />
+
+          <Modal
+            title="Actualizar mis datos"
+            open={profileModalOpen}
+            onCancel={() => setProfileModalOpen(false)}
+            onOk={guardarPerfil}
+            okText="Guardar cambios"
+            cancelText="Cancelar"
+            confirmLoading={savingProfile}
+          >
+            <Form form={profileForm} layout="vertical">
+              <Form.Item
+                name="nombre_completo"
+                label="Nombre completo"
+                rules={[
+                  { required: true, message: "Ingresa tu nombre completo" },
+                  { min: 3, message: "Ingresa un nombre válido" },
+                ]}
+              >
+                <Input placeholder="Ej: Ana María Pérez" maxLength={120} />
+              </Form.Item>
+              <Form.Item
+                name="telefono"
+                label="Teléfono principal"
+                extra="Este número se usará para verificar canjes y futuras comunicaciones del club."
+                rules={[
+                  { required: true, message: "Ingresa tu teléfono" },
+                  { pattern: /^\d{7,15}$/, message: "Solo dígitos, entre 7 y 15 caracteres" },
+                ]}
+              >
+                <Input
+                  prefix={<PhoneOutlined style={{ color: BRAND_FUCHSIA }} />}
+                  placeholder="Ej: 3001234567"
+                  maxLength={15}
+                  inputMode="numeric"
+                  onChange={(event) => {
+                    profileForm.setFieldValue("telefono", event.target.value.replace(/\D/g, ""));
+                  }}
+                />
+              </Form.Item>
+            </Form>
+          </Modal>
 
           <Modal
             title="Confirmar canje con teléfono"

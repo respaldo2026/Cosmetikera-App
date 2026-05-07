@@ -19,6 +19,10 @@ function maskPhone(value: unknown) {
   return `${visibleStart}${hidden}${visibleEnd}`;
 }
 
+function normalizeDigits(value: unknown) {
+  return String(value || "").replace(/\D/g, "").trim();
+}
+
 /**
  * GET /api/club?acceso=1234567890
  * Busca el perfil de un cliente por cédula.
@@ -65,7 +69,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       data: {
         ...data,
-        telefono: maskPhone(data.telefono),
+        telefono: normalizeDigits(data.telefono),
+        telefono_masked: maskPhone(data.telefono),
       },
     });
   } catch (err) {
@@ -96,6 +101,105 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: data || [] });
   } catch (err) {
     console.error("[POST /api/club]", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const perfilId = String(body?.perfilId || "").trim();
+    const acceso = normalizeDigits(body?.acceso);
+    const nombreCompleto = String(body?.nombre_completo || "").trim().replace(/\s+/g, " ");
+    const telefono = normalizeDigits(body?.telefono);
+
+    if (!perfilId || !acceso) {
+      return NextResponse.json({ error: "perfilId y acceso son requeridos" }, { status: 400 });
+    }
+
+    if (!nombreCompleto) {
+      return NextResponse.json({ error: "El nombre completo es obligatorio" }, { status: 400 });
+    }
+
+    if (nombreCompleto.length < 3 || nombreCompleto.length > 120) {
+      return NextResponse.json({ error: "Ingresa un nombre válido" }, { status: 400 });
+    }
+
+    if (!/^\d{7,15}$/.test(telefono)) {
+      return NextResponse.json({ error: "Ingresa un número de teléfono válido" }, { status: 400 });
+    }
+
+    const supabase = getAdminClient();
+    const { data: perfil, error } = await supabase
+      .from("perfiles")
+      .select("id,cedula,telefono,rol")
+      .eq("id", perfilId)
+      .eq("rol", "cliente")
+      .maybeSingle();
+
+    if (error || !perfil) {
+      return NextResponse.json({ error: error?.message || "Cliente no encontrado" }, { status: 404 });
+    }
+
+    if (normalizeDigits(perfil.cedula) !== acceso) {
+      return NextResponse.json({ error: "Los datos de acceso no coinciden con este perfil" }, { status: 403 });
+    }
+
+    const { data: existingPhone, error: existingPhoneError } = await supabase
+      .from("perfiles")
+      .select("id")
+      .eq("telefono", telefono)
+      .neq("id", perfilId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPhoneError) {
+      return NextResponse.json({ error: existingPhoneError.message }, { status: 400 });
+    }
+
+    if (existingPhone?.id) {
+      return NextResponse.json({ error: "Ese teléfono ya está registrado en otra cuenta" }, { status: 409 });
+    }
+
+    const oldPhone = normalizeDigits(perfil.telefono);
+    const { data: updated, error: updateError } = await supabase
+      .from("perfiles")
+      .update({
+        nombre_completo: nombreCompleto,
+        telefono,
+      })
+      .eq("id", perfilId)
+      .select("id,nombre_completo,telefono,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento")
+      .single();
+
+    if (updateError || !updated) {
+      return NextResponse.json({ error: updateError?.message || "No se pudo actualizar el perfil" }, { status: 400 });
+    }
+
+    try {
+      await supabase
+        .from("whatsapp_customer_memory")
+        .update({ nombre: nombreCompleto, telefono })
+        .eq("perfil_id", perfilId);
+
+      if (oldPhone && oldPhone !== telefono) {
+        await supabase
+          .from("whatsapp_customer_memory")
+          .update({ nombre: nombreCompleto, telefono })
+          .eq("telefono", oldPhone);
+      }
+    } catch {
+      // No bloquear actualización del portal si la sincronización secundaria falla.
+    }
+
+    return NextResponse.json({
+      data: {
+        ...updated,
+        telefono_masked: maskPhone(updated.telefono),
+      },
+    });
+  } catch (err) {
+    console.error("[PATCH /api/club]", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
