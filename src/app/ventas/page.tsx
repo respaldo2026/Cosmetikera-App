@@ -888,7 +888,10 @@ export default function VentasPage() {
               return (
                 <div
                   key={art.id}
-                  onClick={() => agregarAlCarrito(art)}
+                  onClick={() => {
+                    agregarAlCarrito(art);
+                    setSearch("");
+                  }}
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
                     padding: "10px 14px",
@@ -1231,19 +1234,6 @@ export default function VentasPage() {
 
       {/* Botones */}
       <Space direction="vertical" style={{ width: "100%" }}>
-        <div style={{
-          padding: "8px 10px",
-          borderRadius: 8,
-          border: "1px solid #f0d6ff",
-          background: "#fff9fe",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}>
-          <Text style={{ fontSize: 12, color: "#595959" }}>Imprimir ticket al cobrar</Text>
-          <Switch checked={imprimirTicket} onChange={setImprimirTicket} checkedChildren="Sí" unCheckedChildren="No" />
-        </div>
-
         <Button
           block
           onClick={aparcarVentaActual}
@@ -1529,6 +1519,22 @@ export default function VentasPage() {
               </Text>
             </div>
           )}
+
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid #f0d6ff",
+              background: "#fff9fe",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text style={{ fontSize: 12, color: "#595959" }}>Imprimir ticket al confirmar</Text>
+            <Switch checked={imprimirTicket} onChange={setImprimirTicket} checkedChildren="Sí" unCheckedChildren="No" />
+          </div>
 
           <Button
             type="primary"
