@@ -103,7 +103,7 @@ interface Cuota {
 interface VentaAparcada {
   id: string;
   creadoEn: string;
-  clienteId: string;
+  clienteId: string | null;
   clienteNombre: string;
   totalAproximado: number;
   cuotas: Array<{
@@ -310,12 +310,19 @@ export default function CajaPage() {
   }, [cuotasSeleccionadas, form]);
 
   const handleClienteChange = useCallback(
-    async (clienteId: string) => {
+    async (clienteId: string | null) => {
       let cuotasCargadas: Cuota[] = [];
       setLoading(true);
       try {
-        const cliente = clientes.find((e) => e.id === clienteId);
+        const cliente = clienteId ? clientes.find((e) => e.id === clienteId) : undefined;
         setClienteSeleccionado(cliente || null);
+
+        if (!clienteId) {
+          setMatriculas([]);
+          setCuotas([]);
+          setCuotasSeleccionadas([]);
+          return [];
+        }
 
         // Cargar matrículas del cliente
         const { data: matriculasData, error: matriculasError } = await supabaseBrowserClient
@@ -586,11 +593,6 @@ export default function CajaPage() {
   }, [form]);
 
   const aparcarVentaActual = useCallback(() => {
-    if (!clienteSeleccionado) {
-      messageApi.warning("Seleccione un cliente antes de aparcar");
-      return;
-    }
-
     if (cuotasSeleccionadas.length === 0) {
       messageApi.warning("Seleccione al menos una cuota para aparcar la venta");
       return;
@@ -601,8 +603,8 @@ export default function CajaPage() {
     const ventaAparcada: VentaAparcada = {
       id: `venta-${Date.now()}`,
       creadoEn: dayjs().toISOString(),
-      clienteId: clienteSeleccionado.id,
-      clienteNombre: clienteSeleccionado.nombre_completo,
+      clienteId: clienteSeleccionado?.id || null,
+      clienteNombre: clienteSeleccionado?.nombre_completo || "Cliente sin asignar",
       totalAproximado: cuotasAPagar.reduce((acc, cuota) => acc + Number(cuota.monto || 0), 0),
       cuotas: cuotasAPagar.map((cuota) => ({
         id: cuota.id,
@@ -1217,7 +1219,7 @@ export default function CajaPage() {
                 <Button
                   size="large"
                   block
-                  disabled={cuotasSeleccionadas.length === 0 || !clienteSeleccionado}
+                  disabled={cuotasSeleccionadas.length === 0}
                   onClick={aparcarVentaActual}
                   style={{
                     height: 48,
