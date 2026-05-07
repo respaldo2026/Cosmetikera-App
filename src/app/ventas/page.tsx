@@ -7,7 +7,7 @@ import {
   InputNumber, Modal, Form, Radio, Table, Empty, DatePicker, List, Popconfirm, Switch, message as antdMessage,
 } from "antd";
 import {
-  ShoppingCartOutlined, SearchOutlined, UserOutlined, PlusOutlined,
+  ShoppingCartOutlined, UserOutlined, PlusOutlined,
   MinusOutlined, DeleteOutlined, CheckOutlined, DollarOutlined,
   CreditCardOutlined, MobileOutlined, BarChartOutlined, TagsOutlined,
   GiftOutlined, CrownOutlined, ReloadOutlined, ExclamationCircleOutlined,
@@ -856,24 +856,16 @@ export default function VentasPage() {
 
   const panelProductos = (
     <div>
-      {/* Escáner de código de barras / QR */}
+      {/* Barra única: escáner + búsqueda manual */}
       <div style={{ marginBottom: 12 }}>
         <EscanerCodigo
           onCodigo={buscarPorCodigo}
-          placeholder="Escanear código de barras o QR del producto..."
+          value={search}
+          onChange={setSearch}
+          placeholder="Escanear o buscar por nombre, marca, referencia o código..."
           conCamara
         />
       </div>
-
-      {/* Búsqueda manual por nombre o código */}
-      <Input
-        placeholder="🔍 Buscar por nombre, marca, referencia o código..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        allowClear
-        size="large"
-        style={{ marginBottom: 8 }}
-      />
 
       {/* Resultados solo cuando hay 3+ caracteres */}
       {search.trim().length >= 3 && (
