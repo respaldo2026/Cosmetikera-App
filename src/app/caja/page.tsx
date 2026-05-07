@@ -36,7 +36,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { supabaseBrowserClient } from "@utils/supabase/client";
-import { abrirCajon } from "@utils/pos-hardware";
+import { abrirCajon, imprimirTicketTermico } from "@utils/pos-hardware";
 
 let ticketUtilsPromise: Promise<typeof import("@utils/pago-ticket")> | null = null;
 let ticketStoragePromise: Promise<typeof import("@utils/ticket-storage")> | null = null;
@@ -172,7 +172,9 @@ const metodoPagoLabels: Record<MetodoPago, string> = {
 
 export default function CajaPage() {
   const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
-  const permiteCajon = posPrintMode === "qz" || posPrintMode === "agent" || posPrintMode === "auto";
+  const usaAgenteLocal = posPrintMode === "agent" || posPrintMode === "auto";
+  const permiteCajon = usaAgenteLocal;
+  const permiteImpresionSilenciosa = usaAgenteLocal;
   const { message: messageApi } = App.useApp();
   const [form] = Form.useForm();
 
@@ -731,7 +733,7 @@ export default function CajaPage() {
       const metodoPago = values.metodo_pago as MetodoPago;
       const referenciaPago = values.referencia || `FAC-${generarNumeroFactura()}`;
       const imprimirTicket = values.imprimir_ticket !== false;
-      const ticketPlaceholder = imprimirTicket ? window.open("", "_blank") : null;
+      const ticketPlaceholder = imprimirTicket && !permiteImpresionSilenciosa ? window.open("", "_blank") : null;
       const { registrarIngresoDesdePago } = await loadMovimientosService();
 
       // Actualizar cada cuota seleccionada
@@ -835,21 +837,59 @@ export default function CajaPage() {
           const { generarTicketPagoBlob, abrirTicketPagoDesdeBlob, imprimirTicketPagoDesdeBlob } = await loadTicketUtils();
           const blob = await generarTicketPagoBlob(ticketData);
 
-          if (ticketPlaceholder) {
-            await imprimirTicketPagoDesdeBlob(blob, ticketPlaceholder);
-          } else {
-            try {
-              abrirTicketPagoDesdeBlob(blob);
-            } catch {
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = `Recibo_${referenciaPago}.pdf`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              setTimeout(() => URL.revokeObjectURL(url), 60_000);
-              messageApi.warning("El navegador bloqueó la ventana de impresión. Se descargó el PDF del ticket.");
+          let impresoPorPOS = false;
+          if (permiteImpresionSilenciosa) {
+            const ticketTermico = {
+              nombreTienda: configTicket?.nombre_academia || "La Cosmetikera",
+              nit: configTicket?.ruc || undefined,
+              direccion: configTicket?.direccion || undefined,
+              telefono: configTicket?.telefono || undefined,
+              numeroVenta: referenciaPago,
+              fecha: dayjs().format("DD/MM/YYYY HH:mm"),
+              cliente: clienteSeleccionado?.nombre_completo || undefined,
+              metodoPago: metodoPagoLabels[metodoPago],
+              cambio: values.metodo_pago === "efectivo" ? (cambio || undefined) : undefined,
+              nota: values.observaciones || undefined,
+              pie: configTicket?.ticket_pie || "Gracias por su pago",
+              lineas: [
+                { tipo: "titulo" as const, texto: configTicket?.ticket_titulo || "RECIBO DE PAGO" },
+                { tipo: "linea" as const },
+                ...cuotasAPagar.map((c) => ({
+                  tipo: "item" as const,
+                  descripcion: c.periodo_pagado || `Cuota ${c.numero_cuota ?? ""}`.trim(),
+                  cantidad: 1,
+                  precio: Number(c.monto || 0),
+                })),
+                { tipo: "linea" as const },
+                { tipo: "total" as const, etiqueta: "TOTAL", valor: totalAPagar },
+              ],
+            };
+
+            const resultPOS = await imprimirTicketTermico(ticketTermico, undefined, undefined, { allowBrowserFallback: false });
+            impresoPorPOS = resultPOS.ok;
+            if (!resultPOS.ok) {
+              console.warn("[Caja] Impresión POS no disponible, usando respaldo PDF:", resultPOS.error ?? "sin detalle");
+            }
+          }
+
+          if (!impresoPorPOS) {
+            const fallbackWindow = ticketPlaceholder ?? window.open("", "_blank");
+            if (fallbackWindow) {
+              await imprimirTicketPagoDesdeBlob(blob, fallbackWindow);
+            } else {
+              try {
+                abrirTicketPagoDesdeBlob(blob);
+              } catch {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `Recibo_${referenciaPago}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                messageApi.warning("No fue posible abrir impresión directa. Se descargó el PDF del ticket.");
+              }
             }
           }
 
@@ -955,6 +995,7 @@ export default function CajaPage() {
     valorEntregado,
     cambio,
     limpiarVentaActual,
+    permiteImpresionSilenciosa,
   ]);
 
   const abrirCajonRegistrador = () => {
