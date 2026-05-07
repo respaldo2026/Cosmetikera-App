@@ -731,6 +731,7 @@ export default function CajaPage() {
       const metodoPago = values.metodo_pago as MetodoPago;
       const referenciaPago = values.referencia || `FAC-${generarNumeroFactura()}`;
       const imprimirTicket = values.imprimir_ticket !== false;
+      const ticketPlaceholder = imprimirTicket ? window.open("", "_blank") : null;
       const { registrarIngresoDesdePago } = await loadMovimientosService();
 
       // Actualizar cada cuota seleccionada
@@ -788,84 +789,103 @@ export default function CajaPage() {
       }
 
       if (imprimirTicket) {
-        // Generar ticket
-        const { data: configActual } = await supabaseBrowserClient
-          .from("configuracion")
-          .select("*")
-          .order("updated_at", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false, nullsFirst: false })
-          .limit(1)
-          .maybeSingle();
+        try {
+          // Generar ticket
+          const { data: configActual } = await supabaseBrowserClient
+            .from("configuracion")
+            .select("*")
+            .order("updated_at", { ascending: false, nullsFirst: false })
+            .order("created_at", { ascending: false, nullsFirst: false })
+            .limit(1)
+            .maybeSingle();
 
-        const configTicket = configActual || configuracion;
+          const configTicket = configActual || configuracion;
 
-        const ticketData = {
-          academia: {
-            nombre: configTicket?.nombre_academia || "La Cosmetikera",
-            ruc: configTicket?.ruc || undefined,
-            logoUrl: configTicket?.logo_url || undefined,
-            telefono: configTicket?.telefono || "",
-            direccion: configTicket?.direccion || "",
-            email: configTicket?.email || "",
-            ticketTitulo: configTicket?.ticket_titulo || "RECIBO DE PAGO",
-            ticketNota: configTicket?.ticket_nota || "",
-            ticketPie: configTicket?.ticket_pie || "Gracias por su pago",
-            ticketCampos: configTicket?.ticket_campos || undefined,
-          },
-          estudiante: {
-            nombre: clienteSeleccionado?.nombre_completo || "",
-            telefono: clienteSeleccionado?.telefono || "",
-          },
-          pago: {
-            monto: totalAPagar,
-            metodo: metodoPagoLabels[metodoPago],
-            fecha: dayjs().format("DD/MM/YYYY HH:mm"),
-            referencia: referenciaPago,
-            concepto: cuotasAPagar.map((c) => c.periodo_pagado || `Cuota ${c.numero_cuota ?? ""}`.trim()).join(", "),
-            numeroCuota: cuotasAPagar.length === 1 ? cuotasAPagar[0]?.numero_cuota : undefined,
-            periodo: cuotasAPagar.map((c) => c.periodo_pagado).join(", "),
-            valorEntregado: valorEntregado || undefined,
-            cambio: cambio || undefined,
-          },
-        };
+          const ticketData = {
+            academia: {
+              nombre: configTicket?.nombre_academia || "La Cosmetikera",
+              ruc: configTicket?.ruc || undefined,
+              logoUrl: configTicket?.logo_url || undefined,
+              telefono: configTicket?.telefono || "",
+              direccion: configTicket?.direccion || "",
+              email: configTicket?.email || "",
+              ticketTitulo: configTicket?.ticket_titulo || "RECIBO DE PAGO",
+              ticketNota: configTicket?.ticket_nota || "",
+              ticketPie: configTicket?.ticket_pie || "Gracias por su pago",
+              ticketCampos: configTicket?.ticket_campos || undefined,
+            },
+            estudiante: {
+              nombre: clienteSeleccionado?.nombre_completo || "",
+              telefono: clienteSeleccionado?.telefono || "",
+            },
+            pago: {
+              monto: totalAPagar,
+              metodo: metodoPagoLabels[metodoPago],
+              fecha: dayjs().format("DD/MM/YYYY HH:mm"),
+              referencia: referenciaPago,
+              concepto: cuotasAPagar.map((c) => c.periodo_pagado || `Cuota ${c.numero_cuota ?? ""}`.trim()).join(", "),
+              numeroCuota: cuotasAPagar.length === 1 ? cuotasAPagar[0]?.numero_cuota : undefined,
+              periodo: cuotasAPagar.map((c) => c.periodo_pagado).join(", "),
+              valorEntregado: valorEntregado || undefined,
+              cambio: cambio || undefined,
+            },
+          };
 
-        // Generar y abrir ticket
-        const { generarTicketPagoBlob, abrirTicketPagoDesdeBlob, imprimirTicketPagoDesdeBlob } = await loadTicketUtils();
-        const blob = await generarTicketPagoBlob(ticketData);
-        const placeholder = window.open("", "_blank");
+          // Generar y abrir ticket sin bloquear el registro del pago si falla la impresión
+          const { generarTicketPagoBlob, abrirTicketPagoDesdeBlob, imprimirTicketPagoDesdeBlob } = await loadTicketUtils();
+          const blob = await generarTicketPagoBlob(ticketData);
 
-        if (placeholder) {
-          await imprimirTicketPagoDesdeBlob(blob, placeholder);
-        } else {
-          abrirTicketPagoDesdeBlob(blob);
-        }
-
-        // Subir ticket a storage y asociarlo a todos los pagos del lote
-        if (pagosActualizados.length > 0) {
-          try {
-            const { subirTicketPago } = await loadTicketStorage();
-            const { publicUrl } = await subirTicketPago({
-              blob,
-              pagoId: pagosActualizados[0].id,
-              estudianteId: clienteSeleccionado?.id,
-            });
-
-            const pagoIds = pagosActualizados.map((p) => p.id);
-
-            // Actualizar URL del ticket en todos los pagos del lote
-            await supabaseBrowserClient
-              .from("pagos")
-              .update({ ticket_url: publicUrl })
-              .in("id", pagoIds);
-
-            // Actualizar URL del ticket en movimientos financieros asociados
-            await supabaseBrowserClient
-              .from("movimientos_financieros")
-              .update({ ticket_url: publicUrl })
-              .in("pago_id", pagoIds);
-          } catch (storageError) {
-            console.error("Error guardando ticket:", storageError);
+          if (ticketPlaceholder) {
+            await imprimirTicketPagoDesdeBlob(blob, ticketPlaceholder);
+          } else {
+            try {
+              abrirTicketPagoDesdeBlob(blob);
+            } catch {
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `Recibo_${referenciaPago}.pdf`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              setTimeout(() => URL.revokeObjectURL(url), 60_000);
+              messageApi.warning("El navegador bloqueó la ventana de impresión. Se descargó el PDF del ticket.");
+            }
           }
+
+          // Subir ticket a storage y asociarlo a todos los pagos del lote
+          if (pagosActualizados.length > 0) {
+            try {
+              const { subirTicketPago } = await loadTicketStorage();
+              const { publicUrl } = await subirTicketPago({
+                blob,
+                pagoId: pagosActualizados[0].id,
+                estudianteId: clienteSeleccionado?.id,
+              });
+
+              const pagoIds = pagosActualizados.map((p) => p.id);
+
+              // Actualizar URL del ticket en todos los pagos del lote
+              await supabaseBrowserClient
+                .from("pagos")
+                .update({ ticket_url: publicUrl })
+                .in("id", pagoIds);
+
+              // Actualizar URL del ticket en movimientos financieros asociados
+              await supabaseBrowserClient
+                .from("movimientos_financieros")
+                .update({ ticket_url: publicUrl })
+                .in("pago_id", pagoIds);
+            } catch (storageError) {
+              console.error("Error guardando ticket:", storageError);
+            }
+          }
+        } catch (printError) {
+          console.error("Error generando/imprimiendo ticket:", printError);
+          if (ticketPlaceholder && !ticketPlaceholder.closed) {
+            ticketPlaceholder.close();
+          }
+          messageApi.warning("El pago quedó registrado, pero no se pudo imprimir el ticket. Intenta imprimirlo desde historial.");
         }
       }
 
