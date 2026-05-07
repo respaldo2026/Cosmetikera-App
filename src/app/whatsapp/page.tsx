@@ -409,22 +409,21 @@ export default function WhatsAppMonitorPage() {
     isFetchingMessagesRef.current = true;
 
     if (!options?.silent && !hasLoadedMessages) setLoadingMessages(true);
+    if (!options?.silent) setClientName("");
     try {
       const res = await fetchWithTimeout(`/api/whatsapp/conversations?phone=${encodeURIComponent(phone)}`);
       const json = await res.json();
       if (json.messages) setMessages(json.messages);
-      if (json.clientName !== undefined) {
-        const resolvedName = String(json.clientName || "").trim();
-        setClientName(resolvedName);
-        if (resolvedName) {
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.telefono === phone && !String(c.nombre || "").trim()
-                ? { ...c, nombre: resolvedName }
-                : c
-            )
-          );
-        }
+      const resolvedName = String(json.clientName || "").trim();
+      setClientName(resolvedName);
+      if (resolvedName) {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.telefono === phone && !String(c.nombre || "").trim()
+              ? { ...c, nombre: resolvedName }
+              : c
+          )
+        );
       }
       setHasLoadedMessages(true);
     } catch {
@@ -517,6 +516,7 @@ export default function WhatsAppMonitorPage() {
 
   const handleSelectConversation = (phone: string) => {
     setSelectedPhone(phone);
+    setClientName("");
     setHasLoadedMessages(false);
     setLoadingMessages(true);
     loadMessages(phone);

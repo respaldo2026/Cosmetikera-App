@@ -83,6 +83,13 @@ function pickProfileNameForPhone(
   return "";
 }
 
+function pickStoredName(
+  rows: Array<{ nombre?: string | null; nombre_completo?: string | null; telefono?: string | null }>,
+  targetPhone: string,
+): string {
+  return pickProfileNameForPhone(rows, targetPhone);
+}
+
 function extractNameFromTemplateMessage(message: string): string {
   const text = String(message || "").trim();
   if (!text) return "";
@@ -361,6 +368,17 @@ export async function GET(request: NextRequest) {
         clientName = pickProfileNameForPhone((perfilByPhone || []) as any, normalizedPhone);
       }
       if (!clientName) {
+        const phoneForLike = normalizedPhone.slice(-10);
+        const { data: memoryByPhone } = await supabase
+          .from("whatsapp_customer_memory")
+          .select("nombre, telefono")
+          .or(
+            `telefono.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%`
+          )
+          .limit(20);
+        clientName = pickStoredName((memoryByPhone || []) as any, normalizedPhone);
+      }
+      if (!clientName) {
         const fromTemplate = (data as ConversationMessage[])
           .filter((m) => String(m.tipo_mensaje || "") === "template")
           .map((m) => extractNameFromTemplateMessage(String(m.mensaje || "")))
@@ -480,7 +498,7 @@ export async function GET(request: NextRequest) {
     .map((c) => c.perfil_id)
     .filter(Boolean) as string[];
 
-  const [perfilRes, phonePerfRes] = await Promise.all([
+  const [perfilRes, phonePerfRes, memoryRes] = await Promise.all([
     perfilIds.length > 0
       ? supabase
           .from("perfiles")
@@ -491,6 +509,13 @@ export async function GET(request: NextRequest) {
       ? supabase
           .from("perfiles")
           .select("id, nombre, nombre_completo, telefono")
+          .not("telefono", "is", null)
+          .limit(10000)
+      : { data: [] },
+    conversations.length > 0
+      ? supabase
+          .from("whatsapp_customer_memory")
+          .select("nombre, telefono")
           .not("telefono", "is", null)
           .limit(10000)
       : { data: [] },
@@ -513,12 +538,27 @@ export async function GET(request: NextRequest) {
     if (last10 && !perfilByLast10Map.has(last10)) perfilByLast10Map.set(last10, nombre);
   }
 
+  const memoryByPhoneMap = new Map<string, string>();
+  const memoryByLast10Map = new Map<string, string>();
+  for (const row of memoryRes.data || []) {
+    const nombre = String((row as any).nombre || "").trim();
+    const telefono = String((row as any).telefono || "").trim();
+    if (!nombre || !telefono) continue;
+    const normalized = normalizePhone(telefono);
+    if (!normalized) continue;
+    if (!memoryByPhoneMap.has(normalized)) memoryByPhoneMap.set(normalized, nombre);
+    const last10 = normalized.slice(-10);
+    if (last10 && !memoryByLast10Map.has(last10)) memoryByLast10Map.set(last10, nombre);
+  }
+
   const enriched = conversations.map((c) => ({
     ...c,
     nombre:
       (c.perfil_id ? perfilByIdMap.get(c.perfil_id) : "") ||
       perfilByPhoneMap.get(c.telefono) ||
       perfilByLast10Map.get(c.telefono.slice(-10)) ||
+      memoryByPhoneMap.get(c.telefono) ||
+      memoryByLast10Map.get(c.telefono.slice(-10)) ||
       c.nombre_inferido ||
       "",
   }));
