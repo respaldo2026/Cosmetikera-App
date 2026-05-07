@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } fr
 import {
   Card, Button, Typography, Space, Input, Select, Tag, App, Spin,
   Row, Col, Statistic, Divider, Grid, Tooltip, Avatar, Badge,
-  InputNumber, Modal, Form, Radio, Table, Empty, DatePicker, message as antdMessage,
+  InputNumber, Modal, Form, Radio, Table, Empty, DatePicker, List, Popconfirm, Switch, message as antdMessage,
 } from "antd";
 import {
   ShoppingCartOutlined, SearchOutlined, UserOutlined, PlusOutlined,
@@ -49,6 +49,23 @@ type ClubVoucher = {
   rewardIcon: string;
   description: string;
 };
+
+type VentaAparcada = {
+  id: string;
+  creadoEn: string;
+  carrito: CarritoItem[];
+  clienteId: string | null;
+  descuento: number;
+  metodoPago: MetodoPago;
+  efectivoRecibido: number;
+  pagoMixto: PagoMixto;
+  voucherClub: ClubVoucher | null;
+  codigoVoucherClub: string;
+  imprimirTicket: boolean;
+};
+
+const VENTAS_APARCADAS_STORAGE_KEY = "pos_ventas_aparcadas_ventas_v1";
+const MAX_VENTAS_APARCADAS = 20;
 
 const NIVEL_COLORS: Record<string, string> = {
   bronce: "#cd7f32", plata: "#aaa", oro: "#faad14", diamante: "#13c2c2",
@@ -162,6 +179,9 @@ export default function VentasPage() {
   const [voucherClub, setVoucherClub] = useState<ClubVoucher | null>(null);
   const [validandoVoucher, setValidandoVoucher] = useState(false);
   const [pagoMixto, setPagoMixto] = useState<PagoMixto>({ efectivo: 0, tarjeta: 0, transferencia: 0 });
+  const [imprimirTicket, setImprimirTicket] = useState(true);
+  const [ventasAparcadas, setVentasAparcadas] = useState<VentaAparcada[]>([]);
+  const [restaurandoVentaId, setRestaurandoVentaId] = useState<string | null>(null);
 
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
   const [nuevoClienteForm] = Form.useForm();
@@ -175,7 +195,7 @@ export default function VentasPage() {
   const descuentoVoucherClub = Math.min(voucherClub?.valueCop || 0, Math.max(0, subtotalCarrito - descuentoVal));
   const totalFinal = Math.max(0, subtotalCarrito - descuentoVal - descuentoVoucherClub);
 
-  const lanzarProcesosPOS = useCallback((ticket: DatosTicket, debeAbrirCajon: boolean) => {
+  const lanzarProcesosPOS = useCallback((ticket: DatosTicket, debeAbrirCajon: boolean, debeImprimir: boolean) => {
     const tareas: Promise<unknown>[] = [];
 
     if (debeAbrirCajon && permiteCajon) {
@@ -188,7 +208,7 @@ export default function VentasPage() {
       );
     }
 
-    if (permiteImpresionSilenciosa) {
+    if (debeImprimir && permiteImpresionSilenciosa) {
       tareas.push(
         imprimirTicketTermico(ticket, undefined, undefined, { allowBrowserFallback: false })
           .then((result) => {
@@ -216,6 +236,20 @@ export default function VentasPage() {
     // Precarga para evitar latencia en la primera impresión/cajón.
     void cargarConfigPOS().catch(() => {});
     void cargarConfigTicketPOS().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(VENTAS_APARCADAS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as VentaAparcada[];
+      if (Array.isArray(parsed)) {
+        setVentasAparcadas(parsed);
+      }
+    } catch (error) {
+      console.error("Error leyendo ventas aparcadas de ventas:", error);
+    }
   }, []);
 
   const deferredSearch = useDeferredValue(search);
@@ -471,6 +505,85 @@ export default function VentasPage() {
     setClientesFiltrados([]);
   };
 
+  const persistirVentasAparcadas = useCallback((ventas: VentaAparcada[]) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(VENTAS_APARCADAS_STORAGE_KEY, JSON.stringify(ventas));
+  }, []);
+
+  const aparcarVentaActual = useCallback(() => {
+    if (carrito.length === 0) {
+      message.warning("No hay productos en el carrito para aparcar");
+      return;
+    }
+
+    const ventaAparcada: VentaAparcada = {
+      id: `venta-${Date.now()}`,
+      creadoEn: dayjs().toISOString(),
+      carrito,
+      clienteId,
+      descuento,
+      metodoPago,
+      efectivoRecibido,
+      pagoMixto,
+      voucherClub,
+      codigoVoucherClub,
+      imprimirTicket,
+    };
+
+    let aparcada = false;
+    setVentasAparcadas((prev) => {
+      if (prev.length >= MAX_VENTAS_APARCADAS) {
+        return prev;
+      }
+      const next = [ventaAparcada, ...prev];
+      persistirVentasAparcadas(next);
+      aparcada = true;
+      return next;
+    });
+
+    if (!aparcada) {
+      message.warning(`Solo se permiten ${MAX_VENTAS_APARCADAS} ventas aparcadas. Reanuda o elimina una para continuar.`);
+      return;
+    }
+
+    limpiarVenta();
+    message.success("Venta aparcada. Puedes atender al siguiente cliente.");
+  }, [carrito, clienteId, descuento, metodoPago, efectivoRecibido, pagoMixto, voucherClub, codigoVoucherClub, imprimirTicket, persistirVentasAparcadas, message]);
+
+  const eliminarVentaAparcada = useCallback((ventaId: string) => {
+    setVentasAparcadas((prev) => {
+      const next = prev.filter((venta) => venta.id !== ventaId);
+      persistirVentasAparcadas(next);
+      return next;
+    });
+    message.success("Venta aparcada eliminada");
+  }, [persistirVentasAparcadas, message]);
+
+  const restaurarVentaAparcada = useCallback((venta: VentaAparcada) => {
+    setRestaurandoVentaId(venta.id);
+    try {
+      setCarrito(venta.carrito || []);
+      setClienteId(venta.clienteId || null);
+      setDescuento(Number(venta.descuento || 0));
+      setMetodoPago(venta.metodoPago || "efectivo");
+      setEfectivoRecibido(Number(venta.efectivoRecibido || 0));
+      setPagoMixto(venta.pagoMixto || { efectivo: 0, tarjeta: 0, transferencia: 0 });
+      setVoucherClub(venta.voucherClub || null);
+      setCodigoVoucherClub(venta.codigoVoucherClub || "");
+      setImprimirTicket(venta.imprimirTicket !== false);
+
+      setVentasAparcadas((prev) => {
+        const next = prev.filter((item) => item.id !== venta.id);
+        persistirVentasAparcadas(next);
+        return next;
+      });
+
+      message.success("Venta restaurada");
+    } finally {
+      setRestaurandoVentaId(null);
+    }
+  }, [persistirVentasAparcadas, message]);
+
   const procesarVenta = async () => {
     if (carrito.length === 0) { message.warning("El carrito está vacío"); return; }
     if (metodoPago === "efectivo" && efectivoRecibido < totalFinal) {
@@ -665,12 +778,12 @@ export default function VentasPage() {
       const ticketTemplate = await cargarConfigTicketPOS();
       const ticketDatos = aplicarPlantillaTicketPOS(ticketBase, ticketTemplate);
 
-      lanzarProcesosPOS(ticketDatos, metodoPago === "efectivo");
+      lanzarProcesosPOS(ticketDatos, metodoPago === "efectivo", imprimirTicket);
       setModalPagoOpen(false);
       limpiarVenta();
       cargar();
       if (!usaUIRapidaPOS) {
-        message.success("¡Venta registrada exitosamente! 🎉");
+        message.success(`¡Venta registrada exitosamente! ${imprimirTicket ? "🎉" : "(sin impresión)"}`);
       }
     } catch (e: any) {
       message.error("Error al procesar: " + (e?.message || "desconocido"));
@@ -1102,6 +1215,28 @@ export default function VentasPage() {
 
       {/* Botones */}
       <Space direction="vertical" style={{ width: "100%" }}>
+        <div style={{
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: "1px solid #f0d6ff",
+          background: "#fff9fe",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <Text style={{ fontSize: 12, color: "#595959" }}>Imprimir ticket al cobrar</Text>
+          <Switch checked={imprimirTicket} onChange={setImprimirTicket} checkedChildren="Sí" unCheckedChildren="No" />
+        </div>
+
+        <Button
+          block
+          onClick={aparcarVentaActual}
+          disabled={carrito.length === 0}
+          style={{ borderColor: "#d81b87", color: "#d81b87" }}
+        >
+          Aparcar venta
+        </Button>
+
         <Button
           type="primary"
           size="large"
@@ -1115,6 +1250,49 @@ export default function VentasPage() {
         </Button>
         {carrito.length > 0 && (
           <Button block onClick={limpiarVenta}>Limpiar carrito</Button>
+        )}
+
+        {ventasAparcadas.length > 0 && (
+          <Card
+            size="small"
+            title={`Ventas aparcadas (${ventasAparcadas.length})`}
+            styles={{ body: { padding: 8 } }}
+          >
+            <List
+              size="small"
+              dataSource={ventasAparcadas}
+              renderItem={(venta) => (
+                <List.Item
+                  actions={[
+                    <Button
+                      key="restaurar"
+                      type="link"
+                      loading={restaurandoVentaId === venta.id}
+                      onClick={() => restaurarVentaAparcada(venta)}
+                    >
+                      Reanudar
+                    </Button>,
+                    <Popconfirm
+                      key="eliminar"
+                      title="¿Eliminar venta aparcada?"
+                      okText="Sí"
+                      cancelText="No"
+                      onConfirm={() => eliminarVentaAparcada(venta.id)}
+                    >
+                      <Button type="link" danger>
+                        Eliminar
+                      </Button>
+                    </Popconfirm>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={venta.clienteId ? (clientes.find((c) => c.id === venta.clienteId)?.nombre_completo || "Cliente") : "Cliente sin asignar"}
+                    description={`$${Number(venta.carrito?.reduce((acc, item) => acc + Number(item.subtotal || 0), 0) || 0).toLocaleString()} · ${dayjs(venta.creadoEn).format("DD/MM HH:mm")}`}
+                  />
+                </List.Item>
+              )}
+            />
+          </Card>
         )}
       </Space>
     </Card>
