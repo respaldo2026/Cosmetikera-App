@@ -351,16 +351,16 @@ export async function GET(request: NextRequest) {
       if (perfil_id) {
         const { data: perfil } = await supabase
           .from("perfiles")
-          .select("nombre, nombre_completo")
+            .select("nombre_completo")
           .eq("id", perfil_id)
           .single();
-        clientName = ((perfil as any)?.nombre_completo || (perfil as any)?.nombre || "").trim();
+          clientName = String((perfil as any)?.nombre_completo || "").trim();
       }
       if (!clientName) {
         const phoneForLike = normalizedPhone.slice(-10);
         const { data: perfilByPhone } = await supabase
           .from("perfiles")
-          .select("nombre, nombre_completo, telefono")
+            .select("nombre_completo, telefono")
           .or(
             `telefono.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%`
           )
@@ -502,13 +502,13 @@ export async function GET(request: NextRequest) {
     perfilIds.length > 0
       ? supabase
           .from("perfiles")
-          .select("id, nombre, nombre_completo, telefono")
+          .select("id, nombre_completo, telefono")
           .in("id", perfilIds)
       : { data: [] },
     conversations.length > 0
       ? supabase
           .from("perfiles")
-          .select("id, nombre, nombre_completo, telefono")
+          .select("id, nombre_completo, telefono")
           .not("telefono", "is", null)
           .limit(10000)
       : { data: [] },
@@ -523,13 +523,13 @@ export async function GET(request: NextRequest) {
 
   const perfilByIdMap = new Map<string, string>();
   for (const p of perfilRes.data || []) {
-    if (p.id) perfilByIdMap.set(p.id, ((p as any).nombre_completo || p.nombre || "").trim());
+    if (p.id) perfilByIdMap.set(p.id, String((p as any).nombre_completo || "").trim());
   }
 
   const perfilByPhoneMap = new Map<string, string>();
   const perfilByLast10Map = new Map<string, string>();
   for (const p of phonePerfRes.data || []) {
-    const nombre = ((p as any).nombre_completo || p.nombre || "").trim();
+    const nombre = String((p as any).nombre_completo || "").trim();
     if (!nombre || !p.telefono) continue;
     const normalized = normalizePhone(String(p.telefono));
     if (!normalized) continue;
