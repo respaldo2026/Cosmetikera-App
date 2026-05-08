@@ -503,6 +503,7 @@ export default function VentasPage() {
     setCodigoVoucherClub("");
     setVoucherClub(null);
     setClientesFiltrados([]);
+     setImprimirTicket(true);
   };
 
   const persistirVentasAparcadas = useCallback((ventas: VentaAparcada[]) => {
@@ -800,7 +801,8 @@ export default function VentasPage() {
     const art = codigoArticuloIndex.get(normalizedCodigo);
     if (art) {
       agregarAlCarrito(art);
-      message.success(`${art.nombre} agregado al carrito`);
+       setSearch("");
+       message.success(`${art.nombre} agregado al carrito`);
     } else {
       // Si no hay match exacto, priorizar búsqueda parcial por nombre/marca/códigos
       // para no interrumpir la operación con modal cuando el usuario aún está escribiendo.
