@@ -171,9 +171,9 @@ async function logConversation(
     perfil_id: perfilId,
     rol: "agente",
     mensaje: `Plantilla enviada: ${PUNTOS_COMPRA_TEMPLATE_NAME} | Total: $${totalCompra.toLocaleString("es-CO")} | Ref: ${numeroVenta} | ${success ? "OK" : "ERROR"}`,
-
     tipo_mensaje: "template",
     intento: null,
+    phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
   });
 }
 

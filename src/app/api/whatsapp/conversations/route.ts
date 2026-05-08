@@ -262,28 +262,42 @@ export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams.get("search") || "";
   const normalizedSearch = normalizePhone(search);
 
+  // Filtro por phone_number_id: solo muestra conversaciones de ESTE bot.
+  // Incluye registros legacy (phone_number_id IS NULL) para no perder historial anterior.
+  const ownPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || null;
+
+  /** Aplica el filtro de aislamiento a un query builder de Supabase */
+  function applyPhoneNumberFilter(query: any) {
+    if (!ownPhoneNumberId) return query;
+    return query.or(`phone_number_id.is.null,phone_number_id.eq.${ownPhoneNumberId}`);
+  }
+
   // ── Detalle de conversación por teléfono ──────────────────────────
   if (phone) {
     const normalizedPhone = normalizePhone(phone);
-    let { data, error } = await supabase
-      .from("whatsapp_conversation_history")
-      .select(
-        "id, telefono, rol, mensaje, tipo_mensaje, intento, created_at, perfil_id"
-      )
-      .eq("telefono", normalizedPhone)
-      .order("created_at", { ascending: true })
-      .limit(200);
-
-    // Compatibilidad: si no hubo resultados con normalización, intentar el valor original
-    if ((!data || data.length === 0) && phone !== normalizedPhone) {
-      const retry = await supabase
+    let { data, error } = await applyPhoneNumberFilter(
+      supabase
         .from("whatsapp_conversation_history")
         .select(
           "id, telefono, rol, mensaje, tipo_mensaje, intento, created_at, perfil_id"
         )
-        .eq("telefono", phone)
+        .eq("telefono", normalizedPhone)
         .order("created_at", { ascending: true })
-        .limit(200);
+        .limit(200)
+    );
+
+    // Compatibilidad: si no hubo resultados con normalización, intentar el valor original
+    if ((!data || data.length === 0) && phone !== normalizedPhone) {
+      const retry = await applyPhoneNumberFilter(
+        supabase
+          .from("whatsapp_conversation_history")
+          .select(
+            "id, telefono, rol, mensaje, tipo_mensaje, intento, created_at, perfil_id"
+          )
+          .eq("telefono", phone)
+          .order("created_at", { ascending: true })
+          .limit(200)
+      );
       data = retry.data;
       error = retry.error;
     }
@@ -392,11 +406,13 @@ export async function GET(request: NextRequest) {
 
   // ── Lista de conversaciones (una por teléfono) ──────────────────
   // Obtener último mensaje de cada teléfono
-  let { data: rawMessages, error } = await supabase
-    .from("whatsapp_conversation_history")
-    .select("id, telefono, rol, mensaje, tipo_mensaje, created_at, perfil_id")
-    .order("created_at", { ascending: false })
-    .limit(2000);
+  let { data: rawMessages, error } = await applyPhoneNumberFilter(
+    supabase
+      .from("whatsapp_conversation_history")
+      .select("id, telefono, rol, mensaje, tipo_mensaje, created_at, perfil_id")
+      .order("created_at", { ascending: false })
+      .limit(2000)
+  );
 
   const templateRecent = await getTemplateMessagesRecent(supabase);
   if (templateRecent.length > 0) {

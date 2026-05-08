@@ -343,9 +343,12 @@ export async function logConversationMessage(
   perfilId: string | undefined,
   rol: "cliente" | "agente",
   mensaje: string,
-  tipo: string = "text"
+  tipo: string = "text",
+  phoneNumberId?: string
 ): Promise<void> {
   const phone = normalizePhone(telefono);
+  const resolvedPhoneNumberId =
+    phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || null;
 
   try {
     const { error } = await supabase.from("whatsapp_conversation_history").insert({
@@ -355,6 +358,7 @@ export async function logConversationMessage(
       mensaje,
       tipo_mensaje: tipo,
       created_at: new Date().toISOString(),
+      phone_number_id: resolvedPhoneNumberId,
     });
 
     if (error) {

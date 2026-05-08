@@ -457,6 +457,7 @@ async function logConversationTemplate(perfilId: string, phone: string, cedula: 
     mensaje: mensajeEnviado,
     tipo_mensaje: "template",
     intento: null,
+    phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
   });
 }
 
