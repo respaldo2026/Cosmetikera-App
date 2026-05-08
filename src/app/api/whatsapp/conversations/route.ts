@@ -361,7 +361,7 @@ export async function GET(request: NextRequest) {
     // Buscar nombre del cliente en perfiles
     let clientName = "";
     if (data && data.length > 0) {
-      const perfil_id = data.find((m) => m.perfil_id)?.perfil_id;
+      const perfil_id = (data as ConversationMessage[]).find((m) => Boolean(m.perfil_id))?.perfil_id;
       if (perfil_id) {
         const { data: perfil } = await supabase
           .from("perfiles")
