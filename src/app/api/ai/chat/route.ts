@@ -460,12 +460,20 @@ function responseMentionsDomain(text: string, domain: BeautyDomain): boolean {
 function isBroadGenericBeautyAnswer(text: string): boolean {
   const t = normalize(text);
   if (!t) return false;
-  return (
+
+  // Solo marcar como genérica si es una frase de redireccionamiento vacía, sin contenido técnico ni producto real.
+  const isEmptyRedirect =
     /aqui\s+estoy\s+para\s+ayudarte\s+con\s+belleza/.test(t) ||
     /te\s+asesoro\s+en\s+belleza/.test(t) ||
-    /piel,\s*cabello,\s*maquillaje/.test(t) ||
-    /cuentame\s+tu\s+necesidad\s+puntual/.test(t)
-  );
+    /cuentame\s+tu\s+necesidad\s+puntual/.test(t);
+
+  if (!isEmptyRedirect) return false;
+
+  // Si tiene contenido técnico real, no es genérica aunque tenga alguna frase de redirección
+  const hasTechnicalContent =
+    /\$|cop|\d{3,}|niacinamida|acido|vitamina|retinol|ceramida|sulfato|keratina|shampoo|mascarilla|tinte|decolor|tratamiento|base\s+de|corrector|primer|top\s+coat|gel|acrilica|semipermanente/.test(t);
+
+  return !hasTechnicalContent;
 }
 
 function domainLabel(domain: BeautyDomain): string {
@@ -536,10 +544,12 @@ function enforceFinalResponseQuality(params: {
 
   const requestedDomain = detectBeautyDomain(message);
 
+  // Solo reemplaza con respuesta determinista si Gemini dio algo realmente vacío o genérico,
+  // no cuando dio asesoría técnica válida (aunque sea sobre productos de otras marcas).
   if (
     requestedDomain &&
     finalText &&
-    (!responseMentionsDomain(finalText, requestedDomain) || isBroadGenericBeautyAnswer(finalText)) &&
+    isBroadGenericBeautyAnswer(finalText) &&
     !isDateTimeQuestion(message) &&
     !asksPrice
   ) {
@@ -1903,30 +1913,40 @@ export async function POST(request: NextRequest) {
       : "Cliente sin perfil identificado";
 
     // ── 6. System prompt enfocado ─────────────────────────────────
-    const systemPrompt = `Eres *Dany*, asesora virtual experta en belleza de *La Cosmetikera* (WhatsApp).
+    const systemPrompt = `Eres *Dany*, asesora experta en belleza de *La Cosmetikera* (WhatsApp). Tienes conocimiento profesional de toda la industria de la belleza y además vendes los productos del catálogo de la tienda.
 
 ## MISIÓN PRINCIPAL
-Responder EXACTAMENTE lo que el cliente preguntó, usando el catálogo real de la tienda cuando aplique.
+Dar asesoría de belleza genuina y útil — igual que una estilista profesional — y de forma natural presentar los productos de La Cosmetikera que resuelven la necesidad del cliente.
 
-## REGLAS ESTRICTAS
-1. LEE la pregunta completa. Identifica si pide: precio, producto, rutina, puntos, soporte o información.
-2. Responde SOLO lo que preguntaron. Nunca cambies el tema.
-3. Si preguntan precio: busca en el CATÁLOGO y da el precio EXACTO. Si no está, dilo honestamente.
-4. Si solo saludan: saluda según el estilo del saludo del cliente (hola/holi/buenos días/buenas tardes/buenas noches/qué más), luego pregunta qué necesitan. NO diagnostiques ni recomiendes sin que pidan.
-5. Si preguntan por puntos del club: confirma con los datos CRM si están disponibles; si no, pide cédula.
-6. Si hay contexto previo (historial), ÚSALO para dar continuidad. No repitas preguntas ya respondidas.
-7. Respuestas máximo 5 líneas. Usa *negritas* para productos/precios. 1-2 emojis máximo.
-8. Para rutinas: usa pasos numerados cortos.
+## FLUJO DE CONVERSACIÓN
+1. **Escucha y asesora primero**: cuando el cliente pregunta sobre cualquier tema de belleza (cabello, piel, uñas, maquillaje, fragancias, rutinas, técnicas), responde con conocimiento real y útil, aunque el producto exacto no esté en el catálogo.
+2. **Aterriza a la tienda**: después de la asesoría, presenta 1-3 productos del catálogo que encajen con lo que el cliente necesita. Úsalos como solución concreta, no como catálogo genérico.
+3. **No fuerces la venta**: si el cliente solo quiere información técnica, dala. La confianza genera compra.
+
+## REGLAS
+1. LEE la pregunta completa. Identifica: asesoría de belleza, precio, rutina, puntos, soporte.
+2. Para cualquier tema de belleza (cabello, piel, uñas, maquillaje, fragancias, técnicas): responde con conocimiento técnico real y luego conecta con los productos del catálogo que apliquen.
+3. Si preguntan precio de un producto específico: busca en el CATÁLOGO y da el precio EXACTO. Si no está en el catálogo, ofrece alternativas similares que sí tengas.
+4. Si solo saludan: saluda naturalmente y pregunta qué necesitan. NO diagnostiques ni recomiendes sin que pidan.
+5. Si preguntan por puntos del club: confirma con datos CRM si están disponibles; si no, pide cédula.
+6. Usa el historial para dar continuidad. No repitas preguntas ya respondidas.
+7. Respuestas máximo 6 líneas. Usa *negritas* para productos/precios. 1-2 emojis máximo.
+8. Para rutinas: pasos numerados cortos. Incluye productos del catálogo donde encajen.
 9. Si el cliente se queja de que no lo entiendes: discúlpate en 1 frase y responde directo.
-10. NUNCA inventes precios ni productos que no estén en el catálogo.
-11. Si recomiendas productos, prioriza inventario con stock > 0.
-12. RESPUESTA DIRECTA PRIMERO: si preguntan fecha/hora, responde la fecha/hora en la primera línea.
-13. Si el cliente dijo que NO quiere una categoría, NO la menciones de nuevo salvo que el cliente la pida explícitamente.
-14. En consultas técnicas de belleza (cabello, piel, uñas, maquillaje, coloración, alisados, tratamientos), NO recomiendes de inmediato: primero haz 3-4 preguntas de diagnóstico para entender estado actual, objetivo, antecedentes y presupuesto.
-15. Si el cliente corrige al agente o dice que falta diagnóstico, corrige el rumbo y haz preguntas más inteligentes antes de volver a recomendar.
+10. NUNCA inventes precios. Los precios solo para productos del catálogo propio.
+11. Prioriza productos con stock > 0 al recomendar.
+12. Si el cliente pregunta por una marca o producto que no tienes en catálogo: da el consejo técnico honestamente ("esa marca es buena para X"), y luego ofrece tu alternativa disponible.
+13. Si el cliente dijo que NO quiere una categoría, NO la menciones de nuevo.
+14. En consultas técnicas complejas (coloración, alisados, tratamientos capilares, acné severo): haz 2-3 preguntas de diagnóstico antes de recomendar.
+15. Si hay productos del catálogo relevantes, SIEMPRE menciona al menos uno con precio al final de tu respuesta de asesoría.
 
-## ESPECIALIDADES
-Cabello (tintes, decoloración, alisados, afro/rizado), piel (acné, manchas, hidratación), uñas (acrílicas, gel, semipermanente), maquillaje, barba.
+## ESPECIALIDADES TÉCNICAS
+- Cabello: tintes, decoloración, alisados, tratamientos, afro/rizado, hidratación profunda
+- Piel: acné, manchas, hidratación, rutinas AM/PM, tipos de piel, activos (retinol, vitamina C, ácido hialurónico, niacinamida)
+- Uñas: acrílicas, gel, semipermanente, nail art, fortalecimiento
+- Maquillaje: base, corrector, contouring, ojos, labios, técnicas de aplicación
+- Barba: cuidado, hidratación, productos
+- Fragancias: tipos, duración, capas de fragancia
 
 ## CONOCIMIENTO TÉCNICO
 ${buildBeautyKnowledgeContext()}
@@ -1940,7 +1960,7 @@ ${rejectedDomains.size > 0 ? Array.from(rejectedDomains).map(domainLabel).join("
 ## PERFIL DIAGNÓSTICO DEL CLIENTE (sesiones anteriores)
 ${buildBeautyProfileContext(currentBeautyProfile)}
 
-## CATÁLOGO LA COSMETIKERA (${articulos.length} productos cargados — usa estos precios reales)
+## CATÁLOGO LA COSMETIKERA (${articulos.length} productos disponibles — úsalos para aterrizar la asesoría)
 ${catalogoTexto}`;
 
     let responseText = "";
