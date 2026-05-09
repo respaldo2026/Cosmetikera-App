@@ -9,6 +9,7 @@ import type { Breakpoint } from "antd/es/_util/responsiveObserver";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
+import { listLabelPrinters } from "@/utils/label-agent";
 import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
 import { getCatalogosArticulosLocal, mergeCatalogos, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
@@ -316,6 +317,7 @@ export default function ConfiguracionPage() {
       cargarPlantillasWhatsApp();
     } else if (key === "pos") {
       cargarConfigPosTab();
+      buscarImpresoras();
     }
   };
 
@@ -400,14 +402,26 @@ export default function ConfiguracionPage() {
   };
 
   const buscarImpresoras = async () => {
-    if (!usaQZ) {
-      setImpresorasDisponibles([]);
-      return;
-    }
     setBuscandoImpresoras(true);
-    const lista = await listarImpresoras();
-    setImpresorasDisponibles(lista);
-    setBuscandoImpresoras(false);
+    try {
+      if (usaQZ) {
+        const lista = await listarImpresoras();
+        setImpresorasDisponibles(lista);
+        return;
+      }
+
+      if (usaAgenteLocal) {
+        const printers = await listLabelPrinters();
+        setImpresorasDisponibles(printers.map((p) => p.name).filter(Boolean));
+        return;
+      }
+
+      setImpresorasDisponibles([]);
+    } catch {
+      setImpresorasDisponibles([]);
+    } finally {
+      setBuscandoImpresoras(false);
+    }
   };
 
   const guardarConfigPos = async () => {
