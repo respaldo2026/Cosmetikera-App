@@ -1138,7 +1138,7 @@ export default function VentasPage() {
         borderRadius: 10,
         padding: "2px 8px",
         background: "#fff",
-        minHeight: isMobile ? 220 : 340,
+        minHeight: isMobile ? 220 : 0,
       }}>
         {carrito.length === 0 ? (
           <Empty
@@ -1364,7 +1364,7 @@ export default function VentasPage() {
   return (
     <div
       style={{
-        height: isMobile ? "auto" : "calc(100dvh - 24px)",
+        height: isMobile ? "auto" : "calc(100dvh - 112px)",
         overflow: isMobile ? "visible" : "hidden",
         display: "flex",
         flexDirection: "column",
@@ -1399,7 +1399,7 @@ export default function VentasPage() {
         <Col xs={24} lg={15} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
           {panelProductos}
         </Col>
-        <Col xs={24} lg={9} style={{ height: "100%", minHeight: 0 }}>
+        <Col xs={24} lg={9} style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
           {panelCarrito}
         </Col>
       </Row>
