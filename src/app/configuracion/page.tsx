@@ -17,6 +17,7 @@ import { ROLES } from "@/constants/roles";
 const { TextArea } = Input;
 const { Option } = Select;
 const LOGO_STORAGE_BUCKET = "branding";
+const LABEL_PRINTER_STORAGE_KEY = "pos_label_printer_name_v1";
 const TICKET_FIELD_KEYS = Object.keys(DEFAULT_TICKET_FIELDS) as Array<keyof typeof DEFAULT_TICKET_FIELDS>;
 
 const extractTicketFieldsFromConfig = (raw: unknown) => {
@@ -194,6 +195,7 @@ export default function ConfiguracionPage() {
   const [impresorasDisponibles, setImpresorasDisponibles] = useState<string[]>([]);
   const [buscandoImpresoras, setBuscandoImpresoras] = useState(false);
   const [posPrinterName, setPosPrinterName] = useState<string>("");
+  const [posLabelPrinterName, setPosLabelPrinterName] = useState<string>("");
   const [posPrinterWidth, setPosPrinterWidth] = useState<number>(48);
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
@@ -358,6 +360,7 @@ export default function ConfiguracionPage() {
   // ==================== FUNCIONES POS / IMPRESORA ====================
   const cargarConfigPosTab = useCallback(async () => {
     // Cargar config guardada
+    let configuredTicketPrinter = "";
     try {
       const { data } = await supabaseBrowserClient
         .from("configuracion")
@@ -365,10 +368,17 @@ export default function ConfiguracionPage() {
         .limit(1)
         .maybeSingle();
       if (data) {
-        setPosPrinterName(data.pos_printer_name ?? "");
+        configuredTicketPrinter = data.pos_printer_name ?? "";
+        setPosPrinterName(configuredTicketPrinter);
         setPosPrinterWidth(data.pos_printer_width ?? 48);
       }
     } catch { /* ignorar */ }
+
+    if (typeof window !== "undefined") {
+      const storedLabelPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
+      setPosLabelPrinterName(storedLabelPrinter || configuredTicketPrinter || "");
+    }
+
     // Verificar estado QZ Tray
     setQzEstado(qzActivo() ? "conectado" : "desconectado");
   }, []);
@@ -418,9 +428,19 @@ export default function ConfiguracionPage() {
         .update({ pos_printer_name: posPrinterName || null, pos_printer_width: posPrinterWidth })
         .eq("id", id);
       if (error) throw error;
+
+      if (typeof window !== "undefined") {
+        const normalizedLabelPrinter = String(posLabelPrinterName || "").trim();
+        if (normalizedLabelPrinter) {
+          window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, normalizedLabelPrinter);
+        } else {
+          window.localStorage.removeItem(LABEL_PRINTER_STORAGE_KEY);
+        }
+      }
+
       invalidarConfigPOS();
       invalidarConfigTicketPOS();
-      messageApi.success("Configuración de impresora guardada");
+      messageApi.success("Configuración de impresión guardada");
     } catch (e: any) {
       messageApi.error("Error al guardar: " + e.message);
     } finally {
@@ -1692,7 +1712,7 @@ export default function ConfiguracionPage() {
       <Row gutter={[16, 16]}>
         {(usaQZ || usaAgenteLocal) && (
           <Col xs={24}>
-            <div style={{ marginBottom: 8, fontWeight: 500 }}>Nombre de la impresora</div>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de tickets</div>
             {impresorasDisponibles.length > 0 ? (
               <Select
                 showSearch
@@ -1712,6 +1732,32 @@ export default function ConfiguracionPage() {
             )}
             <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
               Deja vacío para usar la impresora predeterminada del sistema.
+            </div>
+          </Col>
+        )}
+        {(usaQZ || usaAgenteLocal) && (
+          <Col xs={24}>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de etiquetas</div>
+            {impresorasDisponibles.length > 0 ? (
+              <Select
+                showSearch
+                allowClear
+                value={posLabelPrinterName || undefined}
+                placeholder="Selecciona la impresora de etiquetas"
+                style={{ width: "100%" }}
+                onChange={(v) => setPosLabelPrinterName(v || "")}
+                options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
+              />
+            ) : (
+              <Input
+                value={posLabelPrinterName}
+                onChange={(e) => setPosLabelPrinterName(e.target.value)}
+                placeholder="Ej: 4BARCODE 4B-2054TG"
+                prefix={<TagsOutlined />}
+              />
+            )}
+            <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+              Esta impresora se guarda en este navegador/equipo para usarse en Articulos y Compras.
             </div>
           </Col>
         )}

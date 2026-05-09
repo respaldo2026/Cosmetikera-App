@@ -2156,11 +2156,13 @@ export default function ArticulosPage() {
             <Select
               style={{ width: "100%", marginTop: 4 }}
               mode="tags"
-              maxCount={1}
               showSearch
               loading={loadingLabelPrinters}
               value={selectedLabelPrinter ? [selectedLabelPrinter] : []}
-              onChange={(value) => actualizarImpresoraEtiquetas(value?.[0] ?? null)}
+              onChange={(value) => {
+                const lastValue = Array.isArray(value) ? value[value.length - 1] : null;
+                actualizarImpresoraEtiquetas(lastValue ?? null);
+              }}
               onSearch={(value) => {
                 const normalized = String(value || "").trim();
                 if (normalized) {

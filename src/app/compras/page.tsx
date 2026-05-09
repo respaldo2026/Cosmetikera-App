@@ -1054,12 +1054,14 @@ export default function ComprasPage() {
               <Select
                 showSearch
                 mode="tags"
-                maxCount={1}
                 loading={loadingLabelPrinters}
                 placeholder="Selecciona o escribe impresora"
                 style={{ width: "100%" }}
                 value={selectedLabelPrinter ? [selectedLabelPrinter] : []}
-                onChange={(value) => actualizarImpresoraEtiquetas(value?.[0] ?? null)}
+                onChange={(value) => {
+                  const lastValue = Array.isArray(value) ? value[value.length - 1] : null;
+                  actualizarImpresoraEtiquetas(lastValue ?? null);
+                }}
                 onSearch={(value) => {
                   const normalized = String(value || "").trim();
                   if (normalized) {
