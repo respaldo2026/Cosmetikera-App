@@ -132,6 +132,34 @@ if ($action -eq "printRaw") {
 
   $enc = [System.Text.Encoding]::GetEncoding($encodingName)
   $bytes = $enc.GetBytes($raw)
+
+  # En algunas TM-T20 el texto RAW queda en buffer si no llega avance/corte.
+  # Forzamos LF al final y corte automático (salvo que se desactive explícitamente).
+  $ensureLineFeed = $true
+  if ($null -ne $payload.ensureLineFeed) {
+    $ensureLineFeed = [bool]$payload.ensureLineFeed
+  }
+
+  if ($ensureLineFeed) {
+    $hasLf = $false
+    if ($bytes.Length -gt 0 -and $bytes[$bytes.Length - 1] -eq 0x0A) {
+      $hasLf = $true
+    }
+    if (-not $hasLf) {
+      $bytes = $bytes + [byte[]](0x0A,0x0A,0x0A)
+    }
+  }
+
+  $autoCut = $true
+  if ($null -ne $payload.autoCut) {
+    $autoCut = [bool]$payload.autoCut
+  }
+
+  if ($autoCut) {
+    # GS V 0 => corte completo
+    $bytes = $bytes + [byte[]](0x1D,0x56,0x00)
+  }
+
   $written = Send-RawBytes -TargetPrinter $printerName -Bytes $bytes
   @{ ok = $true; written = $written; printer = $printerName } | ConvertTo-Json -Compress
   exit 0
