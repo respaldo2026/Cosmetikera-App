@@ -290,6 +290,19 @@ export default function ArticulosPage() {
   const [labelItems, setLabelItems] = useState<{ articuloId: string; nombre: string; precio: number; cantidad: number; sku?: string }[]>([]);
   const LABEL_PRINTER_STORAGE_KEY = "pos_label_printer_name_v1";
 
+  const actualizarImpresoraEtiquetas = useCallback((value: string | null) => {
+    const normalized = String(value || "").trim();
+    const finalValue = normalized || null;
+    setSelectedLabelPrinter(finalValue);
+    if (typeof window !== "undefined") {
+      if (finalValue) {
+        window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, finalValue);
+      } else {
+        window.localStorage.removeItem(LABEL_PRINTER_STORAGE_KEY);
+      }
+    }
+  }, [LABEL_PRINTER_STORAGE_KEY]);
+
   const importRowsParsed = useMemo(
     () => importRows.map((row) => mapImportRowToArticulo(row)),
     [importRows],
@@ -372,11 +385,12 @@ export default function ArticulosPage() {
       setLabelPrinters(printers);
       const preferred = typeof window !== "undefined" ? window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) : null;
       const preferredExists = preferred && printers.some((p) => p.name === preferred);
-      setSelectedLabelPrinter(preferredExists ? preferred : (printers.find((p) => p.isDefault)?.name ?? printers[0]?.name ?? null));
+      const resolved = preferredExists ? preferred : (printers.find((p) => p.isDefault)?.name ?? printers[0]?.name ?? null);
+      actualizarImpresoraEtiquetas(resolved);
     } catch (error: any) {
       const preferred = typeof window !== "undefined" ? window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) : null;
       if (preferred) {
-        setSelectedLabelPrinter(preferred);
+        actualizarImpresoraEtiquetas(preferred);
       }
       message.warning(error?.message
         ? `No se pudieron cargar las impresoras (${error.message}). Puedes escribirla manualmente.`
@@ -385,7 +399,7 @@ export default function ArticulosPage() {
     } finally {
       setLoadingLabelPrinters(false);
     }
-  }, [LABEL_PRINTER_STORAGE_KEY, message]);
+  }, [LABEL_PRINTER_STORAGE_KEY, actualizarImpresoraEtiquetas, message]);
 
   const abrirModalEtiquetaArticulo = useCallback(async (articulo: Articulo) => {
     setLabelItems([{ articuloId: articulo.id, nombre: articulo.nombre, precio: articulo.precio_venta, cantidad: 1, sku: articulo.referencia || articulo.codigo_barras }]);
@@ -439,9 +453,7 @@ export default function ArticulosPage() {
     setPrintingLabels(true);
     try {
       const result = await printPriceLabels(items, printerName, "La Cosmetikera");
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, printerName);
-      }
+      actualizarImpresoraEtiquetas(printerName);
       message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
       setLabelModalOpen(false);
     } catch (error: any) {
@@ -449,7 +461,7 @@ export default function ArticulosPage() {
     } finally {
       setPrintingLabels(false);
     }
-  }, [LABEL_PRINTER_STORAGE_KEY, labelItems, message, selectedLabelPrinter]);
+  }, [actualizarImpresoraEtiquetas, labelItems, message, selectedLabelPrinter]);
 
   useEffect(() => {
     void cargarCatalogosCompartidos();
@@ -2148,13 +2160,22 @@ export default function ArticulosPage() {
               showSearch
               loading={loadingLabelPrinters}
               value={selectedLabelPrinter ? [selectedLabelPrinter] : []}
-              onChange={(value) => setSelectedLabelPrinter(value?.[0] ?? null)}
+              onChange={(value) => actualizarImpresoraEtiquetas(value?.[0] ?? null)}
+              onSearch={(value) => {
+                const normalized = String(value || "").trim();
+                if (normalized) {
+                  setSelectedLabelPrinter(normalized);
+                }
+              }}
               placeholder="Selecciona o escribe impresora"
               options={labelPrinters.map((p) => ({
                 label: `${p.name}${p.isDefault ? " (predeterminada)" : ""}`,
                 value: p.name,
               }))}
             />
+            <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 4 }}>
+              Si no aparece en la lista, escríbela manualmente y ya quedará guardada para próximas etiquetas.
+            </Text>
           </div>
 
           <Table
