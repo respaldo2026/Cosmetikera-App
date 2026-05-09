@@ -1924,7 +1924,34 @@ export async function POST(request: NextRequest) {
       ? `Nombre: ${customerName} | sin perfil CRM completo`
       : "Cliente sin perfil identificado";
 
+    // ── 5b. Detectar si el cliente está respondiendo a una plantilla de cumpleaños ──
+    const birthdayTemplateKeywords = [
+      "cumpleanos_celebracion", "cumpleanos_recordatorio", "cumpleaños",
+      "feliz cumpleaños", "feliz cumpleanos", "cumpleanos_recordatorio_2d",
+      "cumpleanos_recordatorio_1d", "cumpleanos_celebracion_es",
+    ];
+    const recentAgentMessages = conversationHistory
+      .filter((m) => m.rol === "agente")
+      .slice(-3)
+      .map((m) => (m.mensaje || "").toLowerCase());
+    const isBirthdayContext = recentAgentMessages.some((m) =>
+      birthdayTemplateKeywords.some((kw) => m.includes(kw))
+    );
+    const nombre = customerName || "";
+
     // ── 6. System prompt enfocado ─────────────────────────────────
+    const birthdayContextSection = isBirthdayContext ? `
+## CONTEXTO ESPECIAL: RESPUESTA A MENSAJE DE CUMPLEAÑOS
+El cliente acaba de recibir un mensaje de felicitación de cumpleaños de La Cosmetikera y está respondiendo a él.
+
+SIGUE ESTE FLUJO:
+1. Responde con calidez humana y brevedad al saludo/agradecimiento del cliente (máximo 2 líneas).
+2. Preséntate como Dany y di que como regalo de cumpleaños pueden venir a la tienda hoy a aprovechar su *descuento de cumpleañero*.
+3. Pregunta qué producto o categoría de belleza les interesa para sugerirles algo personalizado con precio.
+4. NO hagas listas largas. Sé cálida, breve y directa. El objetivo es que vengan a comprar HOY.
+
+NO trates esta conversación como una consulta genérica. Es el día de su cumpleaños: hazlos sentir especiales.` : "";
+
     const systemPrompt = `Eres *Dany*, asesora experta en belleza de *La Cosmetikera* (WhatsApp). Tienes conocimiento profesional de toda la industria de la belleza y además vendes los productos del catálogo de la tienda.
 
 ## MISIÓN PRINCIPAL
@@ -1972,6 +1999,8 @@ ${rejectedDomains.size > 0 ? Array.from(rejectedDomains).map(domainLabel).join("
 ## PERFIL DIAGNÓSTICO DEL CLIENTE (sesiones anteriores)
 ${buildBeautyProfileContext(currentBeautyProfile)}
 
+${birthdayContextSection}
+
 ## CATÁLOGO LA COSMETIKERA (${articulos.length} productos disponibles — úsalos para aterrizar la asesoría)
 ${catalogoTexto}`;
 
@@ -1982,9 +2011,22 @@ ${catalogoTexto}`;
       responseText = directDateTimeReply;
     }
 
+    // ── 6a. Short-circuit para respuesta a plantilla de cumpleaños ────
+    const _normMsg = normalize(message);
+    const isSimpleReplyToBirthday =
+      isBirthdayContext &&
+      /^(gracias|muchas gracias|mil gracias|thanks|grax|jeje|jaja|que chevere|que bueno|genial|wow|omg|bien|ok|okay|oki|siii|claro|obvio|de nada|que amables|qué amables|feliz|contento|contenta|emocionada|emocionado|que detalle|que lindo|que linda|aww|ay que chimba|piola|chevere|bacano|bacana|mucho amor|amor|corazon|❤|🎂|🎉|🎁|😊|😄|🥰|te quiero|los quiero|hasta pronto|hasta luego|bye|adios)[!¡.?¿ ]*$/.test(
+        _normMsg
+      );
+    if (!responseText && isSimpleReplyToBirthday) {
+      const _nombreCumple = nombre ? ` ${nombre.split(" ")[0]}` : "";
+      responseText = `¡Con mucho cariño${_nombreCumple}! 🎂 Hoy es tu día especial y en *La Cosmetikera* queremos celebrarlo contigo.\n¿Qué producto de belleza tienes en mente? Cuéntame y te digo precio y opciones para que vengas y te consigas algo lindo hoy 💄`;
+    }
+
     // ── 6b. Short-circuit para saludos puros ─────────────────────
-    const _greetingOnlyMsg = normalize(message);
+    const _greetingOnlyMsg = _normMsg;
     const isGreetingOnly =
+      !isBirthdayContext &&
       /^(?:(?:hola|holi|hello|hey)(?:\s+(?:buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|amig[ao]))?|buenas?\s*(?:noches?|tardes?|dias?)?|buenos\s+dias?|que\s*mas|q\s*mas|todo\s*bien)\s*[!¡.?¿]*$/.test(_greetingOnlyMsg);
     if (!responseText && isGreetingOnly) {
       const _style = detectGreetingStyle(message);
