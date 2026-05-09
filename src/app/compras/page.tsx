@@ -134,6 +134,19 @@ export default function ComprasPage() {
   const [printingLabels, setPrintingLabels] = useState(false);
   const [labelDraftItems, setLabelDraftItems] = useState<LabelDraftItem[]>([]);
 
+  const actualizarImpresoraEtiquetas = useCallback((value: string | null) => {
+    const normalized = String(value || "").trim();
+    const finalValue = normalized || null;
+    setSelectedLabelPrinter(finalValue);
+    if (typeof window !== "undefined") {
+      if (finalValue) {
+        window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, finalValue);
+      } else {
+        window.localStorage.removeItem(LABEL_PRINTER_STORAGE_KEY);
+      }
+    }
+  }, []);
+
   // ── Carga inicial ─────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -168,19 +181,25 @@ export default function ComprasPage() {
         const preferredExists = preferred && printers.some((p) => p.name === preferred);
 
         if (preferredExists) {
-          setSelectedLabelPrinter(preferred);
+          actualizarImpresoraEtiquetas(preferred);
         } else {
           const defaultPrinter = printers.find((p) => p.isDefault)?.name ?? printers[0]?.name ?? null;
-          setSelectedLabelPrinter(defaultPrinter);
+          actualizarImpresoraEtiquetas(defaultPrinter);
         }
       }
     } catch (error: any) {
-      message.error(error?.message || "No se pudieron cargar las impresoras de etiquetas");
-      setLabelPrinters([]);
+      const preferred = typeof window !== "undefined" ? window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) : null;
+      if (preferred) {
+        actualizarImpresoraEtiquetas(preferred);
+      }
+      message.warning(error?.message
+        ? `No se pudieron cargar las impresoras (${error.message}). Puedes escribirla manualmente.`
+        : "No se pudieron cargar las impresoras. Puedes escribirla manualmente.");
+      setLabelPrinters(preferred ? [{ name: preferred, isDefault: true }] : []);
     } finally {
       setLoadingLabelPrinters(false);
     }
-  }, [message]);
+  }, [actualizarImpresoraEtiquetas, message]);
 
   const abrirModalImpresionEtiquetas = useCallback(async (items: LabelDraftItem[]) => {
     setLabelDraftItems(items);
@@ -189,7 +208,8 @@ export default function ComprasPage() {
   }, [cargarImpresorasEtiquetas]);
 
   const imprimirEtiquetasCompra = useCallback(async () => {
-    if (!selectedLabelPrinter) {
+    const printerName = String(selectedLabelPrinter || "").trim();
+    if (!printerName) {
       message.warning("Selecciona una impresora de etiquetas");
       return;
     }
@@ -211,10 +231,8 @@ export default function ComprasPage() {
 
     setPrintingLabels(true);
     try {
-      const result = await printPriceLabels(itemsToPrint, selectedLabelPrinter, "La Cosmetikera");
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, selectedLabelPrinter);
-      }
+      const result = await printPriceLabels(itemsToPrint, printerName, "La Cosmetikera");
+      actualizarImpresoraEtiquetas(printerName);
       message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
       setLabelModalOpen(false);
       setLabelDraftItems([]);
@@ -223,7 +241,7 @@ export default function ComprasPage() {
     } finally {
       setPrintingLabels(false);
     }
-  }, [labelDraftItems, message, selectedLabelPrinter]);
+  }, [actualizarImpresoraEtiquetas, labelDraftItems, message, selectedLabelPrinter]);
 
   // ── Filtrado lista ────────────────────────────────────────────────────────────
   const filtradas = useMemo(() => compras.filter((c) => {
@@ -1035,17 +1053,27 @@ export default function ComprasPage() {
               <Text strong style={{ display: "block", marginBottom: 4 }}>Impresora de etiquetas</Text>
               <Select
                 showSearch
+                mode="tags"
+                maxCount={1}
                 loading={loadingLabelPrinters}
-                placeholder="Seleccionar impresora..."
+                placeholder="Selecciona o escribe impresora"
                 style={{ width: "100%" }}
-                value={selectedLabelPrinter || undefined}
-                onChange={(value) => setSelectedLabelPrinter(value)}
+                value={selectedLabelPrinter ? [selectedLabelPrinter] : []}
+                onChange={(value) => actualizarImpresoraEtiquetas(value?.[0] ?? null)}
+                onSearch={(value) => {
+                  const normalized = String(value || "").trim();
+                  if (normalized) {
+                    setSelectedLabelPrinter(normalized);
+                  }
+                }}
                 options={labelPrinters.map((printer) => ({
                   value: printer.name,
                   label: printer.isDefault ? `${printer.name} (predeterminada)` : printer.name,
                 }))}
-                optionFilterProp="label"
               />
+              <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 4 }}>
+                Si no aparece en la lista, escríbela manualmente y quedará guardada para próximas etiquetas.
+              </Text>
             </Col>
             <Col span={8}>
               <Text strong style={{ display: "block", marginBottom: 4 }}>Total etiquetas</Text>
