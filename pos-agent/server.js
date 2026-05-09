@@ -126,24 +126,12 @@ function enqueueLabelJob(payload) {
 
 function listPrintersWithPowerShell() {
   return new Promise((resolve, reject) => {
-    const command = [
-      "$ErrorActionPreference='Stop'",
-      "$default = (Get-CimInstance Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -ExpandProperty Name -First 1)",
-      "$rows = Get-CimInstance Win32_Printer | Select-Object Name, Default, PrinterStatus",
-      "$out = @($rows | ForEach-Object {",
-      "  [PSCustomObject]@{",
-      "    name = [string]$_.Name",
-      "    isDefault = [bool]$_.Default",
-      "    status = [string]$_.PrinterStatus",
-      "  }",
-      "})",
-      "if (-not $out -or $out.Count -eq 0) {",
-      "  if ($default) {",
-      "    $out = @([PSCustomObject]@{ name = [string]$default; isDefault = $true; status = 'unknown' })",
-      "  }",
-      "}",
-      "$out | ConvertTo-Json -Compress",
-    ].join("; ");
+    const command = `
+      $ErrorActionPreference = 'Stop'
+      Get-CimInstance Win32_Printer | 
+      Select-Object @{Label='name';Expression={[string]$_.Name}},@{Label='isDefault';Expression={[bool]$_.Default}},@{Label='status';Expression={[string]$_.PrinterStatus}} | 
+      ConvertTo-Json -Compress
+    `;
 
     const ps = spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command], {
       windowsHide: true,
