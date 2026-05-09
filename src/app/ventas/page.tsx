@@ -1067,14 +1067,14 @@ export default function VentasPage() {
             styles={{ image: { height: 40 } }}
           />
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "fixed" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #d81b87" }}>
-                <th style={{ textAlign: "left", paddingBottom: 4, color: "#d81b87", fontWeight: 700 }}>Producto</th>
-                <th style={{ textAlign: "center", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 40 }}>P.</th>
-                <th style={{ textAlign: "center", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 50 }}>Cant</th>
-                <th style={{ textAlign: "right", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 50 }}>Total</th>
-                <th style={{ width: 20 }}></th>
+                <th style={{ textAlign: "left", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: "60%" }}>Producto</th>
+                <th style={{ textAlign: "center", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 36 }}>P.</th>
+                <th style={{ textAlign: "center", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 44 }}>Cant</th>
+                <th style={{ textAlign: "right", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 46 }}>Total</th>
+                <th style={{ width: 16 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -1085,24 +1085,24 @@ export default function VentasPage() {
                     key={item.id} 
                     style={{ 
                       borderBottom: "1px solid #f0f0f0", 
-                      height: 52,
+                      height: 40,
                       background: esProductoReciente ? "#f6ffed" : "transparent",
                       borderLeft: esProductoReciente ? "4px solid #52c41a" : "4px solid transparent",
                       transition: "background-color 0.3s ease-out"
                     }}
                   >
-                    <td style={{ padding: "6px 6px", verticalAlign: "middle" }}>
+                    <td style={{ padding: "4px 6px", verticalAlign: "middle" }}>
                       <Text style={{ fontSize: 13, fontWeight: 600 }} ellipsis>
-                        {item.nombre.length > 18 ? item.nombre.substring(0, 15) + "..." : item.nombre}
+                        {item.nombre.length > 30 ? item.nombre.substring(0, 27) + "..." : item.nombre}
                       </Text>
                       {esProductoReciente && (
                         <div style={{ display: "inline-block", marginLeft: 4 }}>✓</div>
                       )}
                     </td>
-                    <td style={{ textAlign: "center", padding: "6px 0", color: "#d81b87", fontSize: 12, verticalAlign: "middle" }}>
+                    <td style={{ textAlign: "center", padding: "4px 0", color: "#d81b87", fontSize: 12, verticalAlign: "middle" }}>
                       ${Number(item.precio_venta).toLocaleString()}
                     </td>
-                    <td style={{ textAlign: "center", padding: "6px 0", verticalAlign: "middle" }}>
+                    <td style={{ textAlign: "center", padding: "4px 0", verticalAlign: "middle" }}>
                       <Space size={2}>
                         <Button
                           size="small"
@@ -1121,7 +1121,7 @@ export default function VentasPage() {
                         />
                       </Space>
                     </td>
-                    <td style={{ textAlign: "right", padding: "6px 6px", fontSize: 13, fontWeight: 700, color: "#7a1b6f", verticalAlign: "middle" }}>
+                    <td style={{ textAlign: "right", padding: "4px 6px", fontSize: 13, fontWeight: 700, color: "#7a1b6f", verticalAlign: "middle" }}>
                       ${Number(item.subtotal).toLocaleString()}
                     </td>
                   <td style={{ textAlign: "center", padding: "2px 0" }}>
