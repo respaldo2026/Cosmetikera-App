@@ -999,8 +999,6 @@ export default function VentasPage() {
           : "linear-gradient(135deg,#fff7e6,#fff1f0)",
         border: `2px solid ${clienteId ? "#d81b87" : "#ffbb96"}`,
         transition: "all 0.3s",
-        maxHeight: isMobile ? undefined : 220,
-        overflowY: isMobile ? "visible" : "auto",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <CrownOutlined style={{ color: "#d81b87", fontSize: 15 }} />
@@ -1063,8 +1061,23 @@ export default function VentasPage() {
             </Tooltip>
           </Col>
         </Row>
+      </div>
+
+      {/* Resumen cliente/voucher (compacto, sin afectar el selector) */}
+      {(clienteSeleccionado || clienteId) && (
+        <div
+          style={{
+            marginBottom: 8,
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid #f0d6ff",
+            background: "#fff9fe",
+            maxHeight: isMobile ? undefined : 170,
+            overflowY: isMobile ? "visible" : "auto",
+          }}
+        >
         {clienteSeleccionado && (
-          <div style={{ marginTop: 6, padding: "6px 10px", background: "#f9f0ff", borderRadius: 8 }}>
+          <div style={{ padding: "6px 10px", background: "#f9f0ff", borderRadius: 8 }}>
             <Space>
               <Avatar size="small" icon={<UserOutlined />} style={{ background: "#d81b87" }} />
               <div>
@@ -1089,7 +1102,7 @@ export default function VentasPage() {
           </div>
         )}
         {clienteId && (
-          <div style={{ marginTop: 10, padding: "10px", background: voucherClub ? "#f6ffed" : "#fff7fb", borderRadius: 10, border: `1px solid ${voucherClub ? "#b7eb8f" : "#ffd6e7"}` }}>
+          <div style={{ marginTop: 8, padding: "8px", background: voucherClub ? "#f6ffed" : "#fff7fb", borderRadius: 10, border: `1px solid ${voucherClub ? "#b7eb8f" : "#ffd6e7"}` }}>
             <Text strong style={{ fontSize: 12, display: "block", marginBottom: 8 }}>Voucher Club</Text>
             <Space.Compact style={{ width: "100%" }}>
               <Input
@@ -1110,7 +1123,8 @@ export default function VentasPage() {
             )}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       <Divider style={{ margin: "6px 0" }} />
 
@@ -1271,14 +1285,22 @@ export default function VentasPage() {
 
       {/* Botones */}
       <Space direction="vertical" size={8} style={{ width: "100%" }}>
-        <Button
-          block
-          onClick={aparcarVentaActual}
-          disabled={carrito.length === 0}
-          style={{ borderColor: "#d81b87", color: "#d81b87" }}
-        >
-          Aparcar venta
-        </Button>
+        {carrito.length > 0 && (
+          <Row gutter={8}>
+            <Col span={12}>
+              <Button
+                block
+                onClick={aparcarVentaActual}
+                style={{ borderColor: "#d81b87", color: "#d81b87" }}
+              >
+                Aparcar venta
+              </Button>
+            </Col>
+            <Col span={12}>
+              <Button block onClick={limpiarVenta}>Limpiar carrito</Button>
+            </Col>
+          </Row>
+        )}
 
         <Button
           type="primary"
@@ -1291,9 +1313,6 @@ export default function VentasPage() {
         >
           Cobrar ${totalFinal.toLocaleString()}
         </Button>
-        {carrito.length > 0 && (
-          <Button block onClick={limpiarVenta}>Limpiar carrito</Button>
-        )}
 
         {ventasAparcadas.length > 0 && carrito.length === 0 && (
           <Card
