@@ -1783,6 +1783,10 @@ export async function POST(request: NextRequest) {
       body?.telefono_whatsapp || body?.wa_id || ""
     );
     const telefono = rawTelefono ? normalizePhone(rawTelefono) : "";
+    const sourcePhoneNumberId = String(
+      body?.phone_number_id || body?.meta_phone_number_id || body?.to_phone_number_id || ""
+    ).trim();
+    const activePhoneNumberId = sourcePhoneNumberId || String(process.env.WHATSAPP_PHONE_NUMBER_ID || "").trim();
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1799,17 +1803,25 @@ export async function POST(request: NextRequest) {
     const greetingStyle = detectGreetingStyle(message);
 
     // ── 1. Cargar datos en paralelo ───────────────────────────────
-    const [articulos, historyRes, perfilRes, customerContext] = await Promise.all([
-      fetchCatalogArticles(supabase),
-      // Historial real de conversación (últimos 20 mensajes, desc)
-      telefono
-        ? supabase
+    const historyQuery = telefono
+      ? (() => {
+          let q = supabase
             .from("whatsapp_conversation_history")
             .select("rol, mensaje, created_at")
             .eq("telefono", telefono)
             .order("created_at", { ascending: false })
-            .limit(20)
-        : Promise.resolve({ data: [] }),
+            .limit(20);
+          if (activePhoneNumberId) {
+            q = q.eq("phone_number_id", activePhoneNumberId);
+          }
+          return q;
+        })()
+      : Promise.resolve({ data: [] });
+
+    const [articulos, historyRes, perfilRes, customerContext] = await Promise.all([
+      fetchCatalogArticles(supabase),
+      // Historial real de conversación (últimos 20 mensajes, desc)
+      historyQuery,
       // Nombre del cliente desde perfiles
       perfil_id
         ? supabase
@@ -2142,8 +2154,24 @@ ${catalogoTexto}`;
       try {
         const detectedTheme = extractThemeFromMessage(message);
         await Promise.all([
-          logConversationMessage(supabase, telefono, perfil_id || undefined, "cliente", message),
-          logConversationMessage(supabase, telefono, perfil_id || undefined, "agente", responseText),
+          logConversationMessage(
+            supabase,
+            telefono,
+            perfil_id || undefined,
+            "cliente",
+            message,
+            "text",
+            activePhoneNumberId || undefined,
+          ),
+          logConversationMessage(
+            supabase,
+            telefono,
+            perfil_id || undefined,
+            "agente",
+            responseText,
+            "text",
+            activePhoneNumberId || undefined,
+          ),
           mergeCustomerPreferences(supabase, telefono, { beauty_profile: currentBeautyProfile }, perfil_id || undefined, customerName || undefined),
           updateCustomerMemory(
             supabase,

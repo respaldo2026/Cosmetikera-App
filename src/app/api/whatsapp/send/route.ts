@@ -51,6 +51,7 @@ async function logOutboundMessage(params: {
     mensaje: messageText,
     tipo_mensaje: params.type,
     intento: null,
+    phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
   });
 }
 

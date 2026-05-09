@@ -163,6 +163,7 @@ async function ensureMonitorEntryForClubWelcome(args: {
       mensaje,
       tipo_mensaje: "template",
       intento: null,
+      phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
     });
   }
 }

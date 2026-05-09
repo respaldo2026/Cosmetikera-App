@@ -262,14 +262,18 @@ export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams.get("search") || "";
   const normalizedSearch = normalizePhone(search);
 
-  // Filtro por phone_number_id: solo muestra conversaciones de ESTE bot.
-  // Incluye registros legacy (phone_number_id IS NULL) para no perder historial anterior.
+  // Aislamiento estricto por phone_number_id para evitar mezcla entre proyectos/bots.
   const ownPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || null;
+  const includeNotificationTemplates = process.env.WHATSAPP_INCLUDE_NOTIFICATION_TEMPLATES === "true";
+  const allowLegacyAgentFallback = process.env.WHATSAPP_ALLOW_LEGACY_AGENT_CONVERSATIONS === "true";
 
   /** Aplica el filtro de aislamiento a un query builder de Supabase */
   function applyPhoneNumberFilter(query: any) {
-    if (!ownPhoneNumberId) return query;
-    return query.or(`phone_number_id.is.null,phone_number_id.eq.${ownPhoneNumberId}`);
+    if (!ownPhoneNumberId) {
+      // Fail-closed: sin phone_number_id configurado no se exponen conversaciones.
+      return query.eq("phone_number_id", "__missing_phone_number_id__");
+    }
+    return query.eq("phone_number_id", ownPhoneNumberId);
   }
 
   // ── Detalle de conversación por teléfono ──────────────────────────
@@ -302,22 +306,24 @@ export async function GET(request: NextRequest) {
       error = retry.error;
     }
 
-    const templateMessages = await getTemplateMessagesByPhone(supabase, normalizedPhone, phone);
-    // Solo mezclar notificaciones_enviadas si whatsapp_conversation_history
-    // NO tiene ya registros de tipo template para este número. Evita mensajes dobles.
-    const historyHasTemplate = (data || []).some(
-      (m: any) => String(m.tipo_mensaje || "") === "template"
-    );
-    if (templateMessages.length > 0 && !historyHasTemplate) {
-      const merged = dedupeNearDuplicateMessages([
-        ...((data || []) as ConversationMessage[]),
-        ...templateMessages,
-      ]).sort((a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at));
-      data = merged as any;
+    if (includeNotificationTemplates) {
+      const templateMessages = await getTemplateMessagesByPhone(supabase, normalizedPhone, phone);
+      // Solo mezclar notificaciones_enviadas si whatsapp_conversation_history
+      // NO tiene ya registros de tipo template para este número. Evita mensajes dobles.
+      const historyHasTemplate = (data || []).some(
+        (m: any) => String(m.tipo_mensaje || "") === "template"
+      );
+      if (templateMessages.length > 0 && !historyHasTemplate) {
+        const merged = dedupeNearDuplicateMessages([
+          ...((data || []) as ConversationMessage[]),
+          ...templateMessages,
+        ]).sort((a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at));
+        data = merged as any;
+      }
     }
 
     // Fallback a tabla legacy (agent_conversations) si la nueva tabla falla/no existe
-    if (error || !data || data.length === 0) {
+    if (allowLegacyAgentFallback && (error || !data || data.length === 0)) {
       const { data: legacyRows, error: legacyError } = await supabase
         .from("agent_conversations")
         .select("id, phone_number, user_message, agent_response, created_at")
@@ -414,18 +420,20 @@ export async function GET(request: NextRequest) {
       .limit(2000)
   );
 
-  const templateRecent = await getTemplateMessagesRecent(supabase);
-  if (templateRecent.length > 0) {
-    rawMessages = dedupeNearDuplicateMessages([
-      ...((rawMessages || []) as ConversationMessage[]),
-      ...templateRecent,
-    ])
-      .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at))
-      .slice(0, 2500);
+  if (includeNotificationTemplates) {
+    const templateRecent = await getTemplateMessagesRecent(supabase);
+    if (templateRecent.length > 0) {
+      rawMessages = dedupeNearDuplicateMessages([
+        ...((rawMessages || []) as ConversationMessage[]),
+        ...templateRecent,
+      ])
+        .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at))
+        .slice(0, 2500);
+    }
   }
 
   // Fallback a tabla legacy cuando la nueva está vacía o no existe en producción
-  if (error || !rawMessages || rawMessages.length === 0) {
+  if (allowLegacyAgentFallback && (error || !rawMessages || rawMessages.length === 0)) {
     const { data: legacyRows, error: legacyError } = await supabase
       .from("agent_conversations")
       .select("id, phone_number, user_message, agent_response, created_at")
