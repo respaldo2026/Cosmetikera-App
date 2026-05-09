@@ -988,202 +988,133 @@ export default function VentasPage() {
   const panelCarrito = (
     <Card
       style={{ borderRadius: 12, height: "100%", display: "flex", flexDirection: "column" }}
-      styles={{ body: { padding: 12, display: "flex", flexDirection: "column", height: "100%" } }}
+      styles={{ body: { padding: 10, display: "flex", flexDirection: "column", height: "100%" } }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <Text strong style={{ fontSize: 14, color: "#7a1b6f" }}>Carrito de compra</Text>
+        <Text strong style={{ fontSize: 14, color: "#7a1b6f" }}>📦 Carrito</Text>
         <Tag color="magenta" style={{ fontSize: 11, marginRight: 0 }}>
           {carrito.length} item{carrito.length === 1 ? "" : "s"}
         </Tag>
       </div>
 
-      {/* Cliente */}
-      <div style={{
-        marginBottom: 8,
-        padding: "8px 10px",
-        borderRadius: 10,
-        background: clienteId
-          ? "linear-gradient(135deg,#f9f0ff,#fff0f6)"
-          : "linear-gradient(135deg,#fff7e6,#fff1f0)",
-        border: `2px solid ${clienteId ? "#d81b87" : "#ffbb96"}`,
-        transition: "all 0.3s",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-          <CrownOutlined style={{ color: "#d81b87", fontSize: 15 }} />
-          <Text strong style={{ fontSize: 13, color: "#d81b87", letterSpacing: 0.5 }}>
-            Cliente · Fidelización
-          </Text>
-          {!clienteId && carrito.length > 0 && (
-            <Tag color="warning" style={{ fontSize: 10, marginLeft: "auto", cursor: "default", fontWeight: 600 }}>
-              ⚠ Sin cliente
-            </Tag>
-          )}
-          {clienteId && (
-            <Tag color="success" style={{ fontSize: 10, marginLeft: "auto", cursor: "default" }}>
-              ✓ Asignado
-            </Tag>
-          )}
-        </div>
-        <Row gutter={6}>
-          <Col flex="auto">
-            <Select
-              showSearch
-              allowClear
-              placeholder="👤 Buscar por nombre, cédula o teléfono..."
-              status={carrito.length > 0 && !clienteId ? "warning" : ""}
-              size="large"
-              style={{ width: "100%", fontSize: 13 }}
-              value={clienteId}
-              onChange={setClienteId}
-              optionLabelProp="label"
-              notFoundContent={null}
-              filterOption={false}
-              onSearch={(input) => {
-                const q = input.trim();
-                if (q.length < 3) {
-                  setClientesFiltrados([]);
-                  return;
-                }
-                const ql = q.toLowerCase();
-                const qd = q.replace(/\D/g, "");
-                const matches = clientesBusqueda
-                  .filter((c) =>
-                    c.searchText.includes(ql) ||
-                    (qd && c.telefonoDigits.includes(qd))
-                  )
-                  .map(({ searchText, telefonoDigits, ...cliente }) => cliente)
-                  .slice(0, 5);
-                setClientesFiltrados(matches);
-              }}
-              options={opcionesClientesRapidos}
-            />
-          </Col>
-          <Col>
-            <Tooltip title="Crear nuevo cliente">
-              <Button
-                size="large"
-                icon={<PlusOutlined />}
-                onClick={() => setNuevoClienteOpen(true)}
-                style={{ borderColor: "#d81b87", color: "#d81b87", background: "#fff0f6" }}
-              />
-            </Tooltip>
-          </Col>
-        </Row>
-      </div>
-
-      {/* Resumen cliente/voucher (compacto, sin afectar el selector) */}
-      {(clienteSeleccionado || clienteId) && (
-        <div
-          style={{
-            marginBottom: 8,
-            padding: "8px 10px",
-            borderRadius: 10,
-            border: "1px solid #f0d6ff",
-            background: "#fff9fe",
-            maxHeight: isMobile ? undefined : 170,
-            overflowY: isMobile ? "visible" : "auto",
-          }}
-        >
-        {clienteSeleccionado && (
-          <div style={{ padding: "6px 10px", background: "#f9f0ff", borderRadius: 8 }}>
-            <Space>
-              <Avatar size="small" icon={<UserOutlined />} style={{ background: "#d81b87" }} />
-              <div>
-                <Text strong style={{ fontSize: 12 }}>{clienteSeleccionado.nombre_completo}</Text>
-                {clienteSeleccionado.nivel_fidelidad && (
-                  <Tag
-                    color={NIVEL_COLORS[clienteSeleccionado.nivel_fidelidad] || "purple"}
-                    style={{ marginLeft: 4, fontSize: 10 }}
-                  >
-                    <CrownOutlined /> {clienteSeleccionado.nivel_fidelidad}
-                  </Tag>
-                )}
-                {clienteSeleccionado.puntos_fidelidad !== undefined && (
-                  <div>
-                    <Text style={{ fontSize: 11, color: "#888" }}>
-                      <GiftOutlined /> {clienteSeleccionado.puntos_fidelidad} puntos
-                    </Text>
-                  </div>
-                )}
-              </div>
-            </Space>
-          </div>
-        )}
-        {clienteId && (
-          <div style={{ marginTop: 8, padding: "8px", background: voucherClub ? "#f6ffed" : "#fff7fb", borderRadius: 10, border: `1px solid ${voucherClub ? "#b7eb8f" : "#ffd6e7"}` }}>
-            <Text strong style={{ fontSize: 12, display: "block", marginBottom: 8 }}>Voucher Club</Text>
-            <Space.Compact style={{ width: "100%" }}>
-              <Input
-                value={codigoVoucherClub}
-                onChange={(event) => setCodigoVoucherClub(event.target.value.toUpperCase())}
-                placeholder="Ej: CLUB-ABC123"
-                disabled={!!voucherClub}
-              />
-              <Button onClick={voucherClub ? removerVoucherClub : validarVoucherClub} loading={validandoVoucher} style={voucherClub ? undefined : { borderColor: "#d81b87", color: "#d81b87" }}>
-                {voucherClub ? "Quitar" : "Aplicar"}
-              </Button>
-            </Space.Compact>
-            {voucherClub && (
-              <Space wrap style={{ marginTop: 8 }}>
-                <Tag color="success">{voucherClub.rewardIcon} {voucherClub.rewardTitle}</Tag>
-                <Tag color="green">-${descuentoVoucherClub.toLocaleString()}</Tag>
-              </Space>
-            )}
-          </div>
-        )}
-        </div>
+      {!clienteId && carrito.length > 0 && (
+        <Tag color="warning" style={{ fontSize: 10, marginBottom: 8, width: "fit-content" }}>
+          ⚠️ Asigna un cliente
+        </Tag>
       )}
 
-      <Divider style={{ margin: "6px 0" }} />
+      {/* Resumen cliente/voucher compacto */}
+      {clienteSeleccionado && clienteId && (
+        <div style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 8, background: "#f9f0ff", border: "1px solid #f0d6ff", fontSize: 11 }}>
+          <Text strong style={{ fontSize: 11, display: "block" }}>{clienteSeleccionado.nombre_completo}</Text>
+          {clienteSeleccionado.nivel_fidelidad && (
+            <Tag color={NIVEL_COLORS[clienteSeleccionado.nivel_fidelidad] || "purple"} style={{ fontSize: 9, marginTop: 2 }}>
+              {clienteSeleccionado.nivel_fidelidad}
+            </Tag>
+          )}
+        </div>
+      )}
+      {clienteId && voucherClub && (
+        <div style={{ marginBottom: 6, padding: "4px 6px", borderRadius: 6, background: "#f6ffed", border: "1px solid #b7eb8f", fontSize: 10 }}>
+          <Text style={{ fontSize: 10 }}>✅ {voucherClub.rewardTitle} -${descuentoVoucherClub.toLocaleString()}</Text>
+        </div>
+      )}
+      {clienteId && !voucherClub && (
+        <Space.Compact style={{ width: "100%", marginBottom: 6 }} size="small">
+          <Input
+            value={codigoVoucherClub}
+            onChange={(event) => setCodigoVoucherClub(event.target.value.toUpperCase())}
+            placeholder="Voucher..."
+            size="small"
+            style={{ fontSize: 11 }}
+          />
+          <Button
+            size="small"
+            onClick={validarVoucherClub}
+            loading={validandoVoucher}
+            style={{ borderColor: "#d81b87", color: "#d81b87", fontSize: 11 }}
+          >
+            Validar
+          </Button>
+        </Space.Compact>
+      )}
 
-      {/* Items */}
+      {/* Items en formato tipo tabla/TPV */}
       <div style={{
         flex: 1,
         overflowY: "auto",
-        marginBottom: 8,
+        marginBottom: 6,
         border: "1px solid #f3e1ee",
-        borderRadius: 10,
-        padding: "6px 10px",
+        borderRadius: 6,
+        padding: "4px 6px",
         background: "#fff",
         minHeight: isMobile ? 220 : 0,
+        fontSize: 12,
       }}>
         {carrito.length === 0 ? (
           <Empty
             image={<ShoppingCartOutlined style={{ fontSize: 40, color: "#ccc" }} />}
-            description="Toca un producto para agregar"
-            styles={{ image: { height: 50 } }}
+            description="Escanea productos"
+            styles={{ image: { height: 40 } }}
           />
         ) : (
-          carrito.map((item) => (
-            <div key={item.id} style={{
-              padding: "7px 0", borderBottom: "1px solid #f0f0f0",
-              display: "flex", alignItems: "center", gap: 8,
-            }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 13, fontWeight: 700 }} ellipsis>{item.nombre}</Text>
-                <div>
-                  <Text style={{ fontSize: 11, color: "#d81b87" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #d81b87" }}>
+                <th style={{ textAlign: "left", paddingBottom: 4, color: "#d81b87", fontWeight: 700 }}>Producto</th>
+                <th style={{ textAlign: "center", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 40 }}>P.</th>
+                <th style={{ textAlign: "center", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 50 }}>Cant</th>
+                <th style={{ textAlign: "right", paddingBottom: 4, color: "#d81b87", fontWeight: 700, width: 50 }}>Total</th>
+                <th style={{ width: 20 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {carrito.map((item) => (
+                <tr key={item.id} style={{ borderBottom: "1px solid #f0f0f0", height: 32 }}>
+                  <td style={{ padding: "2px 4px" }}>
+                    <Text style={{ fontSize: 11, fontWeight: 600 }} ellipsis>
+                      {item.nombre.length > 18 ? item.nombre.substring(0, 15) + "..." : item.nombre}
+                    </Text>
+                  </td>
+                  <td style={{ textAlign: "center", padding: "2px 0", color: "#d81b87", fontSize: 10 }}>
                     ${Number(item.precio_venta).toLocaleString()}
-                  </Text>
-                </div>
-              </div>
-              <Space size={4}>
-                <Button size="small" icon={<MinusOutlined />} onClick={() => cambiarCantidad(item.id, -1)} />
-                <Text strong style={{ minWidth: 20, textAlign: "center", fontSize: 13 }}>{item.cantidad}</Text>
-                <Button size="small" icon={<PlusOutlined />} onClick={() => cambiarCantidad(item.id, 1)} />
-              </Space>
-              <Text strong style={{ fontSize: 13, minWidth: 70, textAlign: "right" }}>
-                ${Number(item.subtotal).toLocaleString()}
-              </Text>
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => quitarItem(item.id)}
-              />
-            </div>
-          ))
+                  </td>
+                  <td style={{ textAlign: "center", padding: "2px 0" }}>
+                    <Space size={2}>
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<MinusOutlined />}
+                        onClick={() => cambiarCantidad(item.id, -1)}
+                        style={{ padding: "0 4px", height: 24 }}
+                      />
+                      <Text strong style={{ minWidth: 20, textAlign: "center", fontSize: 11 }}>{item.cantidad}</Text>
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<PlusOutlined />}
+                        onClick={() => cambiarCantidad(item.id, 1)}
+                        style={{ padding: "0 4px", height: 24 }}
+                      />
+                    </Space>
+                  </td>
+                  <td style={{ textAlign: "right", padding: "2px 4px", fontSize: 11, fontWeight: 700, color: "#7a1b6f" }}>
+                    ${Number(item.subtotal).toLocaleString()}
+                  </td>
+                  <td style={{ textAlign: "center", padding: "2px 0" }}>
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => quitarItem(item.id)}
+                      style={{ padding: "0 2px", height: 24 }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -1377,11 +1308,11 @@ export default function VentasPage() {
         flexDirection: "column",
       }}
     >
-      {/* HEADER */}
-      <Card style={{ marginBottom: 8, borderRadius: 10 }} styles={{ body: { padding: "6px 12px" } }}>
-        <Row align="middle" justify="space-between">
-          <Col>
-            <Space size={10}>
+      {/* HEADER MEJORADO CON CLIENTE Y BÚSQUEDA */}
+      <Card style={{ marginBottom: 8, borderRadius: 10 }} styles={{ body: { padding: "8px 12px" } }}>
+        <Row align="middle" gutter={12} justify="space-between">
+          <Col flex="200px">
+            <Space size={8}>
               <div style={{
                 width: 32, height: 32, borderRadius: 8,
                 background: "linear-gradient(135deg,#d81b87,#9c27b0)",
@@ -1395,18 +1326,74 @@ export default function VentasPage() {
               </div>
             </Space>
           </Col>
+          <Col flex="auto" style={{ minWidth: 0 }}>
+            <Row gutter={8} align="middle">
+              <Col flex="auto" style={{ minWidth: 0 }}>
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder="👤 Buscar cliente por nombre, cédula..."
+                  size="large"
+                  style={{ width: "100%", fontSize: 12 }}
+                  value={clienteId}
+                  onChange={setClienteId}
+                  filterOption={false}
+                  notFoundContent={null}
+                  onSearch={(input) => {
+                    const q = input.trim();
+                    if (q.length < 3) {
+                      setClientesFiltrados([]);
+                      return;
+                    }
+                    const ql = q.toLowerCase();
+                    const qd = q.replace(/\D/g, "");
+                    const matches = clientesBusqueda
+                      .filter((c) =>
+                        c.searchText.includes(ql) ||
+                        (qd && c.telefonoDigits.includes(qd))
+                      )
+                      .map(({ searchText, telefonoDigits, ...cliente }) => cliente)
+                      .slice(0, 5);
+                    setClientesFiltrados(matches);
+                  }}
+                  options={opcionesClientesRapidos}
+                />
+              </Col>
+              <Col flex="100px">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<PlusOutlined />}
+                  onClick={() => setNuevoClienteOpen(true)}
+                  style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)", border: "none" }}
+                >
+                  Nuevo
+                </Button>
+              </Col>
+            </Row>
+          </Col>
+          <Col flex="100px">
+            {clienteSeleccionado && (
+              <div style={{ textAlign: "right" }}>
+                <Text strong style={{ fontSize: 11, display: "block", color: "#7a1b6f" }}>{clienteSeleccionado.nombre_completo.split(" ")[0]}</Text>
+                {clienteSeleccionado.puntos_fidelidad !== undefined && (
+                  <Text type="secondary" style={{ fontSize: 10 }}>🎁 {clienteSeleccionado.puntos_fidelidad} pts</Text>
+                )}
+              </div>
+            )}
+          </Col>
           <Col>
             <Button size="small" icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
           </Col>
         </Row>
       </Card>
 
-      {/* LAYOUT POS */}
+      {/* LAYOUT POS: Balance 50/50 para mejor lectura */}
       <Row gutter={[12, 12]} style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        <Col xs={24} lg={10} style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
+        <Col xs={24} lg={12} style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
           {panelCarrito}
         </Col>
-        <Col xs={24} lg={14} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
+        <Col xs={24} lg={12} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
           {panelProductos}
         </Col>
       </Row>
