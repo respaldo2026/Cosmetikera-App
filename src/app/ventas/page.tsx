@@ -955,18 +955,20 @@ export default function VentasPage() {
   const panelCarrito = (
     <Card
       style={{ borderRadius: 12, height: "100%", display: "flex", flexDirection: "column" }}
-      styles={{ body: { padding: 12, display: "flex", flexDirection: "column", height: "100%" } }}
+      styles={{ body: { padding: 10, display: "flex", flexDirection: "column", height: "100%" } }}
     >
       {/* Cliente */}
       <div style={{
-        marginBottom: 12,
-        padding: "10px 12px",
+        marginBottom: 8,
+        padding: "8px 10px",
         borderRadius: 10,
         background: clienteId
           ? "linear-gradient(135deg,#f9f0ff,#fff0f6)"
           : "linear-gradient(135deg,#fff7e6,#fff1f0)",
         border: `2px solid ${clienteId ? "#d81b87" : "#ffbb96"}`,
         transition: "all 0.3s",
+        maxHeight: "34vh",
+        overflowY: "auto",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <CrownOutlined style={{ color: "#d81b87", fontSize: 15 }} />
@@ -1078,10 +1080,19 @@ export default function VentasPage() {
         )}
       </div>
 
-      <Divider style={{ margin: "8px 0" }} />
+      <Divider style={{ margin: "6px 0" }} />
 
       {/* Items */}
-      <div style={{ flex: 1, overflowY: "auto", marginBottom: 8 }}>
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        marginBottom: 8,
+        border: "1px solid #f3e1ee",
+        borderRadius: 10,
+        padding: "2px 8px",
+        background: "#fff",
+        minHeight: 260,
+      }}>
         {carrito.length === 0 ? (
           <Empty
             image={<ShoppingCartOutlined style={{ fontSize: 40, color: "#ccc" }} />}
@@ -1091,13 +1102,13 @@ export default function VentasPage() {
         ) : (
           carrito.map((item) => (
             <div key={item.id} style={{
-              padding: "6px 0", borderBottom: "1px solid #f0f0f0",
+              padding: "5px 0", borderBottom: "1px solid #f0f0f0",
               display: "flex", alignItems: "center", gap: 8,
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 12, fontWeight: 600 }} ellipsis>{item.nombre}</Text>
+                <Text style={{ fontSize: 12, fontWeight: 700 }} ellipsis>{item.nombre}</Text>
                 <div>
-                  <Text style={{ fontSize: 11, color: "#d81b87" }}>
+                  <Text style={{ fontSize: 10, color: "#d81b87" }}>
                     ${Number(item.precio_venta).toLocaleString()}
                   </Text>
                 </div>
@@ -1123,7 +1134,7 @@ export default function VentasPage() {
       </div>
 
       {/* Descuento */}
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: 6 }}>
         <Row align="middle" gutter={8}>
           <Col>
             <Text style={{ fontSize: 12, color: "#888" }}>Descuento:</Text>
@@ -1147,10 +1158,10 @@ export default function VentasPage() {
         </Row>
       </div>
 
-      <Divider style={{ margin: "8px 0" }} />
+      <Divider style={{ margin: "6px 0" }} />
 
       {/* Totales */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <Text type="secondary">Subtotal</Text>
           <Text>${subtotalCarrito.toLocaleString()}</Text>
@@ -1180,7 +1191,7 @@ export default function VentasPage() {
       {carrito.length > 0 && (
         clienteId && clienteSeleccionado ? (
           <div style={{
-            marginBottom: 10, padding: "8px 12px",
+            marginBottom: 8, padding: "7px 10px",
             background: clienteSeleccionado?.fecha_nacimiento && isBirthdayMonth(clienteSeleccionado.fecha_nacimiento)
               ? "linear-gradient(90deg,#fff1f0,#fff0f6)"
               : "linear-gradient(90deg,#f9f0ff,#fff0f6)",
@@ -1214,7 +1225,7 @@ export default function VentasPage() {
           </div>
         ) : (
           <div style={{
-            marginBottom: 10, padding: "8px 12px",
+            marginBottom: 8, padding: "7px 10px",
             background: "#fffbe6", borderRadius: 8, border: "1px solid #ffe58f",
             display: "flex", alignItems: "center", gap: 8,
           }}>
@@ -1227,7 +1238,7 @@ export default function VentasPage() {
       )}
 
       {/* Botones */}
-      <Space direction="vertical" style={{ width: "100%" }}>
+      <Space direction="vertical" size={8} style={{ width: "100%" }}>
         <Button
           block
           onClick={aparcarVentaActual}
@@ -1256,7 +1267,7 @@ export default function VentasPage() {
           <Card
             size="small"
             title={`Ventas aparcadas (${ventasAparcadas.length})`}
-            styles={{ body: { padding: 8 } }}
+            styles={{ body: { padding: 8, maxHeight: 150, overflowY: "auto" } }}
           >
             <List
               size="small"
@@ -1325,11 +1336,11 @@ export default function VentasPage() {
       </Card>
 
       {/* LAYOUT POS */}
-      <Row gutter={[12, 12]} style={{ height: "calc(100vh - 200px)", minHeight: 500 }}>
-        <Col xs={24} lg={16} style={{ height: "100%", overflowY: "auto" }}>
+      <Row gutter={[12, 12]} style={{ height: "calc(100vh - 180px)", minHeight: 540 }}>
+        <Col xs={24} lg={15} style={{ height: "100%", overflowY: "auto" }}>
           {panelProductos}
         </Col>
-        <Col xs={24} lg={8} style={{ height: "100%" }}>
+        <Col xs={24} lg={9} style={{ height: "100%" }}>
           {panelCarrito}
         </Col>
       </Row>
