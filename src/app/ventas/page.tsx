@@ -1361,7 +1361,14 @@ export default function VentasPage() {
   );
 
   return (
-    <>
+    <div
+      style={{
+        height: isMobile ? "auto" : "calc(100dvh - 24px)",
+        overflow: isMobile ? "visible" : "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {/* HEADER */}
       <Card style={{ marginBottom: 8, borderRadius: 10 }} styles={{ body: { padding: "6px 12px" } }}>
         <Row align="middle" justify="space-between">
@@ -1387,11 +1394,11 @@ export default function VentasPage() {
       </Card>
 
       {/* LAYOUT POS */}
-      <Row gutter={[12, 12]} style={{ height: "calc(100vh - 154px)", minHeight: 580 }}>
-        <Col xs={24} lg={14} style={{ height: "100%", overflowY: "auto" }}>
+      <Row gutter={[12, 12]} style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+        <Col xs={24} lg={14} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
           {panelProductos}
         </Col>
-        <Col xs={24} lg={10} style={{ height: "100%" }}>
+        <Col xs={24} lg={10} style={{ height: "100%", minHeight: 0 }}>
           {panelCarrito}
         </Col>
       </Row>
@@ -1740,6 +1747,6 @@ export default function VentasPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   );
 }
