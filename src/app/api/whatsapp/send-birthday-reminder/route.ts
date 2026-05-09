@@ -223,27 +223,23 @@ export async function POST(
       );
     }
 
-    // 3. Conectar a Supabase
+    // 3. Conectar a Supabase con service_role_key para evitar bloqueos RLS
+    // (el cron de Vercel no tiene sesión de usuario, la clave anon devuelve 0 filas).
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json(
         {
           success: false,
-          error: "Configuración de Supabase faltante",
+          error: "Configuración de Supabase faltante (SUPABASE_SERVICE_ROLE_KEY)",
         } as BirthdayReminderResponse,
         { status: 500 }
       );
     }
 
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll() {},
-      },
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
     // 4. Obtener clientes con cumpleaños en el offset especificado.
