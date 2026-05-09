@@ -124,6 +124,63 @@ function enqueueLabelJob(payload) {
   });
 }
 
+function listPrintersWithPowerShell() {
+  return new Promise((resolve, reject) => {
+    const command = [
+      "$ErrorActionPreference='Stop'",
+      "$default = (Get-CimInstance Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -ExpandProperty Name -First 1)",
+      "$rows = Get-CimInstance Win32_Printer | Select-Object Name, Default, PrinterStatus",
+      "$out = @($rows | ForEach-Object {",
+      "  [PSCustomObject]@{",
+      "    name = [string]$_.Name",
+      "    isDefault = [bool]$_.Default",
+      "    status = [string]$_.PrinterStatus",
+      "  }",
+      "})",
+      "if (-not $out -or $out.Count -eq 0) {",
+      "  if ($default) {",
+      "    $out = @([PSCustomObject]@{ name = [string]$default; isDefault = $true; status = 'unknown' })",
+      "  }",
+      "}",
+      "$out | ConvertTo-Json -Compress",
+    ].join("; ");
+
+    const ps = spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command], {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    ps.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    ps.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    ps.on("error", (error) => reject(error));
+
+    ps.on("close", (code) => {
+      if (code !== 0) {
+        return reject(new Error((stderr || "Error listando impresoras por PowerShell").trim()));
+      }
+
+      try {
+        const raw = stdout.trim();
+        if (!raw) return resolve([]);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return resolve(parsed);
+        resolve([parsed]);
+      } catch (error) {
+        reject(new Error(`No se pudo parsear salida de PowerShell: ${error?.message || error}`));
+      }
+    });
+  });
+}
+
 async function processLabelQueue() {
   if (processingLabelQueue) return;
   processingLabelQueue = true;
@@ -165,12 +222,22 @@ app.get("/health", (_req, res) => {
 
 app.get("/printers", async (_req, res) => {
   try {
-    const printers = await getPrinters();
-    const normalized = (printers || []).map((p) => ({
-      name: p.name,
-      isDefault: Boolean(p.default),
-      status: p.status || "unknown",
-    }));
+    let printers = [];
+
+    try {
+      printers = await getPrinters();
+    } catch (_error) {
+      printers = await listPrintersWithPowerShell();
+    }
+
+    const normalized = (printers || [])
+      .map((p) => ({
+        name: String(p?.name || p?.Name || "").trim(),
+        isDefault: Boolean(p?.default ?? p?.Default ?? p?.isDefault),
+        status: String(p?.status || p?.PrinterStatus || "unknown"),
+      }))
+      .filter((p) => p.name.length > 0);
+
     return res.json({ ok: true, printers: normalized });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error?.message || "No se pudieron listar impresoras" });
