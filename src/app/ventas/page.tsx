@@ -182,6 +182,7 @@ export default function VentasPage() {
   const [imprimirTicket, setImprimirTicket] = useState(true);
   const [ventasAparcadas, setVentasAparcadas] = useState<VentaAparcada[]>([]);
   const [restaurandoVentaId, setRestaurandoVentaId] = useState<string | null>(null);
+  const [productoAgregadoReciente, setProductoAgregadoReciente] = useState<string | null>(null);
 
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
   const [nuevoClienteForm] = Form.useForm();
@@ -500,6 +501,7 @@ export default function VentasPage() {
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
 
   const agregarAlCarrito = (art: Articulo) => {
+    setProductoAgregadoReciente(art.id);
     setCarrito((prev) => {
       const existe = prev.find((i) => i.id === art.id);
       if (existe) {
@@ -582,6 +584,13 @@ export default function VentasPage() {
     limpiarVenta();
     message.success("Venta aparcada. Puedes atender al siguiente cliente.");
   }, [carrito, clienteId, descuento, metodoPago, efectivoRecibido, pagoMixto, voucherClub, codigoVoucherClub, imprimirTicket, persistirVentasAparcadas, message]);
+
+  // Limpiar el highlight de producto agregado después de 2 segundos
+  useEffect(() => {
+    if (!productoAgregadoReciente) return;
+    const timer = setTimeout(() => setProductoAgregadoReciente(null), 2000);
+    return () => clearTimeout(timer);
+  }, [productoAgregadoReciente]);
 
   const eliminarVentaAparcada = useCallback((ventaId: string) => {
     setVentasAparcadas((prev) => {
@@ -1069,38 +1078,52 @@ export default function VentasPage() {
               </tr>
             </thead>
             <tbody>
-              {carrito.map((item) => (
-                <tr key={item.id} style={{ borderBottom: "1px solid #f0f0f0", height: 40 }}>
-                  <td style={{ padding: "4px 6px" }}>
-                    <Text style={{ fontSize: 13, fontWeight: 600 }} ellipsis>
-                      {item.nombre.length > 18 ? item.nombre.substring(0, 15) + "..." : item.nombre}
-                    </Text>
-                  </td>
-                  <td style={{ textAlign: "center", padding: "4px 0", color: "#d81b87", fontSize: 12 }}>
-                    ${Number(item.precio_venta).toLocaleString()}
-                  </td>
-                  <td style={{ textAlign: "center", padding: "4px 0" }}>
-                    <Space size={2}>
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<MinusOutlined />}
-                        onClick={() => cambiarCantidad(item.id, -1)}
-                        style={{ padding: "0 4px", height: 24 }}
-                      />
-                      <Text strong style={{ minWidth: 20, textAlign: "center", fontSize: 12 }}>{item.cantidad}</Text>
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<PlusOutlined />}
-                        onClick={() => cambiarCantidad(item.id, 1)}
-                        style={{ padding: "0 4px", height: 24 }}
-                      />
-                    </Space>
-                  </td>
-                  <td style={{ textAlign: "right", padding: "4px 6px", fontSize: 13, fontWeight: 700, color: "#7a1b6f" }}>
-                    ${Number(item.subtotal).toLocaleString()}
-                  </td>
+              {carrito.map((item) => {
+                const esProductoReciente = productoAgregadoReciente === item.id;
+                return (
+                  <tr 
+                    key={item.id} 
+                    style={{ 
+                      borderBottom: "1px solid #f0f0f0", 
+                      height: 40,
+                      background: esProductoReciente ? "#f6ffed" : "transparent",
+                      borderLeft: esProductoReciente ? "4px solid #52c41a" : "4px solid transparent",
+                      transition: "background-color 0.3s ease-out"
+                    }}
+                  >
+                    <td style={{ padding: "4px 6px" }}>
+                      <Text style={{ fontSize: 13, fontWeight: 600 }} ellipsis>
+                        {item.nombre.length > 18 ? item.nombre.substring(0, 15) + "..." : item.nombre}
+                      </Text>
+                      {esProductoReciente && (
+                        <div style={{ display: "inline-block", marginLeft: 4 }}>✓</div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: "center", padding: "4px 0", color: "#d81b87", fontSize: 12 }}>
+                      ${Number(item.precio_venta).toLocaleString()}
+                    </td>
+                    <td style={{ textAlign: "center", padding: "4px 0" }}>
+                      <Space size={2}>
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<MinusOutlined />}
+                          onClick={() => cambiarCantidad(item.id, -1)}
+                          style={{ padding: "0 4px", height: 24 }}
+                        />
+                        <Text strong style={{ minWidth: 20, textAlign: "center", fontSize: 12 }}>{item.cantidad}</Text>
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<PlusOutlined />}
+                          onClick={() => cambiarCantidad(item.id, 1)}
+                          style={{ padding: "0 4px", height: 24 }}
+                        />
+                      </Space>
+                    </td>
+                    <td style={{ textAlign: "right", padding: "4px 6px", fontSize: 13, fontWeight: 700, color: "#7a1b6f" }}>
+                      ${Number(item.subtotal).toLocaleString()}
+                    </td>
                   <td style={{ textAlign: "center", padding: "2px 0" }}>
                     <Button
                       type="text"
@@ -1112,7 +1135,8 @@ export default function VentasPage() {
                     />
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         )}
