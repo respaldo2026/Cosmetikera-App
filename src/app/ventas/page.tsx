@@ -1085,13 +1085,13 @@ export default function VentasPage() {
                     key={item.id} 
                     style={{ 
                       borderBottom: "1px solid #f0f0f0", 
-                      height: 40,
+                      height: 52,
                       background: esProductoReciente ? "#f6ffed" : "transparent",
                       borderLeft: esProductoReciente ? "4px solid #52c41a" : "4px solid transparent",
                       transition: "background-color 0.3s ease-out"
                     }}
                   >
-                    <td style={{ padding: "4px 6px" }}>
+                    <td style={{ padding: "6px 6px", verticalAlign: "middle" }}>
                       <Text style={{ fontSize: 13, fontWeight: 600 }} ellipsis>
                         {item.nombre.length > 18 ? item.nombre.substring(0, 15) + "..." : item.nombre}
                       </Text>
@@ -1099,10 +1099,10 @@ export default function VentasPage() {
                         <div style={{ display: "inline-block", marginLeft: 4 }}>✓</div>
                       )}
                     </td>
-                    <td style={{ textAlign: "center", padding: "4px 0", color: "#d81b87", fontSize: 12 }}>
+                    <td style={{ textAlign: "center", padding: "6px 0", color: "#d81b87", fontSize: 12, verticalAlign: "middle" }}>
                       ${Number(item.precio_venta).toLocaleString()}
                     </td>
-                    <td style={{ textAlign: "center", padding: "4px 0" }}>
+                    <td style={{ textAlign: "center", padding: "6px 0", verticalAlign: "middle" }}>
                       <Space size={2}>
                         <Button
                           size="small"
@@ -1121,7 +1121,7 @@ export default function VentasPage() {
                         />
                       </Space>
                     </td>
-                    <td style={{ textAlign: "right", padding: "4px 6px", fontSize: 13, fontWeight: 700, color: "#7a1b6f" }}>
+                    <td style={{ textAlign: "right", padding: "6px 6px", fontSize: 13, fontWeight: 700, color: "#7a1b6f", verticalAlign: "middle" }}>
                       ${Number(item.subtotal).toLocaleString()}
                     </td>
                   <td style={{ textAlign: "center", padding: "2px 0" }}>
