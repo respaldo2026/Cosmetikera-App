@@ -1363,31 +1363,31 @@ export default function VentasPage() {
   return (
     <>
       {/* HEADER */}
-      <Card style={{ marginBottom: 12, borderRadius: 12 }} styles={{ body: { padding: "10px 16px" } }}>
+      <Card style={{ marginBottom: 8, borderRadius: 10 }} styles={{ body: { padding: "6px 12px" } }}>
         <Row align="middle" justify="space-between">
           <Col>
-            <Space>
+            <Space size={10}>
               <div style={{
-                width: 40, height: 40, borderRadius: 10,
+                width: 32, height: 32, borderRadius: 8,
                 background: "linear-gradient(135deg,#d81b87,#9c27b0)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <ShoppingCartOutlined style={{ color: "#fff", fontSize: 20 }} />
+                <ShoppingCartOutlined style={{ color: "#fff", fontSize: 16 }} />
               </div>
               <div>
-                <Title level={4} style={{ margin: 0 }}>Punto de Venta</Title>
-                <Text type="secondary" style={{ fontSize: 11 }}>{dayjs().format("dddd D [de] MMMM, YYYY")}</Text>
+                <Title level={5} style={{ margin: 0, lineHeight: 1.1 }}>Punto de Venta</Title>
+                <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.1 }}>{dayjs().format("dddd D [de] MMMM, YYYY")}</Text>
               </div>
             </Space>
           </Col>
           <Col>
-            <Button icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
+            <Button size="small" icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
           </Col>
         </Row>
       </Card>
 
       {/* LAYOUT POS */}
-      <Row gutter={[12, 12]} style={{ height: "calc(100vh - 170px)", minHeight: 580 }}>
+      <Row gutter={[12, 12]} style={{ height: "calc(100vh - 154px)", minHeight: 580 }}>
         <Col xs={24} lg={14} style={{ height: "100%", overflowY: "auto" }}>
           {panelProductos}
         </Col>
