@@ -200,6 +200,7 @@ export default function ConfiguracionPage() {
   const [posLabelPrinterName, setPosLabelPrinterName] = useState<string>("");
   const [posPrinterWidth, setPosPrinterWidth] = useState<number>(48);
   const [labelTemplateConfig, setLabelTemplateConfig] = useState<LabelTemplateConfig>(DEFAULT_LABEL_TEMPLATE);
+  const [posConfigTab, setPosConfigTab] = useState<string>("pos-printer");
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
   const [testCajon, setTestCajon] = useState(false);
@@ -533,6 +534,47 @@ export default function ConfiguracionPage() {
     } catch {
       messageApi.warning(`Copia manualmente este sitio en QZ Tray: ${currentSiteOrigin}`);
     }
+  };
+
+  const handleLabelLogoUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      messageApi.error("Solo puedes subir imágenes para el logo de la etiqueta");
+      return Upload.LIST_IGNORE;
+    }
+
+    if (file.size > 220 * 1024) {
+      messageApi.error("La imagen debe pesar máximo 220 KB para evitar fallos al enviar a la impresora");
+      return Upload.LIST_IGNORE;
+    }
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
+        reader.readAsDataURL(file);
+      });
+
+      setLabelTemplateConfig((prev) => ({
+        ...prev,
+        logoEnabled: true,
+        logoDataUrl: dataUrl,
+      }));
+      messageApi.success("Imagen de etiqueta cargada");
+    } catch {
+      messageApi.error("No se pudo cargar la imagen");
+    }
+
+    return Upload.LIST_IGNORE;
+  };
+
+  const clearLabelLogo = () => {
+    setLabelTemplateConfig((prev) => ({
+      ...prev,
+      logoEnabled: false,
+      logoDataUrl: "",
+    }));
+    messageApi.info("Imagen de etiqueta eliminada");
   };
 
   const renderTicketDesigner = () => {
@@ -1728,304 +1770,249 @@ export default function ConfiguracionPage() {
 
       {/* Selección de impresora */}
       <Divider orientation="left">Configuración de impresión</Divider>
-      <Row gutter={[16, 16]}>
-        {(usaQZ || usaAgenteLocal) && (
-          <Col xs={24}>
-            <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de tickets</div>
-            {impresorasDisponibles.length > 0 ? (
-              <Select
-                showSearch
-                value={posPrinterName || undefined}
-                placeholder="Selecciona la impresora"
-                style={{ width: "100%" }}
-                onChange={(v) => setPosPrinterName(v)}
-                options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
-              />
-            ) : (
-              <Input
-                value={posPrinterName}
-                onChange={(e) => setPosPrinterName(e.target.value)}
-                placeholder="Ej: EPSON TM-T20II"
-                prefix={<PrinterOutlined />}
-              />
-            )}
-            <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
-              Deja vacío para usar la impresora predeterminada del sistema.
-            </div>
-          </Col>
-        )}
-        {(usaQZ || usaAgenteLocal) && (
-          <Col xs={24}>
-            <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de etiquetas</div>
-            {impresorasDisponibles.length > 0 ? (
-              <Select
-                showSearch
-                allowClear
-                value={posLabelPrinterName || undefined}
-                placeholder="Selecciona la impresora de etiquetas"
-                style={{ width: "100%" }}
-                onChange={(v) => setPosLabelPrinterName(v || "")}
-                options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
-              />
-            ) : (
-              <Input
-                value={posLabelPrinterName}
-                onChange={(e) => setPosLabelPrinterName(e.target.value)}
-                placeholder="Ej: 4BARCODE 4B-2054TG"
-                prefix={<TagsOutlined />}
-              />
-            )}
-            <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
-              Esta impresora se guarda en este navegador/equipo para usarse en Articulos y Compras.
-            </div>
-          </Col>
-        )}
-        <Col xs={24}>
-          <Divider orientation="left" style={{ margin: "8px 0" }}>Formato de etiquetas</Divider>
-          <Row gutter={[12, 12]}>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho pagina (mm)</div>
-              <InputNumber
-                min={30}
-                max={120}
-                step={0.1}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.pageWidthMm}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageWidthMm: Number(v || prev.pageWidthMm) }))}
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alto pagina (mm)</div>
-              <InputNumber
-                min={10}
-                max={80}
-                step={0.1}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.pageHeightMm}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageHeightMm: Number(v || prev.pageHeightMm) }))}
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho etiqueta (mm)</div>
-              <InputNumber
-                min={10}
-                max={80}
-                step={0.1}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.labelWidthMm}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, labelWidthMm: Number(v || prev.labelWidthMm) }))}
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alto etiqueta (mm)</div>
-              <InputNumber
-                min={8}
-                max={60}
-                step={0.1}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.labelHeightMm}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, labelHeightMm: Number(v || prev.labelHeightMm) }))}
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Columnas</div>
-              <InputNumber
-                min={1}
-                max={6}
-                step={1}
-                precision={0}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.columns}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, columns: Math.max(1, Number(v || prev.columns)) }))}
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Margen izq. (mm)</div>
-              <InputNumber
-                min={0}
-                max={20}
-                step={0.1}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.marginLeftMm}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, marginLeftMm: Number(v || 0) }))}
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Espacio horizontal (mm)</div>
-              <InputNumber
-                min={0}
-                max={20}
-                step={0.1}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.gapHorizontalMm}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, gapHorizontalMm: Number(v || 0) }))}
-              />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Radio esquina (mm)</div>
-              <InputNumber
-                min={0}
-                max={10}
-                step={0.1}
-                style={{ width: "100%" }}
-                value={labelTemplateConfig.cornerRadiusMm}
-                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, cornerRadiusMm: Number(v || 0) }))}
-              />
-            </Col>
-          </Row>
-          <Space style={{ marginTop: 10 }}>
-            <Button
-              onClick={() => setLabelTemplateConfig(DEFAULT_LABEL_TEMPLATE)}
-              icon={<ReloadOutlined />}
-            >
-              Restaurar medidas por defecto
-            </Button>
-            <Button
-              onClick={() => setLabelTemplateConfig((prev) => ({ ...prev, columns: 3 }))}
-            >
-              Usar 3 etiquetas por fila
-            </Button>
-          </Space>
-          <Card size="small" style={{ marginTop: 12, background: "#fafafa", borderColor: "#f0f0f0" }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Vista previa en vivo</div>
-            <div style={{ color: "#777", fontSize: 12, marginBottom: 10 }}>
-              Simulación de la primera fila con los valores actuales.
-            </div>
-            {(() => {
-              const pageWidthMm = Math.max(30, Number(labelTemplateConfig.pageWidthMm || 104));
-              const pageHeightMm = Math.max(10, Number(labelTemplateConfig.pageHeightMm || 15));
-              const labelWidthMm = Math.max(8, Number(labelTemplateConfig.labelWidthMm || 32));
-              const labelHeightMm = Math.max(8, Number(labelTemplateConfig.labelHeightMm || 15));
-              const columns = Math.max(1, Math.round(Number(labelTemplateConfig.columns || 3)));
-              const marginLeftMm = Math.max(0, Number(labelTemplateConfig.marginLeftMm || 0));
-              const gapMm = Math.max(0, Number(labelTemplateConfig.gapHorizontalMm || 0));
-              const cornerRadiusMm = Math.max(0, Number(labelTemplateConfig.cornerRadiusMm || 0));
-
-              const previewMaxWidthPx = 520;
-              const previewScale = Math.max(2.6, Math.min(4.8, previewMaxWidthPx / pageWidthMm));
-              const pageWidthPx = pageWidthMm * previewScale;
-              const pageHeightPx = pageHeightMm * previewScale;
-              const labelWidthPx = labelWidthMm * previewScale;
-              const labelHeightPx = labelHeightMm * previewScale;
-              const marginLeftPx = marginLeftMm * previewScale;
-              const gapPx = gapMm * previewScale;
-              const radiusPx = cornerRadiusMm * previewScale;
-              const requiredWidthMm = marginLeftMm + (columns * labelWidthMm) + (Math.max(0, columns - 1) * gapMm);
-              const overflow = requiredWidthMm > pageWidthMm + 0.001;
-
-              return (
-                <>
-                  <div
-                    style={{
-                      width: pageWidthPx,
-                      maxWidth: "100%",
-                      height: pageHeightPx + 24,
-                      border: "1px dashed #d9d9d9",
-                      borderRadius: 8,
-                      background: "repeating-linear-gradient(45deg, #fff, #fff 10px, #fcfcfc 10px, #fcfcfc 20px)",
-                      overflow: "hidden",
-                      position: "relative",
-                    }}
+      <Tabs
+        activeKey={posConfigTab}
+        onChange={(key) => setPosConfigTab(key)}
+        items={[
+          {
+            key: "pos-printer",
+            label: "Impresora POS",
+            children: (
+              <Row gutter={[16, 16]}>
+                {(usaQZ || usaAgenteLocal) && (
+                  <Col xs={24}>
+                    <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de tickets</div>
+                    {impresorasDisponibles.length > 0 ? (
+                      <Select
+                        showSearch
+                        value={posPrinterName || undefined}
+                        placeholder="Selecciona la impresora"
+                        style={{ width: "100%" }}
+                        onChange={(v) => setPosPrinterName(v)}
+                        options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
+                      />
+                    ) : (
+                      <Input
+                        value={posPrinterName}
+                        onChange={(e) => setPosPrinterName(e.target.value)}
+                        placeholder="Ej: EPSON TM-T20II"
+                        prefix={<PrinterOutlined />}
+                      />
+                    )}
+                    <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+                      Deja vacío para usar la impresora predeterminada del sistema.
+                    </div>
+                  </Col>
+                )}
+                <Col xs={24}>
+                  <div style={{ marginBottom: 8, fontWeight: 500 }}>Ancho de papel</div>
+                  <Radio.Group
+                    value={posPrinterWidth}
+                    onChange={(e) => setPosPrinterWidth(e.target.value)}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: gapPx,
-                        paddingLeft: marginLeftPx,
-                        height: pageHeightPx,
-                        paddingTop: 6,
-                      }}
-                    >
-                      {Array.from({ length: columns }).map((_, idx) => (
+                    <Radio value={48}>
+                      <strong>80 mm</strong>{" "}
+                      <span style={{ color: "#888", fontSize: 12 }}>(48 chars — Epson TM-T20II)</span>
+                    </Radio>
+                    <Radio value={32}>
+                      <strong>58 mm</strong>{" "}
+                      <span style={{ color: "#888", fontSize: 12 }}>(32 chars)</span>
+                    </Radio>
+                  </Radio.Group>
+                </Col>
+              </Row>
+            ),
+          },
+          {
+            key: "label-printer",
+            label: "Impresora etiquetas",
+            children: (
+              <Row gutter={[16, 16]}>
+                {(usaQZ || usaAgenteLocal) && (
+                  <Col xs={24}>
+                    <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de etiquetas</div>
+                    {impresorasDisponibles.length > 0 ? (
+                      <Select
+                        showSearch
+                        allowClear
+                        value={posLabelPrinterName || undefined}
+                        placeholder="Selecciona la impresora de etiquetas"
+                        style={{ width: "100%" }}
+                        onChange={(v) => setPosLabelPrinterName(v || "")}
+                        options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
+                      />
+                    ) : (
+                      <Input
+                        value={posLabelPrinterName}
+                        onChange={(e) => setPosLabelPrinterName(e.target.value)}
+                        placeholder="Ej: 4BARCODE 4B-2054TG"
+                        prefix={<TagsOutlined />}
+                      />
+                    )}
+                    <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+                      Esta impresora se guarda en este navegador/equipo para usarse en Articulos y Compras.
+                    </div>
+                  </Col>
+                )}
+
+                <Col xs={24}>
+                  <Divider orientation="left" style={{ margin: "6px 0" }}>Formato base</Divider>
+                  <Row gutter={[12, 12]}>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho pagina (mm)</div><InputNumber min={30} max={120} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.pageWidthMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageWidthMm: Number(v || prev.pageWidthMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alto pagina (mm)</div><InputNumber min={8} max={80} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.pageHeightMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageHeightMm: Number(v || prev.pageHeightMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho etiqueta (mm)</div><InputNumber min={8} max={90} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.labelWidthMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, labelWidthMm: Number(v || prev.labelWidthMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alto etiqueta (mm)</div><InputNumber min={8} max={60} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.labelHeightMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, labelHeightMm: Number(v || prev.labelHeightMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Columnas</div><InputNumber min={1} max={6} step={1} precision={0} style={{ width: "100%" }} value={labelTemplateConfig.columns} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, columns: Math.max(1, Number(v || prev.columns)) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Margen izq. (mm)</div><InputNumber min={0} max={40} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.marginLeftMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, marginLeftMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Espacio horizontal (mm)</div><InputNumber min={0} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.gapHorizontalMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, gapHorizontalMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Radio esquina (mm)</div><InputNumber min={0} max={12} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.cornerRadiusMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, cornerRadiusMm: Number(v || 0) }))} /></Col>
+                  </Row>
+                </Col>
+
+                <Col xs={24}>
+                  <Divider orientation="left" style={{ margin: "6px 0" }}>Contenido y tipografia</Divider>
+                  <Row gutter={[12, 12]}>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Padding izq. contenido (mm)</div><InputNumber min={0} max={10} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.contentPaddingLeftMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, contentPaddingLeftMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Offset superior contenido (mm)</div><InputNumber min={0} max={10} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.contentTopMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, contentTopMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Precio: offset Y (mm)</div><InputNumber min={0} max={30} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.priceTopMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, priceTopMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Precio: tamaño fuente</div><InputNumber min={6} max={36} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.priceFontSize} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, priceFontSize: Number(v || prev.priceFontSize) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Nombre: tamaño fuente</div><InputNumber min={5} max={24} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.nameFontSize} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, nameFontSize: Number(v || prev.nameFontSize) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Nombre: max caracteres</div><InputNumber min={6} max={60} step={1} precision={0} style={{ width: "100%" }} value={labelTemplateConfig.nameMaxLen} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, nameMaxLen: Math.max(6, Number(v || prev.nameMaxLen)) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Mostrar nombre tienda</div><Switch checked={labelTemplateConfig.showStoreName} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showStoreName: checked }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tienda: fuente</div><InputNumber min={4} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.storeNameFontSize} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, storeNameFontSize: Number(v || prev.storeNameFontSize) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tienda: max caracteres</div><InputNumber min={6} max={40} step={1} precision={0} style={{ width: "100%" }} value={labelTemplateConfig.storeNameMaxLen} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, storeNameMaxLen: Math.max(6, Number(v || prev.storeNameMaxLen)) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>DataMatrix: tamaño (mm)</div><InputNumber min={3} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.dataMatrixSizeMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, dataMatrixSizeMm: Number(v || prev.dataMatrixSizeMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>DataMatrix: padding X (mm)</div><InputNumber min={0} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.dataMatrixXPaddingMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, dataMatrixXPaddingMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>DataMatrix: padding Y (mm)</div><InputNumber min={0} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.dataMatrixYPaddingMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, dataMatrixYPaddingMm: Number(v || 0) }))} /></Col>
+                  </Row>
+                </Col>
+
+                <Col xs={24}>
+                  <Divider orientation="left" style={{ margin: "6px 0" }}>Imagen en etiqueta</Divider>
+                  <Space wrap>
+                    <Switch checked={labelTemplateConfig.logoEnabled} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, logoEnabled: checked }))} />
+                    <Upload beforeUpload={handleLabelLogoUpload} showUploadList={false} accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                      <Button icon={<UploadOutlined />}>Subir imagen</Button>
+                    </Upload>
+                    <Button danger onClick={clearLabelLogo}>Quitar imagen</Button>
+                  </Space>
+                  <Row gutter={[12, 12]} style={{ marginTop: 10 }}>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Logo ancho (mm)</div><InputNumber min={2} max={30} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.logoWidthMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, logoWidthMm: Number(v || prev.logoWidthMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Logo alto (mm)</div><InputNumber min={1} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.logoHeightMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, logoHeightMm: Number(v || prev.logoHeightMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Logo offset X (mm)</div><InputNumber min={0} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.logoXOffsetMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, logoXOffsetMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Logo offset Y (mm)</div><InputNumber min={0} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.logoYOffsetMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, logoYOffsetMm: Number(v || 0) }))} /></Col>
+                  </Row>
+                </Col>
+
+                <Col xs={24}>
+                  <Space style={{ marginBottom: 10 }} wrap>
+                    <Button onClick={() => setLabelTemplateConfig(DEFAULT_LABEL_TEMPLATE)} icon={<ReloadOutlined />}>Restaurar medidas por defecto</Button>
+                    <Button onClick={() => setLabelTemplateConfig((prev) => ({ ...prev, columns: 3 }))}>Usar 3 etiquetas por fila</Button>
+                  </Space>
+                  <Card size="small" style={{ background: "#fafafa", borderColor: "#f0f0f0" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Vista previa en vivo (detalle)</div>
+                    <div style={{ color: "#777", fontSize: 12, marginBottom: 10 }}>
+                      Se actualiza al instante al mover cualquier medida. Simula la primera fila y una etiqueta ampliada.
+                    </div>
+                    {(() => {
+                      const cfg = labelTemplateConfig;
+                      const pageWidthMm = Math.max(30, Number(cfg.pageWidthMm || 104));
+                      const pageHeightMm = Math.max(8, Number(cfg.pageHeightMm || 15));
+                      const labelWidthMm = Math.max(8, Number(cfg.labelWidthMm || 32));
+                      const labelHeightMm = Math.max(8, Number(cfg.labelHeightMm || 15));
+                      const columns = Math.max(1, Math.round(Number(cfg.columns || 3)));
+                      const marginLeftMm = Math.max(0, Number(cfg.marginLeftMm || 0));
+                      const gapMm = Math.max(0, Number(cfg.gapHorizontalMm || 0));
+                      const requiredWidthMm = marginLeftMm + (columns * labelWidthMm) + (Math.max(0, columns - 1) * gapMm);
+                      const overflow = requiredWidthMm > pageWidthMm + 0.001;
+
+                      const rowScale = Math.max(2.4, Math.min(4.6, 520 / pageWidthMm));
+                      const zoomScale = 11;
+                      const dmSizePx = Math.max(8, cfg.dataMatrixSizeMm * zoomScale);
+
+                      const labelSample = (
                         <div
-                          key={`preview-label-${idx}`}
                           style={{
-                            width: labelWidthPx,
-                            height: labelHeightPx,
+                            width: labelWidthMm * zoomScale,
+                            height: labelHeightMm * zoomScale,
+                            border: "1px solid #d9d9d9",
+                            borderRadius: cfg.cornerRadiusMm * zoomScale,
                             background: "#fff",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: radiusPx,
-                            padding: 4,
-                            boxSizing: "border-box",
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "space-between",
+                            position: "relative",
+                            overflow: "hidden",
                           }}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
-                            <div
+                          {cfg.logoEnabled && cfg.logoDataUrl && (
+                            <img
+                              src={cfg.logoDataUrl}
+                              alt="Logo etiqueta"
                               style={{
-                                fontSize: Math.max(6, Math.min(10, labelHeightPx * 0.24)),
-                                fontWeight: 700,
-                                lineHeight: 1,
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                maxWidth: "70%",
-                              }}
-                            >
-                              Producto
-                            </div>
-                            <div
-                              style={{
-                                width: Math.max(9, labelHeightPx * 0.32),
-                                height: Math.max(9, labelHeightPx * 0.32),
-                                border: "1px solid #111",
-                                background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 4px 4px",
+                                position: "absolute",
+                                left: cfg.logoXOffsetMm * zoomScale,
+                                top: cfg.logoYOffsetMm * zoomScale,
+                                width: cfg.logoWidthMm * zoomScale,
+                                height: cfg.logoHeightMm * zoomScale,
+                                objectFit: "contain",
                               }}
                             />
+                          )}
+                          {cfg.showStoreName && (
+                            <div style={{ position: "absolute", left: cfg.contentPaddingLeftMm * zoomScale, top: cfg.contentTopMm * zoomScale, fontSize: Math.max(8, cfg.storeNameFontSize * 2), fontWeight: 700, maxWidth: labelWidthMm * zoomScale - dmSizePx - 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              LA COSMETIKERA
+                            </div>
+                          )}
+                          <div style={{ position: "absolute", left: cfg.contentPaddingLeftMm * zoomScale, top: (cfg.contentTopMm + 2.6) * zoomScale, fontSize: Math.max(10, cfg.nameFontSize * 1.9), fontWeight: 700, maxWidth: labelWidthMm * zoomScale - dmSizePx - 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            ACE Almendra
                           </div>
-                          <div
-                            style={{
-                              fontSize: Math.max(8, Math.min(14, labelHeightPx * 0.42)),
-                              fontWeight: 800,
-                              lineHeight: 1,
-                            }}
-                          >
+                          <div style={{ position: "absolute", left: 1.1 * zoomScale, top: cfg.priceTopMm * zoomScale, fontSize: Math.max(13, cfg.priceFontSize * 1.6), fontWeight: 800, lineHeight: 1 }}>
                             $13.400
                           </div>
+                          <div style={{ position: "absolute", right: cfg.dataMatrixXPaddingMm * zoomScale, top: cfg.dataMatrixYPaddingMm * zoomScale, width: dmSizePx, height: dmSizePx, border: "1px solid #111", background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 6px 6px" }} />
                         </div>
-                      ))}
-                    </div>
-                    <div style={{ position: "absolute", right: 8, bottom: 6, fontSize: 11, color: "#666" }}>
-                      {pageWidthMm.toFixed(1)} x {pageHeightMm.toFixed(1)} mm
-                    </div>
+                      );
+
+                      return (
+                        <>
+                          <div style={{ width: pageWidthMm * rowScale, maxWidth: "100%", minHeight: pageHeightMm * rowScale + 18, border: "1px dashed #d9d9d9", borderRadius: 8, background: "repeating-linear-gradient(45deg,#fff,#fff 10px,#fcfcfc 10px,#fcfcfc 20px)", overflow: "hidden", position: "relative", marginBottom: 10 }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: gapMm * rowScale, paddingLeft: marginLeftMm * rowScale, paddingTop: 6 }}>
+                              {Array.from({ length: columns }).map((_, idx) => (
+                                <div key={`live-row-${idx}`} style={{ width: labelWidthMm * rowScale, height: labelHeightMm * rowScale, borderRadius: cfg.cornerRadiusMm * rowScale, border: "1px solid #e5e7eb", background: "#fff" }} />
+                              ))}
+                            </div>
+                            <div style={{ position: "absolute", right: 8, bottom: 6, fontSize: 11, color: "#666" }}>{pageWidthMm.toFixed(1)} x {pageHeightMm.toFixed(1)} mm</div>
+                          </div>
+
+                          <Row gutter={[12, 12]}>
+                            <Col xs={24} md={12}>{labelSample}</Col>
+                            <Col xs={24} md={12}>
+                              <Alert
+                                type="info"
+                                showIcon
+                                message="Resumen de layout"
+                                description={`Fila: ${columns} columnas • Requerido ${requiredWidthMm.toFixed(1)} mm / Página ${pageWidthMm.toFixed(1)} mm`}
+                              />
+                              <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
+                                Consejo: si el texto toca bordes, sube padding izquierdo o baja fuente de precio.
+                              </div>
+                            </Col>
+                          </Row>
+
+                          {overflow && (
+                            <Alert style={{ marginTop: 10 }} type="warning" showIcon message="La fila no cabe en el ancho de página" description={`Ancho requerido: ${requiredWidthMm.toFixed(1)} mm. Reduce columnas/ancho o aumenta ancho de página.`} />
+                          )}
+                        </>
+                      );
+                    })()}
+                  </Card>
+                  <div style={{ color: "#888", fontSize: 12, marginTop: 8 }}>
+                    Estos ajustes se aplican al imprimir etiquetas desde Articulos y Compras en este equipo.
                   </div>
-                  {overflow && (
-                    <Alert
-                      style={{ marginTop: 10 }}
-                      type="warning"
-                      showIcon
-                      message="La fila no cabe en el ancho de página"
-                      description={`Ancho requerido: ${requiredWidthMm.toFixed(1)} mm. Reduce columnas/ancho, o aumenta el ancho de página.`}
-                    />
-                  )}
-                </>
-              );
-            })()}
-          </Card>
-          <div style={{ color: "#888", fontSize: 12, marginTop: 8 }}>
-            Estos ajustes se aplican al imprimir etiquetas desde Articulos y Compras en este equipo.
-          </div>
-        </Col>
-        <Col xs={24}>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>Ancho de papel</div>
-          <Radio.Group
-            value={posPrinterWidth}
-            onChange={(e) => setPosPrinterWidth(e.target.value)}
-          >
-            <Radio value={48}>
-              <strong>80 mm</strong>{" "}
-              <span style={{ color: "#888", fontSize: 12 }}>(48 chars — Epson TM-T20II)</span>
-            </Radio>
-            <Radio value={32}>
-              <strong>58 mm</strong>{" "}
-              <span style={{ color: "#888", fontSize: 12 }}>(32 chars)</span>
-            </Radio>
-          </Radio.Group>
-        </Col>
-      </Row>
+                </Col>
+              </Row>
+            ),
+          },
+        ]}
+      />
 
       <Button
         type="primary"

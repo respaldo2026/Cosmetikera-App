@@ -18,6 +18,21 @@ function normalizeText(input, maxLen) {
   return `${text.slice(0, Math.max(1, maxLen - 1))}…`;
 }
 
+function parseDataUrlImageBuffer(dataUrl) {
+  const raw = String(dataUrl || "").trim();
+  if (!raw.startsWith("data:image/")) return null;
+  const idx = raw.indexOf(",");
+  if (idx < 0) return null;
+  const header = raw.slice(0, idx).toLowerCase();
+  const payload = raw.slice(idx + 1);
+  if (!header.includes(";base64")) return null;
+  try {
+    return Buffer.from(payload, "base64");
+  } catch {
+    return null;
+  }
+}
+
 function expandLabels(items) {
   const expanded = [];
   for (const item of items || []) {
@@ -55,6 +70,24 @@ async function generarPdfEtiquetas(payload) {
     marginLeftMm: Number(payload?.template?.marginLeftMm || 2),
     gapHorizontalMm: Number(payload?.template?.gapHorizontalMm || 2),
     cornerRadiusMm: Number(payload?.template?.cornerRadiusMm || 3.2),
+    contentPaddingLeftMm: Number(payload?.template?.contentPaddingLeftMm || 1.2),
+    contentTopMm: Number(payload?.template?.contentTopMm || 0.6),
+    showStoreName: payload?.template?.showStoreName !== false,
+    storeNameMaxLen: Number(payload?.template?.storeNameMaxLen || 13),
+    storeNameFontSize: Number(payload?.template?.storeNameFontSize || 6.6),
+    nameMaxLen: Number(payload?.template?.nameMaxLen || 16),
+    nameFontSize: Number(payload?.template?.nameFontSize || 7.1),
+    priceFontSize: Number(payload?.template?.priceFontSize || 15.4),
+    priceTopMm: Number(payload?.template?.priceTopMm || 7.1),
+    dataMatrixSizeMm: Number(payload?.template?.dataMatrixSizeMm || 7.4),
+    dataMatrixXPaddingMm: Number(payload?.template?.dataMatrixXPaddingMm || 1.1),
+    dataMatrixYPaddingMm: Number(payload?.template?.dataMatrixYPaddingMm || 3.1),
+    logoEnabled: Boolean(payload?.template?.logoEnabled),
+    logoDataUrl: String(payload?.template?.logoDataUrl || ""),
+    logoWidthMm: Number(payload?.template?.logoWidthMm || 6.5),
+    logoHeightMm: Number(payload?.template?.logoHeightMm || 2.6),
+    logoXOffsetMm: Number(payload?.template?.logoXOffsetMm || 1.2),
+    logoYOffsetMm: Number(payload?.template?.logoYOffsetMm || 0.7),
     storeName: String(payload?.template?.storeName || "La Cosmetikera").trim(),
   };
 
@@ -83,9 +116,16 @@ async function generarPdfEtiquetas(payload) {
   const gapHorizontalPt = mmToPt(settings.gapHorizontalMm);
   const cornerRadiusPt = mmToPt(settings.cornerRadiusMm);
 
-  const dmSizePt = mmToPt(7.4);
-  const dmXPadding = mmToPt(1.1);
-  const dmYPadding = mmToPt(3.1);
+  const dmSizePt = mmToPt(settings.dataMatrixSizeMm);
+  const dmXPadding = mmToPt(settings.dataMatrixXPaddingMm);
+  const dmYPadding = mmToPt(settings.dataMatrixYPaddingMm);
+  const contentPaddingLeftPt = mmToPt(settings.contentPaddingLeftMm);
+  const contentTopPt = mmToPt(settings.contentTopMm);
+  const logoBuffer = settings.logoEnabled ? parseDataUrlImageBuffer(settings.logoDataUrl) : null;
+  const logoWidthPt = mmToPt(settings.logoWidthMm);
+  const logoHeightPt = mmToPt(settings.logoHeightMm);
+  const logoXOffsetPt = mmToPt(settings.logoXOffsetMm);
+  const logoYOffsetPt = mmToPt(settings.logoYOffsetMm);
 
   for (let row = 0; row < rows; row += 1) {
     doc.addPage();
@@ -101,23 +141,35 @@ async function generarPdfEtiquetas(payload) {
       doc.save();
       doc.roundedRect(x, y, labelWidthPt, labelHeightPt, cornerRadiusPt).clip();
 
-      // Logo en negro (texto), alineado arriba a la izquierda
-      doc
-        .fillColor("#000000")
-        .font("Helvetica-Bold")
-        .fontSize(6.6)
-        .text(normalizeText(settings.storeName, 13), x + mmToPt(1.3), y + mmToPt(0.6), {
-          width: labelWidthPt - dmSizePt - mmToPt(3.6),
-          height: mmToPt(2.8),
-          lineBreak: false,
-        });
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, x + logoXOffsetPt, y + logoYOffsetPt, {
+            width: logoWidthPt,
+            height: logoHeightPt,
+          });
+        } catch {
+          // Si la imagen falla, continuamos con el texto.
+        }
+      }
+
+      if (settings.showStoreName) {
+        doc
+          .fillColor("#000000")
+          .font("Helvetica-Bold")
+          .fontSize(settings.storeNameFontSize)
+          .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + contentPaddingLeftPt, y + contentTopPt, {
+            width: labelWidthPt - dmSizePt - mmToPt(3.6),
+            height: mmToPt(2.8),
+            lineBreak: false,
+          });
+      }
 
       // Nombre del artículo
       doc
         .fillColor("#000000")
         .font("Helvetica-Bold")
-        .fontSize(7.1)
-        .text(normalizeText(label.name, 16), x + mmToPt(1.3), y + mmToPt(3.2), {
+        .fontSize(settings.nameFontSize)
+        .text(normalizeText(label.name, settings.nameMaxLen), x + contentPaddingLeftPt, y + mmToPt(3.2), {
           width: labelWidthPt - dmSizePt - mmToPt(3.8),
           height: mmToPt(3.5),
           lineBreak: false,
@@ -127,8 +179,8 @@ async function generarPdfEtiquetas(payload) {
       doc
         .fillColor("#000000")
         .font("Helvetica-Bold")
-        .fontSize(15.4)
-        .text(formatCop(label.price), x + mmToPt(1.1), y + mmToPt(7.1), {
+        .fontSize(settings.priceFontSize)
+        .text(formatCop(label.price), x + mmToPt(1.1), y + mmToPt(settings.priceTopMm), {
           width: labelWidthPt - dmSizePt - mmToPt(3.6),
           height: mmToPt(7.2),
           lineBreak: false,

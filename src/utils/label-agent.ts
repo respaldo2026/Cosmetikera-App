@@ -21,6 +21,24 @@ export type LabelTemplateConfig = {
   marginLeftMm: number;
   gapHorizontalMm: number;
   cornerRadiusMm: number;
+  contentPaddingLeftMm: number;
+  contentTopMm: number;
+  showStoreName: boolean;
+  storeNameMaxLen: number;
+  storeNameFontSize: number;
+  nameMaxLen: number;
+  nameFontSize: number;
+  priceFontSize: number;
+  priceTopMm: number;
+  dataMatrixSizeMm: number;
+  dataMatrixXPaddingMm: number;
+  dataMatrixYPaddingMm: number;
+  logoEnabled: boolean;
+  logoDataUrl: string;
+  logoWidthMm: number;
+  logoHeightMm: number;
+  logoXOffsetMm: number;
+  logoYOffsetMm: number;
 };
 
 export const LABEL_TEMPLATE_STORAGE_KEY = "pos_label_template_v1";
@@ -34,6 +52,24 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
   marginLeftMm: 2,
   gapHorizontalMm: 2,
   cornerRadiusMm: 3.2,
+  contentPaddingLeftMm: 1.2,
+  contentTopMm: 0.6,
+  showStoreName: true,
+  storeNameMaxLen: 13,
+  storeNameFontSize: 6.6,
+  nameMaxLen: 16,
+  nameFontSize: 7.1,
+  priceFontSize: 15.4,
+  priceTopMm: 7.1,
+  dataMatrixSizeMm: 7.4,
+  dataMatrixXPaddingMm: 1.1,
+  dataMatrixYPaddingMm: 3.1,
+  logoEnabled: false,
+  logoDataUrl: "",
+  logoWidthMm: 6.5,
+  logoHeightMm: 2.6,
+  logoXOffsetMm: 1.2,
+  logoYOffsetMm: 0.7,
 };
 
 const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.1:17891").replace(/\/$/, "");
@@ -42,20 +78,47 @@ const POS_AGENT_TOKEN = process.env.NEXT_PUBLIC_POS_AGENT_TOKEN ?? "";
 
 function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined): LabelTemplateConfig {
   const src = raw ?? {};
-  const asNumber = (value: unknown, fallback: number) => {
+  const asNumber = (value: unknown, fallback: number, min: number, max: number) => {
     const n = Number(value);
-    return Number.isFinite(n) && n > 0 ? n : fallback;
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  };
+  const asBool = (value: unknown, fallback: boolean) => {
+    if (typeof value === "boolean") return value;
+    return fallback;
+  };
+  const asString = (value: unknown, fallback: string, maxLen = 400000) => {
+    const text = typeof value === "string" ? value : fallback;
+    return text.slice(0, maxLen);
   };
 
   return {
-    pageWidthMm: asNumber(src.pageWidthMm, DEFAULT_LABEL_TEMPLATE.pageWidthMm),
-    pageHeightMm: asNumber(src.pageHeightMm, DEFAULT_LABEL_TEMPLATE.pageHeightMm),
-    labelWidthMm: asNumber(src.labelWidthMm, DEFAULT_LABEL_TEMPLATE.labelWidthMm),
-    labelHeightMm: asNumber(src.labelHeightMm, DEFAULT_LABEL_TEMPLATE.labelHeightMm),
-    columns: Math.max(1, Math.round(asNumber(src.columns, DEFAULT_LABEL_TEMPLATE.columns))),
-    marginLeftMm: asNumber(src.marginLeftMm, DEFAULT_LABEL_TEMPLATE.marginLeftMm),
-    gapHorizontalMm: asNumber(src.gapHorizontalMm, DEFAULT_LABEL_TEMPLATE.gapHorizontalMm),
-    cornerRadiusMm: asNumber(src.cornerRadiusMm, DEFAULT_LABEL_TEMPLATE.cornerRadiusMm),
+    pageWidthMm: asNumber(src.pageWidthMm, DEFAULT_LABEL_TEMPLATE.pageWidthMm, 30, 120),
+    pageHeightMm: asNumber(src.pageHeightMm, DEFAULT_LABEL_TEMPLATE.pageHeightMm, 8, 80),
+    labelWidthMm: asNumber(src.labelWidthMm, DEFAULT_LABEL_TEMPLATE.labelWidthMm, 8, 90),
+    labelHeightMm: asNumber(src.labelHeightMm, DEFAULT_LABEL_TEMPLATE.labelHeightMm, 8, 60),
+    columns: Math.round(asNumber(src.columns, DEFAULT_LABEL_TEMPLATE.columns, 1, 6)),
+    marginLeftMm: asNumber(src.marginLeftMm, DEFAULT_LABEL_TEMPLATE.marginLeftMm, 0, 40),
+    gapHorizontalMm: asNumber(src.gapHorizontalMm, DEFAULT_LABEL_TEMPLATE.gapHorizontalMm, 0, 20),
+    cornerRadiusMm: asNumber(src.cornerRadiusMm, DEFAULT_LABEL_TEMPLATE.cornerRadiusMm, 0, 12),
+    contentPaddingLeftMm: asNumber(src.contentPaddingLeftMm, DEFAULT_LABEL_TEMPLATE.contentPaddingLeftMm, 0, 10),
+    contentTopMm: asNumber(src.contentTopMm, DEFAULT_LABEL_TEMPLATE.contentTopMm, 0, 10),
+    showStoreName: asBool(src.showStoreName, DEFAULT_LABEL_TEMPLATE.showStoreName),
+    storeNameMaxLen: Math.round(asNumber(src.storeNameMaxLen, DEFAULT_LABEL_TEMPLATE.storeNameMaxLen, 6, 40)),
+    storeNameFontSize: asNumber(src.storeNameFontSize, DEFAULT_LABEL_TEMPLATE.storeNameFontSize, 4, 20),
+    nameMaxLen: Math.round(asNumber(src.nameMaxLen, DEFAULT_LABEL_TEMPLATE.nameMaxLen, 6, 60)),
+    nameFontSize: asNumber(src.nameFontSize, DEFAULT_LABEL_TEMPLATE.nameFontSize, 5, 24),
+    priceFontSize: asNumber(src.priceFontSize, DEFAULT_LABEL_TEMPLATE.priceFontSize, 6, 36),
+    priceTopMm: asNumber(src.priceTopMm, DEFAULT_LABEL_TEMPLATE.priceTopMm, 0, 30),
+    dataMatrixSizeMm: asNumber(src.dataMatrixSizeMm, DEFAULT_LABEL_TEMPLATE.dataMatrixSizeMm, 3, 20),
+    dataMatrixXPaddingMm: asNumber(src.dataMatrixXPaddingMm, DEFAULT_LABEL_TEMPLATE.dataMatrixXPaddingMm, 0, 20),
+    dataMatrixYPaddingMm: asNumber(src.dataMatrixYPaddingMm, DEFAULT_LABEL_TEMPLATE.dataMatrixYPaddingMm, 0, 20),
+    logoEnabled: asBool(src.logoEnabled, DEFAULT_LABEL_TEMPLATE.logoEnabled),
+    logoDataUrl: asString(src.logoDataUrl, DEFAULT_LABEL_TEMPLATE.logoDataUrl),
+    logoWidthMm: asNumber(src.logoWidthMm, DEFAULT_LABEL_TEMPLATE.logoWidthMm, 2, 30),
+    logoHeightMm: asNumber(src.logoHeightMm, DEFAULT_LABEL_TEMPLATE.logoHeightMm, 1, 20),
+    logoXOffsetMm: asNumber(src.logoXOffsetMm, DEFAULT_LABEL_TEMPLATE.logoXOffsetMm, 0, 20),
+    logoYOffsetMm: asNumber(src.logoYOffsetMm, DEFAULT_LABEL_TEMPLATE.logoYOffsetMm, 0, 20),
   };
 }
 
