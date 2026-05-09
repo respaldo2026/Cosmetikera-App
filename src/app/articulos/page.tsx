@@ -12,13 +12,14 @@ import {
   InboxOutlined, BarcodeOutlined, ShopOutlined, AppstoreOutlined,
   UnorderedListOutlined, CameraOutlined, EyeOutlined, PercentageOutlined,
   DollarOutlined, RiseOutlined, FallOutlined, ControlOutlined, CopyOutlined,
-  FileExcelOutlined, UploadOutlined, CheckOutlined,
+  FileExcelOutlined, UploadOutlined, CheckOutlined, PrinterOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { useRouter, useSearchParams } from "next/navigation";
 import EscanerCodigo from "@/components/EscanerCodigo";
 import { getCatalogosArticulosLocal, mergeCatalogos, type CatalogosArticulos } from "@/utils/articulos-catalogos";
+import { listLabelPrinters, printPriceLabels, type LabelPrinter } from "@/utils/label-agent";
 
 let xlsxModulePromise: Promise<typeof import("xlsx")> | null = null;
 
@@ -281,6 +282,13 @@ export default function ArticulosPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [importFileName, setImportFileName] = useState("");
 
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [labelPrinters, setLabelPrinters] = useState<LabelPrinter[]>([]);
+  const [selectedLabelPrinter, setSelectedLabelPrinter] = useState<string | null>(null);
+  const [loadingLabelPrinters, setLoadingLabelPrinters] = useState(false);
+  const [printingLabels, setPrintingLabels] = useState(false);
+  const [labelItems, setLabelItems] = useState<{ articuloId: string; nombre: string; precio: number; cantidad: number; sku?: string }[]>([]);
+
   const importRowsParsed = useMemo(
     () => importRows.map((row) => mapImportRowToArticulo(row)),
     [importRows],
@@ -355,6 +363,85 @@ export default function ArticulosPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  const cargarImpresorasEtiquetas = useCallback(async () => {
+    setLoadingLabelPrinters(true);
+    try {
+      const printers = await listLabelPrinters();
+      setLabelPrinters(printers);
+      const preferred = typeof window !== "undefined" ? window.localStorage.getItem("pos_label_printer_name_v1") : null;
+      const preferredExists = preferred && printers.some((p) => p.name === preferred);
+      setSelectedLabelPrinter(preferredExists ? preferred : (printers.find((p) => p.isDefault)?.name ?? printers[0]?.name ?? null));
+    } catch {
+      message.error("No se pudieron cargar las impresoras de etiquetas");
+      setLabelPrinters([]);
+    } finally {
+      setLoadingLabelPrinters(false);
+    }
+  }, [message]);
+
+  const abrirModalEtiquetaArticulo = useCallback(async (articulo: Articulo) => {
+    setLabelItems([{ articuloId: articulo.id, nombre: articulo.nombre, precio: articulo.precio_venta, cantidad: 1, sku: articulo.referencia || articulo.codigo_barras }]);
+    setLabelModalOpen(true);
+    await cargarImpresorasEtiquetas();
+  }, [cargarImpresorasEtiquetas]);
+
+  const abrirModalEtiquetasSeleccion = useCallback(async () => {
+    const ids = new Set(selectedIds.map(String));
+    const selectedArticulos = articulos.filter((a) => ids.has(String(a.id)));
+    if (!selectedArticulos.length) {
+      message.warning("Selecciona al menos un articulo");
+      return;
+    }
+
+    setLabelItems(
+      selectedArticulos.map((a) => ({
+        articuloId: a.id,
+        nombre: a.nombre,
+        precio: a.precio_venta,
+        cantidad: 1,
+        sku: a.referencia || a.codigo_barras,
+      }))
+    );
+    setLabelModalOpen(true);
+    await cargarImpresorasEtiquetas();
+  }, [articulos, cargarImpresorasEtiquetas, message, selectedIds]);
+
+  const imprimirEtiquetasArticulo = useCallback(async () => {
+    if (!selectedLabelPrinter) {
+      message.warning("Selecciona una impresora de etiquetas");
+      return;
+    }
+
+    const items = labelItems
+      .filter((i) => i.cantidad > 0)
+      .map((i) => ({
+        name: i.nombre,
+        price: i.precio,
+        quantity: i.cantidad,
+        dataMatrix: `LC|${i.articuloId}|${i.precio}`,
+        sku: i.sku,
+      }));
+
+    if (!items.length) {
+      message.warning("No hay etiquetas para imprimir");
+      return;
+    }
+
+    setPrintingLabels(true);
+    try {
+      const result = await printPriceLabels(items, selectedLabelPrinter, "La Cosmetikera");
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("pos_label_printer_name_v1", selectedLabelPrinter);
+      }
+      message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
+      setLabelModalOpen(false);
+    } catch (error: any) {
+      message.error(error?.message || "No fue posible imprimir etiquetas");
+    } finally {
+      setPrintingLabels(false);
+    }
+  }, [labelItems, message, selectedLabelPrinter]);
 
   useEffect(() => {
     void cargarCatalogosCompartidos();
@@ -1124,6 +1211,9 @@ export default function ArticulosPage() {
           <Tooltip key="del" title="Eliminar">
             <DeleteOutlined style={{ color: "#ff4d4f" }} onClick={(event) => { detenerEvento(event); handleEliminar(art); }} />
           </Tooltip>,
+          <Tooltip key="label" title="Imprimir etiqueta">
+            <PrinterOutlined style={{ color: "#9c27b0" }} onClick={(event) => { detenerEvento(event); abrirModalEtiquetaArticulo(art); }} />
+          </Tooltip>,
         ]}
       >
         <Text strong style={{ fontSize: 13, display: "block", marginBottom: 2 }} ellipsis>
@@ -1201,6 +1291,14 @@ export default function ArticulosPage() {
                 onClick={eliminarSeleccionados}
               >
                 {isMobile ? "Borrar" : `Borrar selección (${selectedCount})`}
+              </Button>
+              <Button
+                icon={<PrinterOutlined />}
+                disabled={selectedCount === 0}
+                onClick={abrirModalEtiquetasSeleccion}
+                style={{ color: "#9c27b0", borderColor: "#9c27b0" }}
+              >
+                {isMobile ? "Etiquetas" : `Etiquetas selección (${selectedCount})`}
               </Button>
               <Button
                 type="primary"
@@ -1381,6 +1479,7 @@ export default function ArticulosPage() {
                       <Space size={4}>
                         <Button size="small" icon={<EditOutlined />} onClick={(e) => { detenerEvento(e); irADetalle(a.id); }} />
                         <Button size="small" danger icon={<DeleteOutlined />} onClick={(e) => { detenerEvento(e); handleEliminar(a); }} />
+                        <Button size="small" icon={<PrinterOutlined />} style={{ color: "#9c27b0", borderColor: "#9c27b0" }} onClick={(e) => { detenerEvento(e); abrirModalEtiquetaArticulo(a); }} />
                       </Space>
                     </Col>
                   </Row>
@@ -1456,13 +1555,14 @@ export default function ArticulosPage() {
                 render: (v?: boolean) => v === false ? <Tag color="default">Inactivo</Tag> : <Tag color="success">Activo</Tag>,
               },
               {
-                title: "Acciones", key: "actions", width: 130, align: "center" as const, fixed: "right" as const,
+                title: "Acciones", key: "actions", width: 160, align: "center" as const, fixed: "right" as const,
                 render: (_: unknown, a: Articulo) => (
                   <Space size={4}>
                     <Tooltip title="Ver"><Button size="small" icon={<EyeOutlined />} onClick={(event) => { detenerEvento(event); irADetalle(a.id); }} /></Tooltip>
                     <Tooltip title="Editar detalle"><Button size="small" icon={<EditOutlined />} onClick={(event) => { detenerEvento(event); irADetalle(a.id); }} /></Tooltip>
                     <Tooltip title="Duplicar"><Button size="small" icon={<CopyOutlined />} onClick={(event) => { detenerEvento(event); duplicarArticulo(a); }} /></Tooltip>
                     <Tooltip title="Eliminar"><Button size="small" danger icon={<DeleteOutlined />} onClick={(event) => { detenerEvento(event); handleEliminar(a); }} /></Tooltip>
+                    <Tooltip title="Imprimir etiqueta"><Button size="small" icon={<PrinterOutlined />} style={{ color: "#9c27b0", borderColor: "#9c27b0" }} onClick={(event) => { detenerEvento(event); abrirModalEtiquetaArticulo(a); }} /></Tooltip>
                   </Space>
                 ),
               },
@@ -2007,6 +2107,73 @@ export default function ArticulosPage() {
             </Col>
           </Row>
         </Form>
+      </Modal>
+
+      <Modal
+        title={<Space><PrinterOutlined style={{ color: "#9c27b0" }} />Imprimir etiqueta(s)</Space>}
+        open={labelModalOpen}
+        onCancel={() => setLabelModalOpen(false)}
+        width={560}
+        footer={[
+          <Button key="cancel" onClick={() => setLabelModalOpen(false)}>Cancelar</Button>,
+          <Button
+            key="print"
+            type="primary"
+            icon={<PrinterOutlined />}
+            loading={printingLabels}
+            disabled={!selectedLabelPrinter || labelItems.reduce((sum, item) => sum + Number(item.cantidad || 0), 0) === 0}
+            onClick={imprimirEtiquetasArticulo}
+            style={{ background: "#9c27b0", borderColor: "#9c27b0" }}
+          >
+            Imprimir {labelItems.reduce((sum, item) => sum + Number(item.cantidad || 0), 0)} etiqueta(s)
+          </Button>,
+        ]}
+        destroyOnClose
+      >
+        <Space direction="vertical" style={{ width: "100%" }} size={12}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12 }}>Impresora de etiquetas</Text>
+            <Select
+              style={{ width: "100%", marginTop: 4 }}
+              loading={loadingLabelPrinters}
+              value={selectedLabelPrinter}
+              onChange={setSelectedLabelPrinter}
+              placeholder="Selecciona impresora"
+              options={labelPrinters.map((p) => ({
+                label: `${p.name}${p.isDefault ? " (predeterminada)" : ""}`,
+                value: p.name,
+              }))}
+            />
+          </div>
+
+          <Table
+            dataSource={labelItems}
+            rowKey="articuloId"
+            size="small"
+            pagination={false}
+            scroll={{ y: 260 }}
+            columns={[
+              { title: "Artículo", dataIndex: "nombre", ellipsis: true },
+              { title: "Precio", dataIndex: "precio", width: 100, render: (v: number) => `$${Number(v).toLocaleString()}` },
+              {
+                title: "Cantidad", dataIndex: "cantidad", width: 120,
+                render: (value: number, record: { articuloId: string }) => (
+                  <InputNumber
+                    min={0}
+                    max={999}
+                    size="small"
+                    style={{ width: 90 }}
+                    value={value}
+                    onChange={(nextValue) => {
+                      const safeValue = Math.max(0, Number(nextValue || 0));
+                      setLabelItems((prev) => prev.map((item) => item.articuloId === record.articuloId ? { ...item, cantidad: safeValue } : item));
+                    }}
+                  />
+                ),
+              },
+            ]}
+          />
+        </Space>
       </Modal>
     </>
   );
