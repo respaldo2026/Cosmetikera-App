@@ -34,6 +34,8 @@ export type EscanerCodigoProps = {
   onChange?: (value: string) => void;
   /** Si Enter debe disparar onCodigo */
   submitOnEnter?: boolean;
+  /** Tamaño visual del campo */
+  size?: "small" | "middle" | "large";
 };
 
 // ID único para el div de la cámara
@@ -47,6 +49,7 @@ export default function EscanerCodigo({
   value,
   onChange,
   submitOnEnter = true,
+  size = "middle",
 }: EscanerCodigoProps) {
   const [internalValor, setInternalValor] = useState("");
   const [camaraAbierta, setCamaraAbierta] = useState(false);
@@ -180,6 +183,7 @@ export default function EscanerCodigo({
       <Space.Compact style={{ width: "100%" }}>
         <Input
           ref={inputRef}
+          size={size}
           prefix={<BarcodeOutlined style={{ color: "#d81b87" }} />}
           value={valorActual}
           onChange={(e) => actualizarValor(e.target.value)}
@@ -192,6 +196,7 @@ export default function EscanerCodigo({
         {conCamara && (
           <Tooltip title="Escanear con cámara">
             <Button
+              size={size === "middle" ? undefined : size}
               icon={<CameraOutlined />}
               onClick={abrirCamara}
               disabled={disabled}

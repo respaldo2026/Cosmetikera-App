@@ -898,6 +898,7 @@ export default function VentasPage() {
           onChange={setSearch}
           placeholder="Escanear o buscar por nombre, marca, referencia o código..."
           conCamara
+          size={isMobile ? "middle" : "large"}
         />
       </div>
 
@@ -1395,10 +1396,10 @@ export default function VentasPage() {
 
       {/* LAYOUT POS */}
       <Row gutter={[12, 12]} style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        <Col xs={24} lg={14} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
+        <Col xs={24} lg={15} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
           {panelProductos}
         </Col>
-        <Col xs={24} lg={10} style={{ height: "100%", minHeight: 0 }}>
+        <Col xs={24} lg={9} style={{ height: "100%", minHeight: 0 }}>
           {panelCarrito}
         </Col>
       </Row>
