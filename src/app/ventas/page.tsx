@@ -231,12 +231,44 @@ export default function VentasPage() {
   );
   const pagoMixtoCuadra = useMemo(() => moneyEquals(totalPagoMixto, totalFinal), [totalPagoMixto, totalFinal]);
   const clienteSeleccionado = clientes.find((c) => c.id === clienteId);
+  const showFidelizacionPreview = carrito.length > 0 && (isMobile ? carrito.length <= 4 : carrito.length <= 8);
+
+  const abrirModalCobroRapido = useCallback(() => {
+    if (metodoPago === "efectivo") {
+      setEfectivoRecibido(totalFinal);
+    }
+
+    if (metodoPago === "mixto") {
+      setPagoMixto((prev) => {
+        const totalActual = Number(prev.efectivo || 0) + Number(prev.tarjeta || 0) + Number(prev.transferencia || 0);
+        if (totalActual > 0) return prev;
+        return { efectivo: totalFinal, tarjeta: 0, transferencia: 0 };
+      });
+    }
+
+    setModalPagoOpen(true);
+  }, [metodoPago, totalFinal]);
 
   useEffect(() => {
     // Precarga para evitar latencia en la primera impresión/cajón.
     void cargarConfigPOS().catch(() => {});
     void cargarConfigTicketPOS().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!modalPagoOpen) return;
+
+    if (metodoPago === "efectivo" && efectivoRecibido <= 0) {
+      setEfectivoRecibido(totalFinal);
+    }
+
+    if (metodoPago === "mixto") {
+      const totalActual = Number(pagoMixto.efectivo || 0) + Number(pagoMixto.tarjeta || 0) + Number(pagoMixto.transferencia || 0);
+      if (totalActual <= 0) {
+        setPagoMixto({ efectivo: totalFinal, tarjeta: 0, transferencia: 0 });
+      }
+    }
+  }, [modalPagoOpen, metodoPago, totalFinal, efectivoRecibido, pagoMixto]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -849,10 +881,10 @@ export default function VentasPage() {
         okText: "Continuar sin cliente",
         cancelText: "← Asignar cliente",
         okButtonProps: { danger: true },
-        onOk: () => setModalPagoOpen(true),
+        onOk: abrirModalCobroRapido,
       });
     } else {
-      setModalPagoOpen(true);
+      abrirModalCobroRapido();
     }
   };
 
@@ -967,8 +999,8 @@ export default function VentasPage() {
           : "linear-gradient(135deg,#fff7e6,#fff1f0)",
         border: `2px solid ${clienteId ? "#d81b87" : "#ffbb96"}`,
         transition: "all 0.3s",
-        maxHeight: "34vh",
-        overflowY: "auto",
+        maxHeight: isMobile ? undefined : 220,
+        overflowY: isMobile ? "visible" : "auto",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <CrownOutlined style={{ color: "#d81b87", fontSize: 15 }} />
@@ -1091,7 +1123,7 @@ export default function VentasPage() {
         borderRadius: 10,
         padding: "2px 8px",
         background: "#fff",
-        minHeight: 260,
+        minHeight: isMobile ? 220 : 340,
       }}>
         {carrito.length === 0 ? (
           <Empty
@@ -1188,7 +1220,7 @@ export default function VentasPage() {
       </div>
 
       {/* Preview fidelización */}
-      {carrito.length > 0 && (
+      {showFidelizacionPreview && (
         clienteId && clienteSeleccionado ? (
           <div style={{
             marginBottom: 8, padding: "7px 10px",
@@ -1263,7 +1295,7 @@ export default function VentasPage() {
           <Button block onClick={limpiarVenta}>Limpiar carrito</Button>
         )}
 
-        {ventasAparcadas.length > 0 && (
+        {ventasAparcadas.length > 0 && carrito.length === 0 && (
           <Card
             size="small"
             title={`Ventas aparcadas (${ventasAparcadas.length})`}
@@ -1336,11 +1368,11 @@ export default function VentasPage() {
       </Card>
 
       {/* LAYOUT POS */}
-      <Row gutter={[12, 12]} style={{ height: "calc(100vh - 180px)", minHeight: 540 }}>
-        <Col xs={24} lg={15} style={{ height: "100%", overflowY: "auto" }}>
+      <Row gutter={[12, 12]} style={{ height: "calc(100vh - 170px)", minHeight: 580 }}>
+        <Col xs={24} lg={14} style={{ height: "100%", overflowY: "auto" }}>
           {panelProductos}
         </Col>
-        <Col xs={24} lg={9} style={{ height: "100%" }}>
+        <Col xs={24} lg={10} style={{ height: "100%" }}>
           {panelCarrito}
         </Col>
       </Row>
