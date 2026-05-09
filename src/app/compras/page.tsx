@@ -12,9 +12,10 @@ import {
   SearchOutlined, ReloadOutlined, TruckOutlined, CheckCircleOutlined,
   ClockCircleOutlined, WarningOutlined,
   BarcodeOutlined, ShoppingCartOutlined, MinusOutlined,
-  PlusCircleOutlined, CheckOutlined, ExclamationCircleOutlined,
+  PlusCircleOutlined, CheckOutlined, ExclamationCircleOutlined, PrinterOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { listLabelPrinters, printPriceLabels, type LabelPrinter } from "@utils/label-agent";
 import dayjs from "dayjs";
 import EscanerCodigo from "@components/EscanerCodigo";
 
@@ -61,6 +62,16 @@ type Articulo = {
   marca?: string;
 };
 
+type LabelDraftItem = {
+  key: string;
+  articuloId: string;
+  nombre: string;
+  precio: number;
+  cantidad: number;
+  dataMatrix: string;
+  sku: string;
+};
+
 type CompraEstado = Compra["estado"];
 
 const ESTADO_CONFIG: Record<CompraEstado, { color: string; label: string; icon: React.ReactNode }> = {
@@ -69,6 +80,8 @@ const ESTADO_CONFIG: Record<CompraEstado, { color: string; label: string; icon: 
   parcial: { color: "orange", label: "Parcial", icon: <WarningOutlined /> },
   cancelada: { color: "red", label: "Cancelada", icon: <DeleteOutlined /> },
 };
+
+const LABEL_PRINTER_STORAGE_KEY = "pos_label_printer_name_v1";
 
 export default function ComprasPage() {
   const screens = useBreakpoint();
@@ -113,6 +126,14 @@ export default function ComprasPage() {
   const [editItems, setEditItems]         = useState<CompraItem[]>([]);
   const [guardandoEdit, setGuardandoEdit] = useState(false);
 
+  // — Modal impresión de etiquetas al finalizar compra —
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [labelPrinters, setLabelPrinters] = useState<LabelPrinter[]>([]);
+  const [selectedLabelPrinter, setSelectedLabelPrinter] = useState<string | null>(null);
+  const [loadingLabelPrinters, setLoadingLabelPrinters] = useState(false);
+  const [printingLabels, setPrintingLabels] = useState(false);
+  const [labelDraftItems, setLabelDraftItems] = useState<LabelDraftItem[]>([]);
+
   // ── Carga inicial ─────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -130,6 +151,79 @@ export default function ComprasPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  const totalEtiquetasDraft = useMemo(
+    () => labelDraftItems.reduce((acc, item) => acc + Number(item.cantidad || 0), 0),
+    [labelDraftItems]
+  );
+
+  const cargarImpresorasEtiquetas = useCallback(async () => {
+    setLoadingLabelPrinters(true);
+    try {
+      const printers = await listLabelPrinters();
+      setLabelPrinters(printers);
+
+      if (typeof window !== "undefined") {
+        const preferred = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY);
+        const preferredExists = preferred && printers.some((p) => p.name === preferred);
+
+        if (preferredExists) {
+          setSelectedLabelPrinter(preferred);
+        } else {
+          const defaultPrinter = printers.find((p) => p.isDefault)?.name ?? printers[0]?.name ?? null;
+          setSelectedLabelPrinter(defaultPrinter);
+        }
+      }
+    } catch (error: any) {
+      message.error(error?.message || "No se pudieron cargar las impresoras de etiquetas");
+      setLabelPrinters([]);
+    } finally {
+      setLoadingLabelPrinters(false);
+    }
+  }, [message]);
+
+  const abrirModalImpresionEtiquetas = useCallback(async (items: LabelDraftItem[]) => {
+    setLabelDraftItems(items);
+    setLabelModalOpen(true);
+    await cargarImpresorasEtiquetas();
+  }, [cargarImpresorasEtiquetas]);
+
+  const imprimirEtiquetasCompra = useCallback(async () => {
+    if (!selectedLabelPrinter) {
+      message.warning("Selecciona una impresora de etiquetas");
+      return;
+    }
+
+    const itemsToPrint = labelDraftItems
+      .map((item) => ({
+        name: item.nombre,
+        price: item.precio,
+        quantity: Math.max(0, Number(item.cantidad || 0)),
+        dataMatrix: item.dataMatrix,
+        sku: item.sku,
+      }))
+      .filter((item) => item.quantity > 0);
+
+    if (!itemsToPrint.length) {
+      message.warning("No hay etiquetas para imprimir");
+      return;
+    }
+
+    setPrintingLabels(true);
+    try {
+      const result = await printPriceLabels(itemsToPrint, selectedLabelPrinter, "La Cosmetikera");
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, selectedLabelPrinter);
+      }
+      message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
+      setLabelModalOpen(false);
+      setLabelDraftItems([]);
+    } catch (error: any) {
+      message.error(error?.message || "No fue posible imprimir etiquetas");
+    } finally {
+      setPrintingLabels(false);
+    }
+  }, [labelDraftItems, message, selectedLabelPrinter]);
 
   // ── Filtrado lista ────────────────────────────────────────────────────────────
   const filtradas = useMemo(() => compras.filter((c) => {
@@ -295,6 +389,23 @@ export default function ComprasPage() {
       if (errCompra) throw new Error(errCompra.message);
 
       const itemsConId = carrito.filter(i => i.articulo_id);
+      const etiquetasDraft: LabelDraftItem[] = itemsConId.map((item) => {
+        const art = articulos.find((a) => a.id === item.articulo_id);
+        const precioVenta = Number(art?.precio_venta ?? item.precio_unitario ?? 0);
+        const sku = String(art?.referencia || art?.codigo_barras || item.codigo || item.articulo_id || "");
+        const dataMatrix = `LC|${item.articulo_id}|${precioVenta}`;
+
+        return {
+          key: `${item.articulo_id}`,
+          articuloId: String(item.articulo_id),
+          nombre: item.nombre,
+          precio: precioVenta,
+          cantidad: Number(item.cantidad || 0),
+          dataMatrix,
+          sku,
+        };
+      });
+
       for (const item of itemsConId) {
         const artActual = articulos.find(a => a.id === item.articulo_id);
         const nuevoStock = (artActual?.stock ?? 0) + item.cantidad;
@@ -313,6 +424,9 @@ export default function ComprasPage() {
       setNotasCompra("");
       setFechaCompra(dayjs());
       setDrawerOpen(false);
+      if (etiquetasDraft.length > 0) {
+        await abrirModalImpresionEtiquetas(etiquetasDraft);
+      }
       cargar();
     } catch (e: any) {
       message.error(e?.message || "Error al registrar compra");
@@ -889,6 +1003,120 @@ export default function ComprasPage() {
             <Input placeholder="Ej: Cuidado capilar" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={
+          <Space>
+            <PrinterOutlined style={{ color: "#096dd9" }} />
+            Imprimir etiquetas de esta compra
+          </Space>
+        }
+        open={labelModalOpen}
+        onCancel={() => {
+          if (printingLabels) return;
+          setLabelModalOpen(false);
+          setLabelDraftItems([]);
+        }}
+        onOk={imprimirEtiquetasCompra}
+        okText={printingLabels ? "Imprimiendo..." : "Imprimir etiquetas"}
+        cancelText="Omitir"
+        confirmLoading={printingLabels}
+        width={760}
+        destroyOnHidden
+      >
+        <div style={{ marginTop: 8 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Selecciona la impresora de etiquetas del PC de ventas y confirma cantidades.
+          </Text>
+
+          <Row gutter={10} style={{ marginTop: 12, marginBottom: 10 }}>
+            <Col span={16}>
+              <Text strong style={{ display: "block", marginBottom: 4 }}>Impresora de etiquetas</Text>
+              <Select
+                showSearch
+                loading={loadingLabelPrinters}
+                placeholder="Seleccionar impresora..."
+                style={{ width: "100%" }}
+                value={selectedLabelPrinter || undefined}
+                onChange={(value) => setSelectedLabelPrinter(value)}
+                options={labelPrinters.map((printer) => ({
+                  value: printer.name,
+                  label: printer.isDefault ? `${printer.name} (predeterminada)` : printer.name,
+                }))}
+                optionFilterProp="label"
+              />
+            </Col>
+            <Col span={8}>
+              <Text strong style={{ display: "block", marginBottom: 4 }}>Total etiquetas</Text>
+              <div style={{
+                height: 32,
+                border: "1px solid #d9d9d9",
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#fafafa",
+                fontWeight: 700,
+              }}>
+                {totalEtiquetasDraft}
+              </div>
+            </Col>
+          </Row>
+
+          <div style={{ maxHeight: 280, overflowY: "auto", border: "1px solid #f0f0f0", borderRadius: 8 }}>
+            <Table
+              size="small"
+              pagination={false}
+              rowKey="key"
+              dataSource={labelDraftItems}
+              columns={[
+                {
+                  title: "Articulo",
+                  dataIndex: "nombre",
+                  key: "nombre",
+                  render: (nombre: string, row: LabelDraftItem) => (
+                    <div>
+                      <Text strong style={{ fontSize: 12 }}>{nombre}</Text>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          {row.sku || row.articuloId}
+                        </Text>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  title: "Precio",
+                  key: "precio",
+                  width: 120,
+                  render: (_: unknown, row: LabelDraftItem) => (
+                    <Text style={{ color: "#096dd9", fontWeight: 700 }}>${Number(row.precio).toLocaleString()}</Text>
+                  ),
+                },
+                {
+                  title: "Etiquetas",
+                  key: "cantidad",
+                  width: 130,
+                  render: (_: unknown, row: LabelDraftItem) => (
+                    <InputNumber
+                      min={0}
+                      max={999}
+                      value={row.cantidad}
+                      onChange={(value) => {
+                        const next = Math.max(0, Number(value || 0));
+                        setLabelDraftItems((prev) => prev.map((item) => (
+                          item.key === row.key ? { ...item, cantidad: next } : item
+                        )));
+                      }}
+                      style={{ width: "100%" }}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </div>
+        </div>
       </Modal>
 
       {/* MODAL: Editar compra historica */}

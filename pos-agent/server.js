@@ -1,6 +1,8 @@
 const express = require("express");
 const path = require("path");
 const { spawn } = require("child_process");
+const { print: printPdf, getPrinters } = require("pdf-to-printer");
+const { generarPdfEtiquetas } = require("./labels-pdf");
 
 const app = express();
 const PORT = Number(process.env.POS_AGENT_PORT || 17891);
@@ -9,6 +11,8 @@ const AUTH_TOKEN = process.env.POS_AGENT_TOKEN || "";
 
 const actionQueue = [];
 let processingQueue = false;
+const labelQueue = [];
+let processingLabelQueue = false;
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -113,8 +117,64 @@ async function processQueue() {
   processingQueue = false;
 }
 
+function enqueueLabelJob(payload) {
+  return new Promise((resolve, reject) => {
+    labelQueue.push({ payload, resolve, reject });
+    processLabelQueue();
+  });
+}
+
+async function processLabelQueue() {
+  if (processingLabelQueue) return;
+  processingLabelQueue = true;
+
+  while (labelQueue.length > 0) {
+    const current = labelQueue.shift();
+    if (!current) continue;
+
+    try {
+      const { outputPath, totalLabels, pages } = await generarPdfEtiquetas(current.payload);
+      try {
+        await printPdf(outputPath, {
+          printer: current.payload?.printerName || undefined,
+          scale: "noscale",
+        });
+      } finally {
+        try {
+          require("fs").unlinkSync(outputPath);
+        } catch (_error) {}
+      }
+
+      current.resolve({
+        ok: true,
+        totalLabels,
+        pages,
+        printer: current.payload?.printerName || null,
+      });
+    } catch (error) {
+      current.reject(error);
+    }
+  }
+
+  processingLabelQueue = false;
+}
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "la-cosmetikera-pos-agent", version: "1.0.0" });
+});
+
+app.get("/printers", async (_req, res) => {
+  try {
+    const printers = await getPrinters();
+    const normalized = (printers || []).map((p) => ({
+      name: p.name,
+      isDefault: Boolean(p.default),
+      status: p.status || "unknown",
+    }));
+    return res.json({ ok: true, printers: normalized });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error?.message || "No se pudieron listar impresoras" });
+  }
 });
 
 app.post("/print-raw", async (req, res) => {
@@ -151,6 +211,39 @@ app.post("/drawer", async (req, res) => {
     return res.json({ ok: true, queued: true });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error?.message || "No se pudo abrir cajon" });
+  }
+});
+
+app.post("/print-labels", async (req, res) => {
+  try {
+    const { printerName = null, items = [], template = {} } = req.body || {};
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ ok: false, error: "items es requerido" });
+    }
+
+    const safeItems = items
+      .map((item) => ({
+        name: String(item?.name || "").trim(),
+        price: Number(item?.price || 0),
+        quantity: Math.max(0, Number(item?.quantity || 0)),
+        dataMatrix: String(item?.dataMatrix || "").trim(),
+        sku: String(item?.sku || "").trim(),
+      }))
+      .filter((item) => item.name && item.quantity > 0);
+
+    if (!safeItems.length) {
+      return res.status(400).json({ ok: false, error: "No hay items validos para imprimir" });
+    }
+
+    const result = await enqueueLabelJob({
+      printerName,
+      items: safeItems,
+      template,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error?.message || "No se pudieron imprimir etiquetas" });
   }
 });
 
