@@ -288,6 +288,7 @@ export default function ArticulosPage() {
   const [loadingLabelPrinters, setLoadingLabelPrinters] = useState(false);
   const [printingLabels, setPrintingLabels] = useState(false);
   const [labelItems, setLabelItems] = useState<{ articuloId: string; nombre: string; precio: number; cantidad: number; sku?: string }[]>([]);
+  const LABEL_PRINTER_STORAGE_KEY = "pos_label_printer_name_v1";
 
   const importRowsParsed = useMemo(
     () => importRows.map((row) => mapImportRowToArticulo(row)),
@@ -369,16 +370,22 @@ export default function ArticulosPage() {
     try {
       const printers = await listLabelPrinters();
       setLabelPrinters(printers);
-      const preferred = typeof window !== "undefined" ? window.localStorage.getItem("pos_label_printer_name_v1") : null;
+      const preferred = typeof window !== "undefined" ? window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) : null;
       const preferredExists = preferred && printers.some((p) => p.name === preferred);
       setSelectedLabelPrinter(preferredExists ? preferred : (printers.find((p) => p.isDefault)?.name ?? printers[0]?.name ?? null));
-    } catch {
-      message.error("No se pudieron cargar las impresoras de etiquetas");
-      setLabelPrinters([]);
+    } catch (error: any) {
+      const preferred = typeof window !== "undefined" ? window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) : null;
+      if (preferred) {
+        setSelectedLabelPrinter(preferred);
+      }
+      message.warning(error?.message
+        ? `No se pudieron cargar las impresoras (${error.message}). Puedes escribirla manualmente.`
+        : "No se pudieron cargar las impresoras. Puedes escribirla manualmente.");
+      setLabelPrinters(preferred ? [{ name: preferred, isDefault: true }] : []);
     } finally {
       setLoadingLabelPrinters(false);
     }
-  }, [message]);
+  }, [LABEL_PRINTER_STORAGE_KEY, message]);
 
   const abrirModalEtiquetaArticulo = useCallback(async (articulo: Articulo) => {
     setLabelItems([{ articuloId: articulo.id, nombre: articulo.nombre, precio: articulo.precio_venta, cantidad: 1, sku: articulo.referencia || articulo.codigo_barras }]);
@@ -408,7 +415,8 @@ export default function ArticulosPage() {
   }, [articulos, cargarImpresorasEtiquetas, message, selectedIds]);
 
   const imprimirEtiquetasArticulo = useCallback(async () => {
-    if (!selectedLabelPrinter) {
+    const printerName = String(selectedLabelPrinter || "").trim();
+    if (!printerName) {
       message.warning("Selecciona una impresora de etiquetas");
       return;
     }
@@ -430,9 +438,9 @@ export default function ArticulosPage() {
 
     setPrintingLabels(true);
     try {
-      const result = await printPriceLabels(items, selectedLabelPrinter, "La Cosmetikera");
+      const result = await printPriceLabels(items, printerName, "La Cosmetikera");
       if (typeof window !== "undefined") {
-        window.localStorage.setItem("pos_label_printer_name_v1", selectedLabelPrinter);
+        window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, printerName);
       }
       message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
       setLabelModalOpen(false);
@@ -441,7 +449,7 @@ export default function ArticulosPage() {
     } finally {
       setPrintingLabels(false);
     }
-  }, [labelItems, message, selectedLabelPrinter]);
+  }, [LABEL_PRINTER_STORAGE_KEY, labelItems, message, selectedLabelPrinter]);
 
   useEffect(() => {
     void cargarCatalogosCompartidos();
@@ -2135,10 +2143,13 @@ export default function ArticulosPage() {
             <Text type="secondary" style={{ fontSize: 12 }}>Impresora de etiquetas</Text>
             <Select
               style={{ width: "100%", marginTop: 4 }}
+              mode="tags"
+              maxCount={1}
+              showSearch
               loading={loadingLabelPrinters}
-              value={selectedLabelPrinter}
-              onChange={setSelectedLabelPrinter}
-              placeholder="Selecciona impresora"
+              value={selectedLabelPrinter ? [selectedLabelPrinter] : []}
+              onChange={(value) => setSelectedLabelPrinter(value?.[0] ?? null)}
+              placeholder="Selecciona o escribe impresora"
               options={labelPrinters.map((p) => ({
                 label: `${p.name}${p.isDefault ? " (predeterminada)" : ""}`,
                 value: p.name,
