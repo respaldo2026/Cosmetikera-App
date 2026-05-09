@@ -890,15 +890,15 @@ export default function VentasPage() {
 
   const panelProductos = (
     <div>
-      {/* Barra única: escáner + búsqueda manual */}
-      <div style={{ marginBottom: 12 }}>
+      {/* Barra única: escáner + búsqueda manual - GRANDE Y VISIBLE */}
+      <div style={{ marginBottom: 20, padding: 12, background: "#fff9fe", borderRadius: 10, border: "2px solid #f0d6ff" }}>
         <EscanerCodigo
           onCodigo={buscarPorCodigo}
           value={search}
           onChange={setSearch}
-          placeholder="Escanear o buscar por nombre, marca, referencia o código..."
+          placeholder="🔍 Escanear o buscar por nombre, marca, referencia o código..."
           conCamara
-          size={isMobile ? "middle" : "large"}
+          size="large"
         />
       </div>
 
@@ -1513,10 +1513,11 @@ export default function VentasPage() {
               <Text style={{ fontSize: 13 }}>Efectivo recibido:</Text>
               <InputNumber
                 size="large"
-                style={{ width: "100%", marginTop: 4 }}
+                style={{ width: "100%", marginTop: 4, fontSize: 14 }}
                 min={0}
                 value={efectivoRecibido}
                 onChange={(v) => setEfectivoRecibido(v || 0)}
+                onFocus={() => setEfectivoRecibido(0)}
                 formatter={(v) => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
                 placeholder="$ 0"
               />
