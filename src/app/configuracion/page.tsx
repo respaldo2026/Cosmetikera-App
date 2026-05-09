@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid, Alert, Badge, Radio } from "antd";
+import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid, Alert, Badge, Radio, InputNumber } from "antd";
 import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined, CopyOutlined, TagsOutlined, ShopOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
@@ -10,6 +10,7 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
 import { listLabelPrinters } from "@/utils/label-agent";
+import { DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, saveLabelTemplateConfig, type LabelTemplateConfig } from "@/utils/label-agent";
 import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
 import { getCatalogosArticulosLocal, mergeCatalogos, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
@@ -198,6 +199,7 @@ export default function ConfiguracionPage() {
   const [posPrinterName, setPosPrinterName] = useState<string>("");
   const [posLabelPrinterName, setPosLabelPrinterName] = useState<string>("");
   const [posPrinterWidth, setPosPrinterWidth] = useState<number>(48);
+  const [labelTemplateConfig, setLabelTemplateConfig] = useState<LabelTemplateConfig>(DEFAULT_LABEL_TEMPLATE);
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
   const [testCajon, setTestCajon] = useState(false);
@@ -379,6 +381,7 @@ export default function ConfiguracionPage() {
     if (typeof window !== "undefined") {
       const storedLabelPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
       setPosLabelPrinterName(storedLabelPrinter || configuredTicketPrinter || "");
+      setLabelTemplateConfig(getLabelTemplateConfig());
     }
 
     // Verificar estado QZ Tray
@@ -450,6 +453,8 @@ export default function ConfiguracionPage() {
         } else {
           window.localStorage.removeItem(LABEL_PRINTER_STORAGE_KEY);
         }
+
+        saveLabelTemplateConfig(labelTemplateConfig);
       }
 
       invalidarConfigPOS();
@@ -1775,6 +1780,235 @@ export default function ConfiguracionPage() {
             </div>
           </Col>
         )}
+        <Col xs={24}>
+          <Divider orientation="left" style={{ margin: "8px 0" }}>Formato de etiquetas</Divider>
+          <Row gutter={[12, 12]}>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho pagina (mm)</div>
+              <InputNumber
+                min={30}
+                max={120}
+                step={0.1}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.pageWidthMm}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageWidthMm: Number(v || prev.pageWidthMm) }))}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alto pagina (mm)</div>
+              <InputNumber
+                min={10}
+                max={80}
+                step={0.1}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.pageHeightMm}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageHeightMm: Number(v || prev.pageHeightMm) }))}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho etiqueta (mm)</div>
+              <InputNumber
+                min={10}
+                max={80}
+                step={0.1}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.labelWidthMm}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, labelWidthMm: Number(v || prev.labelWidthMm) }))}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alto etiqueta (mm)</div>
+              <InputNumber
+                min={8}
+                max={60}
+                step={0.1}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.labelHeightMm}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, labelHeightMm: Number(v || prev.labelHeightMm) }))}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Columnas</div>
+              <InputNumber
+                min={1}
+                max={6}
+                step={1}
+                precision={0}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.columns}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, columns: Math.max(1, Number(v || prev.columns)) }))}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Margen izq. (mm)</div>
+              <InputNumber
+                min={0}
+                max={20}
+                step={0.1}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.marginLeftMm}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, marginLeftMm: Number(v || 0) }))}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Espacio horizontal (mm)</div>
+              <InputNumber
+                min={0}
+                max={20}
+                step={0.1}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.gapHorizontalMm}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, gapHorizontalMm: Number(v || 0) }))}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Radio esquina (mm)</div>
+              <InputNumber
+                min={0}
+                max={10}
+                step={0.1}
+                style={{ width: "100%" }}
+                value={labelTemplateConfig.cornerRadiusMm}
+                onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, cornerRadiusMm: Number(v || 0) }))}
+              />
+            </Col>
+          </Row>
+          <Space style={{ marginTop: 10 }}>
+            <Button
+              onClick={() => setLabelTemplateConfig(DEFAULT_LABEL_TEMPLATE)}
+              icon={<ReloadOutlined />}
+            >
+              Restaurar medidas por defecto
+            </Button>
+            <Button
+              onClick={() => setLabelTemplateConfig((prev) => ({ ...prev, columns: 3 }))}
+            >
+              Usar 3 etiquetas por fila
+            </Button>
+          </Space>
+          <Card size="small" style={{ marginTop: 12, background: "#fafafa", borderColor: "#f0f0f0" }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Vista previa en vivo</div>
+            <div style={{ color: "#777", fontSize: 12, marginBottom: 10 }}>
+              Simulación de la primera fila con los valores actuales.
+            </div>
+            {(() => {
+              const pageWidthMm = Math.max(30, Number(labelTemplateConfig.pageWidthMm || 104));
+              const pageHeightMm = Math.max(10, Number(labelTemplateConfig.pageHeightMm || 15));
+              const labelWidthMm = Math.max(8, Number(labelTemplateConfig.labelWidthMm || 32));
+              const labelHeightMm = Math.max(8, Number(labelTemplateConfig.labelHeightMm || 15));
+              const columns = Math.max(1, Math.round(Number(labelTemplateConfig.columns || 3)));
+              const marginLeftMm = Math.max(0, Number(labelTemplateConfig.marginLeftMm || 0));
+              const gapMm = Math.max(0, Number(labelTemplateConfig.gapHorizontalMm || 0));
+              const cornerRadiusMm = Math.max(0, Number(labelTemplateConfig.cornerRadiusMm || 0));
+
+              const previewMaxWidthPx = 520;
+              const previewScale = Math.max(2.6, Math.min(4.8, previewMaxWidthPx / pageWidthMm));
+              const pageWidthPx = pageWidthMm * previewScale;
+              const pageHeightPx = pageHeightMm * previewScale;
+              const labelWidthPx = labelWidthMm * previewScale;
+              const labelHeightPx = labelHeightMm * previewScale;
+              const marginLeftPx = marginLeftMm * previewScale;
+              const gapPx = gapMm * previewScale;
+              const radiusPx = cornerRadiusMm * previewScale;
+              const requiredWidthMm = marginLeftMm + (columns * labelWidthMm) + (Math.max(0, columns - 1) * gapMm);
+              const overflow = requiredWidthMm > pageWidthMm + 0.001;
+
+              return (
+                <>
+                  <div
+                    style={{
+                      width: pageWidthPx,
+                      maxWidth: "100%",
+                      height: pageHeightPx + 24,
+                      border: "1px dashed #d9d9d9",
+                      borderRadius: 8,
+                      background: "repeating-linear-gradient(45deg, #fff, #fff 10px, #fcfcfc 10px, #fcfcfc 20px)",
+                      overflow: "hidden",
+                      position: "relative",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: gapPx,
+                        paddingLeft: marginLeftPx,
+                        height: pageHeightPx,
+                        paddingTop: 6,
+                      }}
+                    >
+                      {Array.from({ length: columns }).map((_, idx) => (
+                        <div
+                          key={`preview-label-${idx}`}
+                          style={{
+                            width: labelWidthPx,
+                            height: labelHeightPx,
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: radiusPx,
+                            padding: 4,
+                            boxSizing: "border-box",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
+                            <div
+                              style={{
+                                fontSize: Math.max(6, Math.min(10, labelHeightPx * 0.24)),
+                                fontWeight: 700,
+                                lineHeight: 1,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                maxWidth: "70%",
+                              }}
+                            >
+                              Producto
+                            </div>
+                            <div
+                              style={{
+                                width: Math.max(9, labelHeightPx * 0.32),
+                                height: Math.max(9, labelHeightPx * 0.32),
+                                border: "1px solid #111",
+                                background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 4px 4px",
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              fontSize: Math.max(8, Math.min(14, labelHeightPx * 0.42)),
+                              fontWeight: 800,
+                              lineHeight: 1,
+                            }}
+                          >
+                            $13.400
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ position: "absolute", right: 8, bottom: 6, fontSize: 11, color: "#666" }}>
+                      {pageWidthMm.toFixed(1)} x {pageHeightMm.toFixed(1)} mm
+                    </div>
+                  </div>
+                  {overflow && (
+                    <Alert
+                      style={{ marginTop: 10 }}
+                      type="warning"
+                      showIcon
+                      message="La fila no cabe en el ancho de página"
+                      description={`Ancho requerido: ${requiredWidthMm.toFixed(1)} mm. Reduce columnas/ancho, o aumenta el ancho de página.`}
+                    />
+                  )}
+                </>
+              );
+            })()}
+          </Card>
+          <div style={{ color: "#888", fontSize: 12, marginTop: 8 }}>
+            Estos ajustes se aplican al imprimir etiquetas desde Articulos y Compras en este equipo.
+          </div>
+        </Col>
         <Col xs={24}>
           <div style={{ marginBottom: 8, fontWeight: 500 }}>Ancho de papel</div>
           <Radio.Group
