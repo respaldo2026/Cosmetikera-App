@@ -988,8 +988,15 @@ export default function VentasPage() {
   const panelCarrito = (
     <Card
       style={{ borderRadius: 12, height: "100%", display: "flex", flexDirection: "column" }}
-      styles={{ body: { padding: 10, display: "flex", flexDirection: "column", height: "100%" } }}
+      styles={{ body: { padding: 12, display: "flex", flexDirection: "column", height: "100%" } }}
     >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <Text strong style={{ fontSize: 14, color: "#7a1b6f" }}>Carrito de compra</Text>
+        <Tag color="magenta" style={{ fontSize: 11, marginRight: 0 }}>
+          {carrito.length} item{carrito.length === 1 ? "" : "s"}
+        </Tag>
+      </div>
+
       {/* Cliente */}
       <div style={{
         marginBottom: 8,
@@ -1136,7 +1143,7 @@ export default function VentasPage() {
         marginBottom: 8,
         border: "1px solid #f3e1ee",
         borderRadius: 10,
-        padding: "2px 8px",
+        padding: "6px 10px",
         background: "#fff",
         minHeight: isMobile ? 220 : 0,
       }}>
@@ -1149,23 +1156,23 @@ export default function VentasPage() {
         ) : (
           carrito.map((item) => (
             <div key={item.id} style={{
-              padding: "5px 0", borderBottom: "1px solid #f0f0f0",
+              padding: "7px 0", borderBottom: "1px solid #f0f0f0",
               display: "flex", alignItems: "center", gap: 8,
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 12, fontWeight: 700 }} ellipsis>{item.nombre}</Text>
+                <Text style={{ fontSize: 13, fontWeight: 700 }} ellipsis>{item.nombre}</Text>
                 <div>
-                  <Text style={{ fontSize: 10, color: "#d81b87" }}>
+                  <Text style={{ fontSize: 11, color: "#d81b87" }}>
                     ${Number(item.precio_venta).toLocaleString()}
                   </Text>
                 </div>
               </div>
               <Space size={4}>
                 <Button size="small" icon={<MinusOutlined />} onClick={() => cambiarCantidad(item.id, -1)} />
-                <Text strong style={{ minWidth: 20, textAlign: "center" }}>{item.cantidad}</Text>
+                <Text strong style={{ minWidth: 20, textAlign: "center", fontSize: 13 }}>{item.cantidad}</Text>
                 <Button size="small" icon={<PlusOutlined />} onClick={() => cambiarCantidad(item.id, 1)} />
               </Space>
-              <Text strong style={{ fontSize: 12, minWidth: 60, textAlign: "right" }}>
+              <Text strong style={{ fontSize: 13, minWidth: 70, textAlign: "right" }}>
                 ${Number(item.subtotal).toLocaleString()}
               </Text>
               <Button
@@ -1229,8 +1236,8 @@ export default function VentasPage() {
           display: "flex", justifyContent: "space-between",
           padding: "8px 0", borderTop: "2px solid #f0f0f0", marginTop: 4,
         }}>
-          <Text strong style={{ fontSize: 16 }}>TOTAL</Text>
-          <Text strong style={{ fontSize: 20, color: "#d81b87" }}>${totalFinal.toLocaleString()}</Text>
+          <Text strong style={{ fontSize: 17 }}>TOTAL</Text>
+          <Text strong style={{ fontSize: 24, color: "#d81b87" }}>${totalFinal.toLocaleString()}</Text>
         </div>
       </div>
 
@@ -1396,11 +1403,11 @@ export default function VentasPage() {
 
       {/* LAYOUT POS */}
       <Row gutter={[12, 12]} style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        <Col xs={24} lg={15} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
-          {panelProductos}
-        </Col>
-        <Col xs={24} lg={9} style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
+        <Col xs={24} lg={10} style={{ height: "100%", minHeight: 0, overflow: "hidden" }}>
           {panelCarrito}
+        </Col>
+        <Col xs={24} lg={14} style={{ height: "100%", minHeight: 0, overflowY: "auto" }}>
+          {panelProductos}
         </Col>
       </Row>
 
