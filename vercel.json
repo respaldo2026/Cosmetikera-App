@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/cumpleanos/2d",
-      "schedule": "0 11 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/cron/cumpleanos/1d",
-      "schedule": "5 11 * * *"
+      "schedule": "5 15 * * *"
     },
     {
       "path": "/api/cron/cumpleanos/hoy",
-      "schedule": "10 11 * * *"
+      "schedule": "10 15 * * *"
     }
   ]
 }
