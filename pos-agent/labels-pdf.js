@@ -65,9 +65,6 @@ async function buildCodePng(content, codeType = "datamatrix") {
 
 async function generarPdfEtiquetas(payload) {
   const settings = {
-    printOrientation: String(payload?.template?.printOrientation || "landscape").toLowerCase() === "portrait"
-      ? "portrait"
-      : "landscape",
     pageWidthMm: Number(payload?.template?.pageWidthMm || 104),
     pageHeightMm: Number(payload?.template?.pageHeightMm || 15),
     labelWidthMm: Number(payload?.template?.labelWidthMm || 32),
@@ -124,15 +121,9 @@ async function generarPdfEtiquetas(payload) {
   const fileName = `labels-${Date.now()}.pdf`;
   const outputPath = path.join(os.tmpdir(), fileName);
 
-  const usesRotatedLandscapePage = settings.printOrientation === "landscape";
-  const pageWidthPt = mmToPt(settings.pageWidthMm);
-  const pageHeightPt = mmToPt(settings.pageHeightMm);
-  const pdfPageWidthPt = usesRotatedLandscapePage ? pageHeightPt : pageWidthPt;
-  const pdfPageHeightPt = usesRotatedLandscapePage ? pageWidthPt : pageHeightPt;
-
   const doc = new PDFDocument({
     autoFirstPage: false,
-    size: [pdfPageWidthPt, pdfPageHeightPt],
+    size: [mmToPt(settings.pageWidthMm), mmToPt(settings.pageHeightMm)],
     margin: 0,
     compress: true,
   });
@@ -157,13 +148,6 @@ async function generarPdfEtiquetas(payload) {
 
   for (let row = 0; row < rows; row += 1) {
     doc.addPage();
-    doc.save();
-    if (usesRotatedLandscapePage) {
-      // Algunos drivers termicos ignoran landscape en PDFs con tamano personalizado.
-      // Generamos una pagina portrait y rotamos el lienzo completo para conservar
-      // una geometria logica horizontal de 104x15 mm.
-      doc.transform(0, 1, -1, 0, pdfPageWidthPt, 0);
-    }
 
     for (let col = 0; col < settings.columns; col += 1) {
       const idx = row * settings.columns + col;
@@ -247,8 +231,6 @@ async function generarPdfEtiquetas(payload) {
 
       doc.restore();
     }
-
-    doc.restore();
   }
 
   doc.end();

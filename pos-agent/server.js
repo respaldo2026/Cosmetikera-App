@@ -183,7 +183,6 @@ async function processLabelQueue() {
         await printPdf(outputPath, {
           printer: current.payload?.printerName || undefined,
           scale: "noscale",
-          orientation: "portrait",
         });
       } finally {
         try {
