@@ -76,13 +76,7 @@ Write-Output "[POS-AGENT] NPM : $npmCmd"
 
 & $npmCmd install
 
-if (Test-IsAdministrator) {
-  Write-Output "[POS-AGENT] Instalando como servicio de Windows..."
-  powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-windows-service.ps1") -NodePath $nodePath -ServiceName $ServiceName
-} else {
-  Write-Warning "[POS-AGENT] Sin permisos de administrador. Se instalará como tarea programada."
-  powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
-
+function Start-AgentProcess {
   Write-Output "[POS-AGENT] Arrancando agente..."
 
   Get-Process -Name "node" -ErrorAction SilentlyContinue |
@@ -96,6 +90,25 @@ if (Test-IsAdministrator) {
   $startInfo.WindowStyle     = [System.Diagnostics.ProcessWindowStyle]::Minimized
   $startInfo.UseShellExecute = $true
   [System.Diagnostics.Process]::Start($startInfo) | Out-Null
+}
+
+if (Test-IsAdministrator) {
+  Write-Output "[POS-AGENT] Intentando instalar como servicio de Windows..."
+  try {
+    powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-windows-service.ps1") -NodePath $nodePath -ServiceName $ServiceName
+    if ($LASTEXITCODE -ne 0) {
+      throw "La instalación como servicio devolvió código $LASTEXITCODE"
+    }
+  } catch {
+    Write-Warning "[POS-AGENT] Falló instalación como servicio. Se usará tarea programada."
+    Write-Warning ("[POS-AGENT] Motivo: " + $_.Exception.Message)
+    powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
+    Start-AgentProcess
+  }
+} else {
+  Write-Warning "[POS-AGENT] Sin permisos de administrador. Se instalará como tarea programada."
+  powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
+  Start-AgentProcess
 }
 
 Write-Output "[POS-AGENT] Esperando que el agente arranque..."
