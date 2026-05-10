@@ -113,7 +113,7 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
 };
 
 const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.1:17891").replace(/\/$/, "");
-const POS_AGENT_TIMEOUT_MS = 6000;
+const POS_AGENT_TIMEOUT_MS = 12000;
 const POS_AGENT_TOKEN = process.env.NEXT_PUBLIC_POS_AGENT_TOKEN ?? "";
 
 function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined): LabelTemplateConfig {
