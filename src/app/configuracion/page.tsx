@@ -1860,6 +1860,7 @@ export default function ConfiguracionPage() {
                   <Divider orientation="left" style={{ margin: "6px 0" }}>Formato base</Divider>
                   <Row gutter={[12, 12]}>
                     <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Orientacion impresion</div><Select value={labelTemplateConfig.printOrientation} style={{ width: "100%" }} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, printOrientation: v }))} options={[{ label: "Horizontal (landscape)", value: "landscape" }, { label: "Vertical (portrait)", value: "portrait" }]} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Correccion rotacion contenido</div><Select value={labelTemplateConfig.contentRotationDeg} style={{ width: "100%" }} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, contentRotationDeg: v }))} options={[{ label: "0° (sin correccion)", value: 0 }, { label: "90°", value: 90 }, { label: "180°", value: 180 }, { label: "270°", value: 270 }]} /></Col>
                     <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho pagina (mm)</div><InputNumber min={30} max={120} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.pageWidthMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageWidthMm: Number(v || prev.pageWidthMm) }))} /></Col>
                     <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alto pagina (mm)</div><InputNumber min={8} max={80} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.pageHeightMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, pageHeightMm: Number(v || prev.pageHeightMm) }))} /></Col>
                     <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Ancho etiqueta (mm)</div><InputNumber min={8} max={90} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.labelWidthMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, labelWidthMm: Number(v || prev.labelWidthMm) }))} /></Col>
@@ -1973,6 +1974,7 @@ export default function ConfiguracionPage() {
                           <Row gutter={[12, 12]}>
                             <Col xs={24} md={14}>
                               <div style={{ width: labelWidthMm * designerScale, height: labelHeightMm * designerScale, maxWidth: "100%", border: "1px solid #d9d9d9", borderRadius: cfg.cornerRadiusMm * designerScale, background: "#fff", position: "relative", overflow: "hidden" }}>
+                                <div style={{ position: "absolute", inset: 0, transform: `rotate(${cfg.contentRotationDeg || 0}deg)`, transformOrigin: "center center" }}>
                                 {cfg.showStoreName && (
                                   <Rnd
                                     bounds="parent"
@@ -2040,6 +2042,7 @@ export default function ConfiguracionPage() {
                                     </div>
                                   </Rnd>
                                 )}
+                                </div>
                               </div>
                             </Col>
                             <Col xs={24} md={10}>

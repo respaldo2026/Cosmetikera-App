@@ -92,6 +92,7 @@ async function generarPdfEtiquetas(payload) {
     logoXOffsetMm: Number(payload?.template?.logoXOffsetMm || 1.2),
     logoYOffsetMm: Number(payload?.template?.logoYOffsetMm || 0.7),
     codeType: String(payload?.template?.codeType || "datamatrix").toLowerCase(),
+    contentRotationDeg: Number(payload?.template?.contentRotationDeg || 0),
     storeNameXMm: Number(payload?.template?.storeNameXMm || 1.2),
     storeNameYMm: Number(payload?.template?.storeNameYMm || 0.6),
     storeNameWidthMm: Number(payload?.template?.storeNameWidthMm || 20),
@@ -158,6 +159,17 @@ async function generarPdfEtiquetas(payload) {
 
       doc.save();
       doc.roundedRect(x, y, labelWidthPt, labelHeightPt, cornerRadiusPt).clip();
+
+      const contentRotationDeg = [0, 90, 180, 270].includes(settings.contentRotationDeg)
+        ? settings.contentRotationDeg
+        : 0;
+      if (contentRotationDeg !== 0) {
+        const cx = x + (labelWidthPt / 2);
+        const cy = y + (labelHeightPt / 2);
+        doc.translate(cx, cy);
+        doc.rotate(contentRotationDeg);
+        doc.translate(-cx, -cy);
+      }
 
       if (logoBuffer) {
         try {
