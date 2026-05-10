@@ -25,6 +25,6 @@ echo   Cierra esta ventana para detener
 echo ==========================================
 echo.
 
-node server.js
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0start-agent-hidden.ps1"
 
 pause
