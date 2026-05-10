@@ -453,9 +453,9 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   cmds.push((datos.pie || "¡Gracias por tu compra!") + LF);
   cmds.push(`${ESC}a\x00`);
 
-  // Avanzar papel y cortar
-  cmds.push(`${LF}${LF}${LF}`);
-  cmds.push(`${GS}V\x41\x05`); // corte parcial
+  // Reducir desperdicio: solo un salto y corte parcial sin avance extra.
+  cmds.push(LF);
+  cmds.push(`${GS}V\x41\x00`); // corte parcial con feed minimo
 
   return cmds;
 }
