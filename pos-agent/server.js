@@ -180,13 +180,9 @@ async function processLabelQueue() {
     try {
       const { outputPath, totalLabels, pages } = await generarPdfEtiquetas(current.payload);
       try {
-        const orientation = String(current.payload?.template?.printOrientation || "landscape").toLowerCase() === "portrait"
-          ? "portrait"
-          : "landscape";
         await printPdf(outputPath, {
           printer: current.payload?.printerName || undefined,
           scale: "noscale",
-          orientation,
         });
       } finally {
         try {
