@@ -15,6 +15,7 @@ import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, in
 import { getCatalogosArticulosLocal, mergeCatalogos, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
 import { ROLES } from "@/constants/roles";
+import { Rnd } from "react-rnd";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -1881,9 +1882,9 @@ export default function ConfiguracionPage() {
                     <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Mostrar nombre tienda</div><Switch checked={labelTemplateConfig.showStoreName} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showStoreName: checked }))} /></Col>
                     <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tienda: fuente</div><InputNumber min={4} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.storeNameFontSize} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, storeNameFontSize: Number(v || prev.storeNameFontSize) }))} /></Col>
                     <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tienda: max caracteres</div><InputNumber min={6} max={40} step={1} precision={0} style={{ width: "100%" }} value={labelTemplateConfig.storeNameMaxLen} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, storeNameMaxLen: Math.max(6, Number(v || prev.storeNameMaxLen)) }))} /></Col>
-                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>DataMatrix: tamaño (mm)</div><InputNumber min={3} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.dataMatrixSizeMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, dataMatrixSizeMm: Number(v || prev.dataMatrixSizeMm) }))} /></Col>
-                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>DataMatrix: padding X (mm)</div><InputNumber min={0} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.dataMatrixXPaddingMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, dataMatrixXPaddingMm: Number(v || 0) }))} /></Col>
-                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>DataMatrix: padding Y (mm)</div><InputNumber min={0} max={20} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.dataMatrixYPaddingMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, dataMatrixYPaddingMm: Number(v || 0) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tipo de codigo</div><Select value={labelTemplateConfig.codeType} style={{ width: "100%" }} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, codeType: v }))} options={[{ label: "Data Matrix", value: "datamatrix" }, { label: "QR", value: "qrcode" }, { label: "Code 128", value: "code128" }]} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Codigo: ancho (mm)</div><InputNumber min={3} max={30} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.codeWidthMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, codeWidthMm: Number(v || prev.codeWidthMm) }))} /></Col>
+                    <Col xs={12} md={6}><div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Codigo: alto (mm)</div><InputNumber min={3} max={30} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.codeHeightMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, codeHeightMm: Number(v || prev.codeHeightMm) }))} /></Col>
                   </Row>
                 </Col>
 
@@ -1910,9 +1911,9 @@ export default function ConfiguracionPage() {
                     <Button onClick={() => setLabelTemplateConfig((prev) => ({ ...prev, columns: 3 }))}>Usar 3 etiquetas por fila</Button>
                   </Space>
                   <Card size="small" style={{ background: "#fafafa", borderColor: "#f0f0f0" }}>
-                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Vista previa en vivo (detalle)</div>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Editor visual en vivo (arrastrar y ampliar)</div>
                     <div style={{ color: "#777", fontSize: 12, marginBottom: 10 }}>
-                      Se actualiza al instante al mover cualquier medida. Simula la primera fila y una etiqueta ampliada.
+                      Arrastra y redimensiona con el mouse cada bloque. Queda guardado al pulsar Guardar configuracion.
                     </div>
                     {(() => {
                       const cfg = labelTemplateConfig;
@@ -1927,49 +1928,35 @@ export default function ConfiguracionPage() {
                       const overflow = requiredWidthMm > pageWidthMm + 0.001;
 
                       const rowScale = Math.max(2.4, Math.min(4.6, 520 / pageWidthMm));
-                      const zoomScale = 11;
-                      const dmSizePx = Math.max(8, cfg.dataMatrixSizeMm * zoomScale);
+                      const designerScale = 12;
+                      const mmToPx = (mm: number) => mm * designerScale;
+                      const pxToMm = (px: number) => Math.round((px / designerScale) * 100) / 100;
 
-                      const labelSample = (
-                        <div
-                          style={{
-                            width: labelWidthMm * zoomScale,
-                            height: labelHeightMm * zoomScale,
-                            border: "1px solid #d9d9d9",
-                            borderRadius: cfg.cornerRadiusMm * zoomScale,
-                            background: "#fff",
-                            position: "relative",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {cfg.logoEnabled && cfg.logoDataUrl && (
-                            <img
-                              src={cfg.logoDataUrl}
-                              alt="Logo etiqueta"
-                              style={{
-                                position: "absolute",
-                                left: cfg.logoXOffsetMm * zoomScale,
-                                top: cfg.logoYOffsetMm * zoomScale,
-                                width: cfg.logoWidthMm * zoomScale,
-                                height: cfg.logoHeightMm * zoomScale,
-                                objectFit: "contain",
-                              }}
-                            />
-                          )}
-                          {cfg.showStoreName && (
-                            <div style={{ position: "absolute", left: cfg.contentPaddingLeftMm * zoomScale, top: cfg.contentTopMm * zoomScale, fontSize: Math.max(8, cfg.storeNameFontSize * 2), fontWeight: 700, maxWidth: labelWidthMm * zoomScale - dmSizePx - 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              LA COSMETIKERA
-                            </div>
-                          )}
-                          <div style={{ position: "absolute", left: cfg.contentPaddingLeftMm * zoomScale, top: (cfg.contentTopMm + 2.6) * zoomScale, fontSize: Math.max(10, cfg.nameFontSize * 1.9), fontWeight: 700, maxWidth: labelWidthMm * zoomScale - dmSizePx - 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            ACE Almendra
-                          </div>
-                          <div style={{ position: "absolute", left: 1.1 * zoomScale, top: cfg.priceTopMm * zoomScale, fontSize: Math.max(13, cfg.priceFontSize * 1.6), fontWeight: 800, lineHeight: 1 }}>
-                            $13.400
-                          </div>
-                          <div style={{ position: "absolute", right: cfg.dataMatrixXPaddingMm * zoomScale, top: cfg.dataMatrixYPaddingMm * zoomScale, width: dmSizePx, height: dmSizePx, border: "1px solid #111", background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 6px 6px" }} />
-                        </div>
-                      );
+                      const updateBox = (
+                        key: "store" | "name" | "price" | "code" | "logo",
+                        next: { x: number; y: number; w: number; h: number }
+                      ) => {
+                        const x = Math.max(0, next.x);
+                        const y = Math.max(0, next.y);
+                        const w = Math.max(1, next.w);
+                        const h = Math.max(1, next.h);
+
+                        setLabelTemplateConfig((prev) => {
+                          if (key === "store") {
+                            return { ...prev, storeNameXMm: x, storeNameYMm: y, storeNameWidthMm: w, storeNameHeightMm: h };
+                          }
+                          if (key === "name") {
+                            return { ...prev, nameXMm: x, nameYMm: y, nameWidthMm: w, nameHeightMm: h };
+                          }
+                          if (key === "price") {
+                            return { ...prev, priceXMm: x, priceYMm: y, priceWidthMm: w, priceHeightMm: h };
+                          }
+                          if (key === "code") {
+                            return { ...prev, codeXMm: x, codeYMm: y, codeWidthMm: w, codeHeightMm: h };
+                          }
+                          return { ...prev, logoXOffsetMm: x, logoYOffsetMm: y, logoWidthMm: w, logoHeightMm: h };
+                        });
+                      };
 
                       return (
                         <>
@@ -1983,16 +1970,84 @@ export default function ConfiguracionPage() {
                           </div>
 
                           <Row gutter={[12, 12]}>
-                            <Col xs={24} md={12}>{labelSample}</Col>
-                            <Col xs={24} md={12}>
-                              <Alert
-                                type="info"
-                                showIcon
-                                message="Resumen de layout"
-                                description={`Fila: ${columns} columnas • Requerido ${requiredWidthMm.toFixed(1)} mm / Página ${pageWidthMm.toFixed(1)} mm`}
-                              />
-                              <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
-                                Consejo: si el texto toca bordes, sube padding izquierdo o baja fuente de precio.
+                            <Col xs={24} md={14}>
+                              <div style={{ width: labelWidthMm * designerScale, height: labelHeightMm * designerScale, maxWidth: "100%", border: "1px solid #d9d9d9", borderRadius: cfg.cornerRadiusMm * designerScale, background: "#fff", position: "relative", overflow: "hidden" }}>
+                                {cfg.showStoreName && (
+                                  <Rnd
+                                    bounds="parent"
+                                    size={{ width: mmToPx(cfg.storeNameWidthMm), height: mmToPx(cfg.storeNameHeightMm) }}
+                                    position={{ x: mmToPx(cfg.storeNameXMm), y: mmToPx(cfg.storeNameYMm) }}
+                                    minWidth={mmToPx(4)}
+                                    minHeight={mmToPx(1)}
+                                    onDragStop={(_e, d) => updateBox("store", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.storeNameWidthMm, h: cfg.storeNameHeightMm })}
+                                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("store", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                                  >
+                                    <div style={{ width: "100%", height: "100%", border: "1px dashed #7c3aed", color: "#7c3aed", fontSize: Math.max(8, cfg.storeNameFontSize * 1.9), fontWeight: 700, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(124,58,237,0.05)" }}>TIENDA</div>
+                                  </Rnd>
+                                )}
+
+                                <Rnd
+                                  bounds="parent"
+                                  size={{ width: mmToPx(cfg.nameWidthMm), height: mmToPx(cfg.nameHeightMm) }}
+                                  position={{ x: mmToPx(cfg.nameXMm), y: mmToPx(cfg.nameYMm) }}
+                                  minWidth={mmToPx(4)}
+                                  minHeight={mmToPx(1)}
+                                  onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })}
+                                  onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("name", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                                >
+                                  <div style={{ width: "100%", height: "100%", border: "1px dashed #2563eb", color: "#2563eb", fontSize: Math.max(9, cfg.nameFontSize * 1.8), fontWeight: 700, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(37,99,235,0.06)" }}>ACE Almendra</div>
+                                </Rnd>
+
+                                <Rnd
+                                  bounds="parent"
+                                  size={{ width: mmToPx(cfg.priceWidthMm), height: mmToPx(cfg.priceHeightMm) }}
+                                  position={{ x: mmToPx(cfg.priceXMm), y: mmToPx(cfg.priceYMm) }}
+                                  minWidth={mmToPx(6)}
+                                  minHeight={mmToPx(2)}
+                                  onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })}
+                                  onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("price", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                                >
+                                  <div style={{ width: "100%", height: "100%", border: "1px dashed #16a34a", color: "#166534", fontSize: Math.max(12, cfg.priceFontSize * 1.55), fontWeight: 800, padding: 2, lineHeight: 1, background: "rgba(22,163,74,0.06)" }}>$13.400</div>
+                                </Rnd>
+
+                                <Rnd
+                                  bounds="parent"
+                                  size={{ width: mmToPx(cfg.codeWidthMm), height: mmToPx(cfg.codeHeightMm) }}
+                                  position={{ x: mmToPx(cfg.codeXMm), y: mmToPx(cfg.codeYMm) }}
+                                  minWidth={mmToPx(3)}
+                                  minHeight={mmToPx(3)}
+                                  onDragStop={(_e, d) => updateBox("code", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.codeWidthMm, h: cfg.codeHeightMm })}
+                                  onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("code", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                                >
+                                  <div style={{ width: "100%", height: "100%", border: "1px dashed #111827", background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 6px 6px", display: "flex", alignItems: "flex-end", justifyContent: "center", color: "#111", fontSize: 10, fontWeight: 700 }}>
+                                    {cfg.codeType === "qrcode" ? "QR" : cfg.codeType === "code128" ? "128" : "DM"}
+                                  </div>
+                                </Rnd>
+
+                                {cfg.logoEnabled && cfg.logoDataUrl && (
+                                  <Rnd
+                                    bounds="parent"
+                                    size={{ width: mmToPx(cfg.logoWidthMm), height: mmToPx(cfg.logoHeightMm) }}
+                                    position={{ x: mmToPx(cfg.logoXOffsetMm), y: mmToPx(cfg.logoYOffsetMm) }}
+                                    minWidth={mmToPx(2)}
+                                    minHeight={mmToPx(1)}
+                                    onDragStop={(_e, d) => updateBox("logo", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.logoWidthMm, h: cfg.logoHeightMm })}
+                                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("logo", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                                  >
+                                    <div style={{ width: "100%", height: "100%", border: "1px dashed #d81b87", background: "rgba(216,27,135,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                      <img src={cfg.logoDataUrl} alt="Logo" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                                    </div>
+                                  </Rnd>
+                                )}
+                              </div>
+                            </Col>
+                            <Col xs={24} md={10}>
+                              <Alert type="info" showIcon message="Modo diseño tipo Bartender" description="Arrastra y redimensiona bloques. El resultado se refleja en impresión real." />
+                              <div style={{ marginTop: 10, fontSize: 12, color: "#555" }}>
+                                Fila: {columns} columnas. Requerido: {requiredWidthMm.toFixed(1)} mm / Pagina: {pageWidthMm.toFixed(1)} mm.
+                              </div>
+                              <div style={{ marginTop: 8, fontSize: 12, color: "#777" }}>
+                                Atajo: para volver a calibración base, usa "Usar 3 etiquetas por fila" y luego ajusta solo con el mouse.
                               </div>
                             </Col>
                           </Row>

@@ -48,10 +48,13 @@ function expandLabels(items) {
   return expanded;
 }
 
-async function buildDataMatrixPng(content) {
+async function buildCodePng(content, codeType = "datamatrix") {
   if (!content) return null;
+
+  const bcid = codeType === "qrcode" ? "qrcode" : codeType === "code128" ? "code128" : "datamatrix";
+
   return bwipjs.toBuffer({
-    bcid: "datamatrix",
+    bcid,
     text: content,
     scale: 2,
     includetext: false,
@@ -88,6 +91,23 @@ async function generarPdfEtiquetas(payload) {
     logoHeightMm: Number(payload?.template?.logoHeightMm || 2.6),
     logoXOffsetMm: Number(payload?.template?.logoXOffsetMm || 1.2),
     logoYOffsetMm: Number(payload?.template?.logoYOffsetMm || 0.7),
+    codeType: String(payload?.template?.codeType || "datamatrix").toLowerCase(),
+    storeNameXMm: Number(payload?.template?.storeNameXMm || 1.2),
+    storeNameYMm: Number(payload?.template?.storeNameYMm || 0.6),
+    storeNameWidthMm: Number(payload?.template?.storeNameWidthMm || 20),
+    storeNameHeightMm: Number(payload?.template?.storeNameHeightMm || 2.8),
+    nameXMm: Number(payload?.template?.nameXMm || 1.2),
+    nameYMm: Number(payload?.template?.nameYMm || 3.2),
+    nameWidthMm: Number(payload?.template?.nameWidthMm || 20),
+    nameHeightMm: Number(payload?.template?.nameHeightMm || 3.5),
+    priceXMm: Number(payload?.template?.priceXMm || 1.1),
+    priceYMm: Number(payload?.template?.priceYMm || 7.1),
+    priceWidthMm: Number(payload?.template?.priceWidthMm || 20),
+    priceHeightMm: Number(payload?.template?.priceHeightMm || 7.2),
+    codeXMm: Number(payload?.template?.codeXMm || 23.5),
+    codeYMm: Number(payload?.template?.codeYMm || 3.1),
+    codeWidthMm: Number(payload?.template?.codeWidthMm || 7.4),
+    codeHeightMm: Number(payload?.template?.codeHeightMm || 7.4),
     storeName: String(payload?.template?.storeName || "La Cosmetikera").trim(),
   };
 
@@ -117,8 +137,6 @@ async function generarPdfEtiquetas(payload) {
   const cornerRadiusPt = mmToPt(settings.cornerRadiusMm);
 
   const dmSizePt = mmToPt(settings.dataMatrixSizeMm);
-  const dmXPadding = mmToPt(settings.dataMatrixXPaddingMm);
-  const dmYPadding = mmToPt(settings.dataMatrixYPaddingMm);
   const contentPaddingLeftPt = mmToPt(settings.contentPaddingLeftMm);
   const contentTopPt = mmToPt(settings.contentTopMm);
   const logoBuffer = settings.logoEnabled ? parseDataUrlImageBuffer(settings.logoDataUrl) : null;
@@ -157,9 +175,9 @@ async function generarPdfEtiquetas(payload) {
           .fillColor("#000000")
           .font("Helvetica-Bold")
           .fontSize(settings.storeNameFontSize)
-          .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + contentPaddingLeftPt, y + contentTopPt, {
-            width: labelWidthPt - dmSizePt - mmToPt(3.6),
-            height: mmToPt(2.8),
+          .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + mmToPt(settings.storeNameXMm || 0), y + mmToPt(settings.storeNameYMm || 0), {
+            width: mmToPt(settings.storeNameWidthMm || 20),
+            height: mmToPt(settings.storeNameHeightMm || 2.8),
             lineBreak: false,
           });
       }
@@ -169,9 +187,9 @@ async function generarPdfEtiquetas(payload) {
         .fillColor("#000000")
         .font("Helvetica-Bold")
         .fontSize(settings.nameFontSize)
-        .text(normalizeText(label.name, settings.nameMaxLen), x + contentPaddingLeftPt, y + mmToPt(3.2), {
-          width: labelWidthPt - dmSizePt - mmToPt(3.8),
-          height: mmToPt(3.5),
+        .text(normalizeText(label.name, settings.nameMaxLen), x + mmToPt(settings.nameXMm || 0), y + mmToPt(settings.nameYMm || 0), {
+          width: mmToPt(settings.nameWidthMm || 20),
+          height: mmToPt(settings.nameHeightMm || 3.5),
           lineBreak: false,
         });
 
@@ -180,19 +198,19 @@ async function generarPdfEtiquetas(payload) {
         .fillColor("#000000")
         .font("Helvetica-Bold")
         .fontSize(settings.priceFontSize)
-        .text(formatCop(label.price), x + mmToPt(1.1), y + mmToPt(settings.priceTopMm), {
-          width: labelWidthPt - dmSizePt - mmToPt(3.6),
-          height: mmToPt(7.2),
+        .text(formatCop(label.price), x + mmToPt(settings.priceXMm || 1.1), y + mmToPt(settings.priceYMm || settings.priceTopMm), {
+          width: mmToPt(settings.priceWidthMm || 20),
+          height: mmToPt(settings.priceHeightMm || 7.2),
           lineBreak: false,
         });
 
-      // Data Matrix pequeño y legible
+      // Codigo seleccionable (Data Matrix, QR o Code128)
       try {
-        const dmBuffer = await buildDataMatrixPng(label.dataMatrix);
+        const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
         if (dmBuffer) {
-          doc.image(dmBuffer, x + labelWidthPt - dmSizePt - dmXPadding, y + dmYPadding, {
-            width: dmSizePt,
-            height: dmSizePt,
+          doc.image(dmBuffer, x + mmToPt(settings.codeXMm || 0), y + mmToPt(settings.codeYMm || 0), {
+            width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
+            height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
           });
         }
       } catch (error) {

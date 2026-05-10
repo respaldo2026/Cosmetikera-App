@@ -39,6 +39,24 @@ export type LabelTemplateConfig = {
   logoHeightMm: number;
   logoXOffsetMm: number;
   logoYOffsetMm: number;
+  codeType: "datamatrix" | "qrcode" | "code128";
+  storeNameXMm: number;
+  storeNameYMm: number;
+  storeNameWidthMm: number;
+  storeNameHeightMm: number;
+  nameXMm: number;
+  nameYMm: number;
+  nameWidthMm: number;
+  nameHeightMm: number;
+  priceXMm: number;
+  priceYMm: number;
+  priceWidthMm: number;
+  priceHeightMm: number;
+  codeXMm: number;
+  codeYMm: number;
+  codeWidthMm: number;
+  codeHeightMm: number;
+  enableVisualDesigner: boolean;
 };
 
 export const LABEL_TEMPLATE_STORAGE_KEY = "pos_label_template_v1";
@@ -70,6 +88,24 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
   logoHeightMm: 2.6,
   logoXOffsetMm: 1.2,
   logoYOffsetMm: 0.7,
+  codeType: "datamatrix",
+  storeNameXMm: 1.2,
+  storeNameYMm: 0.6,
+  storeNameWidthMm: 20,
+  storeNameHeightMm: 2.8,
+  nameXMm: 1.2,
+  nameYMm: 3.2,
+  nameWidthMm: 20,
+  nameHeightMm: 3.5,
+  priceXMm: 1.1,
+  priceYMm: 7.1,
+  priceWidthMm: 20,
+  priceHeightMm: 7.2,
+  codeXMm: 23.5,
+  codeYMm: 3.1,
+  codeWidthMm: 7.4,
+  codeHeightMm: 7.4,
+  enableVisualDesigner: true,
 };
 
 const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.1:17891").replace(/\/$/, "");
@@ -90,6 +126,11 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
   const asString = (value: unknown, fallback: string, maxLen = 400000) => {
     const text = typeof value === "string" ? value : fallback;
     return text.slice(0, maxLen);
+  };
+  const asCodeType = (value: unknown): "datamatrix" | "qrcode" | "code128" => {
+    const v = String(value || "").toLowerCase();
+    if (v === "qrcode" || v === "code128") return v;
+    return "datamatrix";
   };
 
   return {
@@ -119,6 +160,24 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     logoHeightMm: asNumber(src.logoHeightMm, DEFAULT_LABEL_TEMPLATE.logoHeightMm, 1, 20),
     logoXOffsetMm: asNumber(src.logoXOffsetMm, DEFAULT_LABEL_TEMPLATE.logoXOffsetMm, 0, 20),
     logoYOffsetMm: asNumber(src.logoYOffsetMm, DEFAULT_LABEL_TEMPLATE.logoYOffsetMm, 0, 20),
+    codeType: asCodeType(src.codeType),
+    storeNameXMm: asNumber(src.storeNameXMm, DEFAULT_LABEL_TEMPLATE.storeNameXMm, 0, 100),
+    storeNameYMm: asNumber(src.storeNameYMm, DEFAULT_LABEL_TEMPLATE.storeNameYMm, 0, 100),
+    storeNameWidthMm: asNumber(src.storeNameWidthMm, DEFAULT_LABEL_TEMPLATE.storeNameWidthMm, 2, 100),
+    storeNameHeightMm: asNumber(src.storeNameHeightMm, DEFAULT_LABEL_TEMPLATE.storeNameHeightMm, 1, 100),
+    nameXMm: asNumber(src.nameXMm, DEFAULT_LABEL_TEMPLATE.nameXMm, 0, 100),
+    nameYMm: asNumber(src.nameYMm, DEFAULT_LABEL_TEMPLATE.nameYMm, 0, 100),
+    nameWidthMm: asNumber(src.nameWidthMm, DEFAULT_LABEL_TEMPLATE.nameWidthMm, 2, 100),
+    nameHeightMm: asNumber(src.nameHeightMm, DEFAULT_LABEL_TEMPLATE.nameHeightMm, 1, 100),
+    priceXMm: asNumber(src.priceXMm, DEFAULT_LABEL_TEMPLATE.priceXMm, 0, 100),
+    priceYMm: asNumber(src.priceYMm, DEFAULT_LABEL_TEMPLATE.priceYMm, 0, 100),
+    priceWidthMm: asNumber(src.priceWidthMm, DEFAULT_LABEL_TEMPLATE.priceWidthMm, 2, 100),
+    priceHeightMm: asNumber(src.priceHeightMm, DEFAULT_LABEL_TEMPLATE.priceHeightMm, 1, 100),
+    codeXMm: asNumber(src.codeXMm, DEFAULT_LABEL_TEMPLATE.codeXMm, 0, 100),
+    codeYMm: asNumber(src.codeYMm, DEFAULT_LABEL_TEMPLATE.codeYMm, 0, 100),
+    codeWidthMm: asNumber(src.codeWidthMm, DEFAULT_LABEL_TEMPLATE.codeWidthMm, 1, 100),
+    codeHeightMm: asNumber(src.codeHeightMm, DEFAULT_LABEL_TEMPLATE.codeHeightMm, 1, 100),
+    enableVisualDesigner: asBool(src.enableVisualDesigner, DEFAULT_LABEL_TEMPLATE.enableVisualDesigner),
   };
 }
 
