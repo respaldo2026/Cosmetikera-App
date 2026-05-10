@@ -133,9 +133,9 @@ if ($action -eq "printRaw") {
   $enc = [System.Text.Encoding]::GetEncoding($encodingName)
   $bytes = $enc.GetBytes($raw)
 
-  # En algunas TM-T20 el texto RAW queda en buffer si no llega avance/corte.
-  # Forzamos LF al final y corte automático (salvo que se desactive explícitamente).
-  $ensureLineFeed = $true
+  # No forzar avance/corte por defecto para evitar desperdicio de papel.
+  # Si un flujo lo necesita, puede activar payload.ensureLineFeed / payload.autoCut.
+  $ensureLineFeed = $false
   if ($null -ne $payload.ensureLineFeed) {
     $ensureLineFeed = [bool]$payload.ensureLineFeed
   }
@@ -146,11 +146,11 @@ if ($action -eq "printRaw") {
       $hasLf = $true
     }
     if (-not $hasLf) {
-      $bytes = $bytes + [byte[]](0x0A,0x0A,0x0A)
+      $bytes = $bytes + [byte[]](0x0A)
     }
   }
 
-  $autoCut = $true
+  $autoCut = $false
   if ($null -ne $payload.autoCut) {
     $autoCut = [bool]$payload.autoCut
   }
