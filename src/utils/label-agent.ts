@@ -13,6 +13,7 @@ export type LabelPrintItem = {
 };
 
 export type LabelTemplateConfig = {
+  printOrientation: "portrait" | "landscape";
   pageWidthMm: number;
   pageHeightMm: number;
   labelWidthMm: number;
@@ -62,6 +63,7 @@ export type LabelTemplateConfig = {
 export const LABEL_TEMPLATE_STORAGE_KEY = "pos_label_template_v1";
 
 export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
+  printOrientation: "landscape",
   pageWidthMm: 104,
   pageHeightMm: 15,
   labelWidthMm: 32,
@@ -132,8 +134,13 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     if (v === "qrcode" || v === "code128") return v;
     return "datamatrix";
   };
+  const asOrientation = (value: unknown): "portrait" | "landscape" => {
+    const v = String(value || "").toLowerCase();
+    return v === "portrait" ? "portrait" : "landscape";
+  };
 
   return {
+    printOrientation: asOrientation(src.printOrientation),
     pageWidthMm: asNumber(src.pageWidthMm, DEFAULT_LABEL_TEMPLATE.pageWidthMm, 30, 120),
     pageHeightMm: asNumber(src.pageHeightMm, DEFAULT_LABEL_TEMPLATE.pageHeightMm, 8, 80),
     labelWidthMm: asNumber(src.labelWidthMm, DEFAULT_LABEL_TEMPLATE.labelWidthMm, 8, 90),
