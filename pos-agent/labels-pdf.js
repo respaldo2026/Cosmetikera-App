@@ -117,13 +117,16 @@ async function generarPdfEtiquetas(payload) {
     throw new Error("No hay etiquetas para imprimir");
   }
 
-  // El driver ya maneja el layout de columnas (3 etiquetas por fila de 104mm).
-  // Generamos 1 pagina PDF por etiqueta (32x15mm) para que el driver las posicione.
+  // El driver ya está configurado con 3 columnas sobre una tira de 104x15 mm.
+  // Generamos una pagina PDF por fila completa, con las 3 etiquetas dibujadas
+  // en su posicion real dentro de la pagina.
   const fileName = `labels-${Date.now()}.pdf`;
   const outputPath = path.join(os.tmpdir(), fileName);
 
   const labelWidthPt = mmToPt(settings.labelWidthMm);
   const labelHeightPt = mmToPt(settings.labelHeightMm);
+  const marginLeftPt = mmToPt(settings.marginLeftMm);
+  const gapHorizontalPt = mmToPt(settings.gapHorizontalMm);
   const cornerRadiusPt = mmToPt(settings.cornerRadiusMm);
   const logoBuffer = settings.logoEnabled ? parseDataUrlImageBuffer(settings.logoDataUrl) : null;
   const logoWidthPt = mmToPt(settings.logoWidthMm);
@@ -131,10 +134,11 @@ async function generarPdfEtiquetas(payload) {
   const logoXOffsetPt = mmToPt(settings.logoXOffsetMm);
   const logoYOffsetPt = mmToPt(settings.logoYOffsetMm);
 
+  const rows = Math.ceil(labels.length / settings.columns);
+
   const doc = new PDFDocument({
     autoFirstPage: false,
-    // Cada pagina = 1 etiqueta. El driver agrupa 3 por fila en la tira de 104mm.
-    size: [labelWidthPt, labelHeightPt],
+    size: [mmToPt(settings.pageWidthMm), mmToPt(settings.pageHeightMm)],
     margin: 0,
     compress: true,
   });
@@ -142,74 +146,80 @@ async function generarPdfEtiquetas(payload) {
   const stream = fs.createWriteStream(outputPath);
   doc.pipe(stream);
 
-  for (const label of labels) {
+  for (let row = 0; row < rows; row += 1) {
     doc.addPage();
 
-    const x = 0;
-    const y = 0;
+    for (let col = 0; col < settings.columns; col += 1) {
+      const idx = row * settings.columns + col;
+      const label = labels[idx];
+      if (!label) continue;
 
-    doc.save();
-    doc.roundedRect(x, y, labelWidthPt, labelHeightPt, cornerRadiusPt).clip();
+      const x = marginLeftPt + col * (labelWidthPt + gapHorizontalPt);
+      const y = 0;
 
-    if (logoBuffer) {
-      try {
-        doc.image(logoBuffer, x + logoXOffsetPt, y + logoYOffsetPt, {
-          width: logoWidthPt,
-          height: logoHeightPt,
-        });
-      } catch {
-        // Si la imagen falla, continuamos con el texto.
+      doc.save();
+      doc.roundedRect(x, y, labelWidthPt, labelHeightPt, cornerRadiusPt).clip();
+
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, x + logoXOffsetPt, y + logoYOffsetPt, {
+            width: logoWidthPt,
+            height: logoHeightPt,
+          });
+        } catch {
+          // Si la imagen falla, continuamos con el texto.
+        }
       }
-    }
 
-    if (settings.showStoreName) {
+      if (settings.showStoreName) {
+        doc
+          .fillColor("#000000")
+          .font("Helvetica-Bold")
+          .fontSize(settings.storeNameFontSize)
+          .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + mmToPt(settings.storeNameXMm || 0), y + mmToPt(settings.storeNameYMm || 0), {
+            width: mmToPt(settings.storeNameWidthMm || 20),
+            height: mmToPt(settings.storeNameHeightMm || 2.8),
+            lineBreak: false,
+          });
+      }
+
+      // Nombre del artículo
       doc
         .fillColor("#000000")
         .font("Helvetica-Bold")
-        .fontSize(settings.storeNameFontSize)
-        .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + mmToPt(settings.storeNameXMm || 0), y + mmToPt(settings.storeNameYMm || 0), {
-          width: mmToPt(settings.storeNameWidthMm || 20),
-          height: mmToPt(settings.storeNameHeightMm || 2.8),
+        .fontSize(settings.nameFontSize)
+        .text(normalizeText(label.name, settings.nameMaxLen), x + mmToPt(settings.nameXMm || 0), y + mmToPt(settings.nameYMm || 0), {
+          width: mmToPt(settings.nameWidthMm || 20),
+          height: mmToPt(settings.nameHeightMm || 3.5),
           lineBreak: false,
         });
-    }
 
-    // Nombre del artículo
-    doc
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .fontSize(settings.nameFontSize)
-      .text(normalizeText(label.name, settings.nameMaxLen), x + mmToPt(settings.nameXMm || 0), y + mmToPt(settings.nameYMm || 0), {
-        width: mmToPt(settings.nameWidthMm || 20),
-        height: mmToPt(settings.nameHeightMm || 3.5),
-        lineBreak: false,
-      });
-
-    // Precio destacado
-    doc
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .fontSize(settings.priceFontSize)
-      .text(formatCop(label.price), x + mmToPt(settings.priceXMm || 1.1), y + mmToPt(settings.priceYMm || settings.priceTopMm), {
-        width: mmToPt(settings.priceWidthMm || 20),
-        height: mmToPt(settings.priceHeightMm || 7.2),
-        lineBreak: false,
-      });
-
-    // Codigo seleccionable (Data Matrix, QR o Code128)
-    try {
-      const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
-      if (dmBuffer) {
-        doc.image(dmBuffer, x + mmToPt(settings.codeXMm || 0), y + mmToPt(settings.codeYMm || 0), {
-          width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
-          height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
+      // Precio destacado
+      doc
+        .fillColor("#000000")
+        .font("Helvetica-Bold")
+        .fontSize(settings.priceFontSize)
+        .text(formatCop(label.price), x + mmToPt(settings.priceXMm || 1.1), y + mmToPt(settings.priceYMm || settings.priceTopMm), {
+          width: mmToPt(settings.priceWidthMm || 20),
+          height: mmToPt(settings.priceHeightMm || 7.2),
+          lineBreak: false,
         });
-      }
-    } catch (error) {
-      // No bloquear la etiqueta por error de Data Matrix
-    }
 
-    doc.restore();
+      // Codigo seleccionable (Data Matrix, QR o Code128)
+      try {
+        const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
+        if (dmBuffer) {
+          doc.image(dmBuffer, x + mmToPt(settings.codeXMm || 0), y + mmToPt(settings.codeYMm || 0), {
+            width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
+            height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
+          });
+        }
+      } catch (error) {
+        // No bloquear la etiqueta por error de Data Matrix
+      }
+
+      doc.restore();
+    }
   }
 
   doc.end();
@@ -222,7 +232,7 @@ async function generarPdfEtiquetas(payload) {
   return {
     outputPath,
     totalLabels: labels.length,
-    pages: labels.length,
+    pages: rows,
   };
 }
 
