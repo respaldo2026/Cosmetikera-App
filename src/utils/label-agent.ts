@@ -41,7 +41,7 @@ export type LabelTemplateConfig = {
   logoHeightMm: number;
   logoXOffsetMm: number;
   logoYOffsetMm: number;
-  codeType: "datamatrix" | "qrcode" | "code128";
+  codeType: "datamatrix" | "aztec" | "qrcode" | "code128";
   storeNameXMm: number;
   storeNameYMm: number;
   storeNameWidthMm: number;
@@ -131,9 +131,9 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     const text = typeof value === "string" ? value : fallback;
     return text.slice(0, maxLen);
   };
-  const asCodeType = (value: unknown): "datamatrix" | "qrcode" | "code128" => {
+  const asCodeType = (value: unknown): "datamatrix" | "aztec" | "qrcode" | "code128" => {
     const v = String(value || "").toLowerCase();
-    if (v === "qrcode" || v === "code128") return v;
+    if (v === "aztec" || v === "qrcode" || v === "code128") return v;
     return "datamatrix";
   };
   const asOrientation = (value: unknown): "portrait" | "landscape" => {

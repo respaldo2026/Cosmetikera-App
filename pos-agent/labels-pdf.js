@@ -51,7 +51,13 @@ function expandLabels(items) {
 async function buildCodePng(content, codeType = "datamatrix") {
   if (!content) return null;
 
-  const bcid = codeType === "qrcode" ? "qrcode" : codeType === "code128" ? "code128" : "datamatrix";
+  const bcid = codeType === "aztec"
+    ? "azteccode"
+    : codeType === "qrcode"
+    ? "qrcode"
+    : codeType === "code128"
+    ? "code128"
+    : "datamatrix";
 
   return bwipjs.toBuffer({
     bcid,
