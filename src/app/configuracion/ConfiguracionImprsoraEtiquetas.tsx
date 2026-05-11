@@ -184,6 +184,13 @@ export default function ConfiguracionImprsoraEtiquetas({
       return Upload.LIST_IGNORE;
     }
 
+    const toDataUrl = (input: File) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
+      reader.readAsDataURL(input);
+    });
+
     setUploadingLogo(true);
     try {
       const fileExt = (file.name.split(".").pop() || "png").toLowerCase();
@@ -213,7 +220,25 @@ export default function ConfiguracionImprsoraEtiquetas({
 
       messageApi.success("Logo actualizado");
     } catch (error) {
-      messageApi.error("Error subiendo logo: " + (error instanceof Error ? error.message : "desconocido"));
+      const errorMessage = error instanceof Error ? error.message : "desconocido";
+      const lower = String(errorMessage).toLowerCase();
+      const storageIssue = lower.includes("bucket") || lower.includes("policy") || lower.includes("row-level") || lower.includes("storage");
+
+      if (storageIssue) {
+        try {
+          const dataUrl = await toDataUrl(file);
+          setLabelTemplateConfig((prev) => ({
+            ...prev,
+            logoDataUrl: dataUrl,
+            logoEnabled: true,
+          }));
+          messageApi.warning("Storage no disponible. Logo de etiqueta guardado localmente.");
+        } catch {
+          messageApi.error("Error subiendo logo: " + errorMessage);
+        }
+      } else {
+        messageApi.error("Error subiendo logo: " + errorMessage);
+      }
     } finally {
       setUploadingLogo(false);
     }

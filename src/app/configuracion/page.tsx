@@ -238,6 +238,13 @@ export default function ConfiguracionPage() {
       return Upload.LIST_IGNORE;
     }
 
+    const toDataUrl = (input: File) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
+      reader.readAsDataURL(input);
+    });
+
     setUploadingLogo(true);
     try {
       const fileExt = (file.name.split(".").pop() || "png").toLowerCase();
@@ -285,7 +292,29 @@ export default function ConfiguracionPage() {
       messageApi.success("Logo actualizado correctamente");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "No se pudo subir el logo";
-      messageApi.error(errorMessage);
+      const lower = errorMessage.toLowerCase();
+      const storageIssue = lower.includes("bucket") || lower.includes("policy") || lower.includes("row-level") || lower.includes("storage");
+
+      if (storageIssue) {
+        try {
+          const dataUrl = await toDataUrl(file);
+          const localId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+          formAcademia.setFieldsValue({ logo_url: dataUrl });
+          setLogoFileList([
+            {
+              uid: localId,
+              name: file.name,
+              status: "done",
+              url: dataUrl,
+            },
+          ]);
+          messageApi.warning("Storage no disponible. Logo guardado localmente en la configuración.");
+        } catch {
+          messageApi.error(errorMessage);
+        }
+      } else {
+        messageApi.error(errorMessage);
+      }
     } finally {
       setUploadingLogo(false);
     }
