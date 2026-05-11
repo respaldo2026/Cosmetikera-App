@@ -124,26 +124,6 @@ function enqueueLabelJob(payload) {
   });
 }
 
-function expandLabelItems(payload) {
-  const sourceItems = Array.isArray(payload?.items) ? payload.items : [];
-  const expanded = [];
-
-  for (const item of sourceItems) {
-    const quantity = Math.max(0, Number(item?.quantity || 0));
-    for (let i = 0; i < quantity; i += 1) {
-      expanded.push({
-        name: String(item?.name || "").trim(),
-        price: Number(item?.price || 0),
-        quantity: 1,
-        dataMatrix: String(item?.dataMatrix || item?.sku || item?.name || "").trim(),
-        sku: String(item?.sku || "").trim(),
-      });
-    }
-  }
-
-  return expanded;
-}
-
 function listPrintersWithPowerShell() {
   return new Promise((resolve, reject) => {
     const command = `
@@ -198,47 +178,26 @@ async function processLabelQueue() {
     if (!current) continue;
 
     try {
-      const expandedItems = expandLabelItems(current.payload);
-      if (!expandedItems.length) {
-        throw new Error("No hay etiquetas válidas para imprimir");
-      }
-
       const orientation = String(current.payload?.template?.printOrientation || "landscape").toLowerCase() === "portrait"
         ? "portrait"
         : "landscape";
-
-      let printedLabels = 0;
-      let printedPages = 0;
-
-      // Algunos drivers de etiquetas ignoran paginas > 1 de un PDF.
-      // Imprimimos una etiqueta por trabajo para garantizar cantidad/alineacion.
-      for (const item of expandedItems) {
-        const singlePayload = {
-          ...current.payload,
-          items: [{ ...item, quantity: 1 }],
-        };
-
-        const { outputPath, totalLabels, pages } = await generarPdfEtiquetas(singlePayload);
+      const { outputPath, totalLabels, pages } = await generarPdfEtiquetas(current.payload);
+      try {
+        await printPdf(outputPath, {
+          printer: current.payload?.printerName || undefined,
+          scale: "noscale",
+          orientation,
+        });
+      } finally {
         try {
-          await printPdf(outputPath, {
-            printer: current.payload?.printerName || undefined,
-            scale: "noscale",
-            orientation,
-          });
-        } finally {
-          try {
-            require("fs").unlinkSync(outputPath);
-          } catch (_error) {}
-        }
-
-        printedLabels += Number(totalLabels || 0);
-        printedPages += Number(pages || 0);
+          require("fs").unlinkSync(outputPath);
+        } catch (_error) {}
       }
 
       current.resolve({
         ok: true,
-        totalLabels: printedLabels,
-        pages: printedPages,
+        totalLabels,
+        pages,
         printer: current.payload?.printerName || null,
       });
     } catch (error) {
