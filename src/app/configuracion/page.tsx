@@ -1614,6 +1614,9 @@ export default function ConfiguracionPage() {
           ticketFields={ticketFields}
         />
       </div>
+      <div style={{ marginTop: 20 }}>
+        {renderTicketDesigner()}
+      </div>
     </div>
   );
 
