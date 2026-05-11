@@ -121,7 +121,7 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
   codeWidthMm: 7.4,
   codeHeightMm: 7.4,
   enableVisualDesigner: true,
-  showProductName: true,
+  showProductName: false,
   showPrice: true,
   showCode: true,
   showFreeText: false,
@@ -296,6 +296,7 @@ export async function printPriceLabels(items: LabelPrintItem[], printerName: str
       items,
       template: {
         ...template,
+        showProductName: false,
         storeName,
       },
     }),

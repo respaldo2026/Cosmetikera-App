@@ -26,7 +26,6 @@ type CampoEtiqueta = "store" | "name" | "price" | "code" | "logo" | "freeText";
 
 const CAMPOS_ETIQUETA_OPTIONS: Array<{ label: string; value: CampoEtiqueta }> = [
   { label: "Nombre tienda", value: "store" },
-  { label: "Nombre producto", value: "name" },
   { label: "Precio", value: "price" },
   { label: "Código", value: "code" },
   { label: "Logo", value: "logo" },
@@ -76,7 +75,7 @@ export default function ConfiguracionImprsoraEtiquetas({
       if (typeof window !== "undefined") {
         const storedLabelPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
         setPosLabelPrinterName(storedLabelPrinter);
-        setLabelTemplateConfig(getLabelTemplateConfig());
+        setLabelTemplateConfig({ ...getLabelTemplateConfig(), showProductName: false });
         labelTemplateReadyRef.current = true;
       }
 
@@ -234,7 +233,6 @@ export default function ConfiguracionImprsoraEtiquetas({
   const getCamposSeleccionados = (cfg: LabelTemplateConfig): CampoEtiqueta[] => {
     const selected: CampoEtiqueta[] = [];
     if (cfg.showStoreName) selected.push("store");
-    if (cfg.showProductName) selected.push("name");
     if (cfg.showPrice) selected.push("price");
     if (cfg.showCode) selected.push("code");
     if (cfg.logoEnabled) selected.push("logo");
@@ -247,7 +245,7 @@ export default function ConfiguracionImprsoraEtiquetas({
     setLabelTemplateConfig((prev) => ({
       ...prev,
       showStoreName: selected.has("store"),
-      showProductName: selected.has("name"),
+      showProductName: false,
       showPrice: selected.has("price"),
       showCode: selected.has("code"),
       logoEnabled: selected.has("logo") && Boolean(prev.logoDataUrl),
