@@ -401,11 +401,18 @@ export default function ArticulosPage() {
     }
   }, [LABEL_PRINTER_STORAGE_KEY, actualizarImpresoraEtiquetas, message]);
 
+  const resolverCodigoEtiqueta = useCallback((articulo: Partial<Articulo>) => {
+    return String(
+      articulo.referencia || articulo.codigo_secundario || articulo.codigo_barras || articulo.id || ""
+    ).trim();
+  }, []);
+
   const abrirModalEtiquetaArticulo = useCallback(async (articulo: Articulo) => {
-    setLabelItems([{ articuloId: articulo.id, nombre: articulo.nombre, precio: articulo.precio_venta, cantidad: 1, sku: articulo.referencia || articulo.codigo_barras }]);
+    const codigoEtiqueta = resolverCodigoEtiqueta(articulo);
+    setLabelItems([{ articuloId: articulo.id, nombre: articulo.nombre, precio: articulo.precio_venta, cantidad: 1, sku: codigoEtiqueta }]);
     setLabelModalOpen(true);
     await cargarImpresorasEtiquetas();
-  }, [cargarImpresorasEtiquetas]);
+  }, [cargarImpresorasEtiquetas, resolverCodigoEtiqueta]);
 
   const abrirModalEtiquetasSeleccion = useCallback(async () => {
     const ids = new Set(selectedIds.map(String));
@@ -421,12 +428,12 @@ export default function ArticulosPage() {
         nombre: a.nombre,
         precio: a.precio_venta,
         cantidad: 1,
-        sku: a.referencia || a.codigo_barras,
+        sku: resolverCodigoEtiqueta(a),
       }))
     );
     setLabelModalOpen(true);
     await cargarImpresorasEtiquetas();
-  }, [articulos, cargarImpresorasEtiquetas, message, selectedIds]);
+  }, [articulos, cargarImpresorasEtiquetas, message, resolverCodigoEtiqueta, selectedIds]);
 
   const imprimirEtiquetasArticulo = useCallback(async () => {
     const printerName = String(selectedLabelPrinter || "").trim();
@@ -441,7 +448,7 @@ export default function ArticulosPage() {
         name: i.nombre,
         price: i.precio,
         quantity: i.cantidad,
-        dataMatrix: `LC|${i.articuloId}|${i.precio}`,
+        dataMatrix: String(i.sku || i.articuloId).trim(),
         sku: i.sku,
       }));
 

@@ -54,6 +54,7 @@ type Articulo = {
   id: string;
   nombre: string;
   referencia?: string;
+  codigo_secundario?: string;
   codigo_barras?: string;
   precio_costo?: number;
   precio_venta?: number;
@@ -147,6 +148,12 @@ export default function ComprasPage() {
     }
   }, []);
 
+  const resolverCodigoEtiqueta = useCallback((articulo: Partial<Articulo>, fallbackId?: string | number) => {
+    return String(
+      articulo.referencia || articulo.codigo_secundario || articulo.codigo_barras || fallbackId || ""
+    ).trim();
+  }, []);
+
   // ── Carga inicial ─────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -154,7 +161,7 @@ export default function ComprasPage() {
       supabaseBrowserClient.from("compras").select("*").order("fecha", { ascending: false }),
       supabaseBrowserClient.from("proveedores").select("id,nombre").order("nombre"),
       supabaseBrowserClient.from("articulos")
-        .select("id,nombre,referencia,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
+        .select("id,nombre,referencia,codigo_secundario,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
         .order("nombre"),
     ]);
     setCompras(c || []);
@@ -219,7 +226,7 @@ export default function ComprasPage() {
         name: item.nombre,
         price: item.precio,
         quantity: Math.max(0, Number(item.cantidad || 0)),
-        dataMatrix: item.dataMatrix,
+        dataMatrix: String(item.sku || item.dataMatrix || item.articuloId).trim(),
         sku: item.sku,
       }))
       .filter((item) => item.quantity > 0);
@@ -360,7 +367,7 @@ export default function ComprasPage() {
       if (!res.ok) throw new Error(json.error || "Error creando articulo");
       const { data: newArt } = await supabaseBrowserClient
         .from("articulos")
-        .select("id,nombre,referencia,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
+        .select("id,nombre,referencia,codigo_secundario,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
         .eq("id", json.data[0].id)
         .single();
       if (newArt) {
@@ -410,8 +417,8 @@ export default function ComprasPage() {
       const etiquetasDraft: LabelDraftItem[] = itemsConId.map((item) => {
         const art = articulos.find((a) => a.id === item.articulo_id);
         const precioVenta = Number(art?.precio_venta ?? item.precio_unitario ?? 0);
-        const sku = String(art?.referencia || art?.codigo_barras || item.codigo || item.articulo_id || "");
-        const dataMatrix = `LC|${item.articulo_id}|${precioVenta}`;
+        const sku = resolverCodigoEtiqueta(art || {}, item.codigo || item.articulo_id);
+        const dataMatrix = sku;
 
         return {
           key: `${item.articulo_id}`,
