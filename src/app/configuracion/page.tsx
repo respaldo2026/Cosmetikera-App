@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid, Alert, Badge, Radio, InputNumber } from "antd";
 import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined, CopyOutlined, TagsOutlined, ShopOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
@@ -201,6 +201,7 @@ export default function ConfiguracionPage() {
   const [posLabelPrinterName, setPosLabelPrinterName] = useState<string>("");
   const [posPrinterWidth, setPosPrinterWidth] = useState<number>(48);
   const [labelTemplateConfig, setLabelTemplateConfig] = useState<LabelTemplateConfig>(DEFAULT_LABEL_TEMPLATE);
+  const labelTemplateReadyRef = useRef(false);
   const [posConfigTab, setPosConfigTab] = useState<string>("pos-printer");
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
@@ -384,11 +385,17 @@ export default function ConfiguracionPage() {
       const storedLabelPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
       setPosLabelPrinterName(storedLabelPrinter || configuredTicketPrinter || "");
       setLabelTemplateConfig(getLabelTemplateConfig());
+      labelTemplateReadyRef.current = true;
     }
 
     // Verificar estado QZ Tray
     setQzEstado(qzActivo() ? "conectado" : "desconectado");
   }, []);
+
+  useEffect(() => {
+    if (!labelTemplateReadyRef.current) return;
+    saveLabelTemplateConfig(labelTemplateConfig);
+  }, [labelTemplateConfig]);
 
   const conectarQZ = async () => {
     if (!usaQZ) {
