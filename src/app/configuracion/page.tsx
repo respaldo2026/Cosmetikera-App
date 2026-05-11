@@ -551,7 +551,7 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const testImprimirEtiqueta = async () => {
+  const testImprimirEtiqueta = async (cantidad: 1 | 3 | 6 = 3) => {
     if (!usaAgenteLocal) {
       messageApi.info("La prueba de etiquetas desde configuración requiere modo agente local.");
       return;
@@ -575,7 +575,7 @@ export default function ConfiguracionPage() {
         {
           name: "TEST",
           price: 13400,
-          quantity: 3,
+          quantity: cantidad,
           dataMatrix: "TEST|13400",
           sku: "TEST",
         },
@@ -1907,8 +1907,8 @@ export default function ConfiguracionPage() {
                       <Button icon={<ReloadOutlined />} loading={buscandoImpresorasEtiquetas} onClick={buscarImpresorasEtiquetas}>
                         Detectar impresoras de etiquetas
                       </Button>
-                      <Button type="primary" icon={<TagsOutlined />} loading={testEtiquetas} onClick={testImprimirEtiqueta} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
-                        Imprimir etiqueta de prueba
+                      <Button type="primary" icon={<TagsOutlined />} loading={testEtiquetas} onClick={() => testImprimirEtiqueta(3)} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
+                        Probar etiquetas x3
                       </Button>
                     </Space>
                     <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de etiquetas</div>
@@ -2197,17 +2197,35 @@ export default function ConfiguracionPage() {
             label: "Pruebas etiquetas",
             children: (
               <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                <Button
-                  type="primary"
-                  icon={<TagsOutlined />}
-                  loading={testEtiquetas}
-                  onClick={testImprimirEtiqueta}
-                  style={{ width: "fit-content", background: "#d81b87", borderColor: "#d81b87" }}
-                >
-                  Imprimir 3 etiquetas de prueba
-                </Button>
+                <Space wrap>
+                  <Button
+                    icon={<TagsOutlined />}
+                    loading={testEtiquetas}
+                    onClick={() => testImprimirEtiqueta(1)}
+                    style={{ width: "fit-content" }}
+                  >
+                    Imprimir prueba x1
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<TagsOutlined />}
+                    loading={testEtiquetas}
+                    onClick={() => testImprimirEtiqueta(3)}
+                    style={{ width: "fit-content", background: "#d81b87", borderColor: "#d81b87" }}
+                  >
+                    Imprimir prueba x3
+                  </Button>
+                  <Button
+                    icon={<TagsOutlined />}
+                    loading={testEtiquetas}
+                    onClick={() => testImprimirEtiqueta(6)}
+                    style={{ width: "fit-content" }}
+                  >
+                    Imprimir prueba x6
+                  </Button>
+                </Space>
                 <div style={{ color: "#888", fontSize: 12 }}>
-                  Usa la impresora seleccionada en la pestaña de etiquetas y la plantilla guardada en este equipo.
+                  Usa la impresora seleccionada en la pestaña de etiquetas y la plantilla guardada en este equipo para validar alineación.
                 </div>
               </Space>
             ),
