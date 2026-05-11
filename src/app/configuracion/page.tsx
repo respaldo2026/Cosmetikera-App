@@ -1761,8 +1761,10 @@ export default function ConfiguracionPage() {
     {
       key: "pos",
       label: (
-        <span>
-          <PrinterOutlined /> Impresora POS
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#1677ff", fontWeight: 600 }}>
+          <PrinterOutlined />
+          <span>Impresora POS</span>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#1677ff", display: "inline-block" }} />
         </span>
       ),
       children: posTab,
@@ -1770,8 +1772,10 @@ export default function ConfiguracionPage() {
     {
       key: "etiquetas",
       label: (
-        <span>
-          <TagsOutlined /> Impresora Etiquetas
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#d81b87", fontWeight: 600 }}>
+          <TagsOutlined />
+          <span>Impresora Etiquetas</span>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#d81b87", display: "inline-block" }} />
         </span>
       ),
       children: etiquetasTab,
