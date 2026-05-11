@@ -9,7 +9,7 @@ import type { Breakpoint } from "antd/es/_util/responsiveObserver";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
-import { listLabelPrinters } from "@/utils/label-agent";
+import { listLabelPrinters, printPriceLabels } from "@/utils/label-agent";
 import { DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, saveLabelTemplateConfig, type LabelTemplateConfig } from "@/utils/label-agent";
 import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
 import { getCatalogosArticulosLocal, mergeCatalogos, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
@@ -195,8 +195,10 @@ export default function ConfiguracionPage() {
   // ── Estados POS / Impresora ──────────────────────────────────────────────
   const [qzEstado, setQzEstado] = useState<"desconocido" | "conectado" | "desconectado">("desconocido");
   const [conectandoQZ, setConectandoQZ] = useState(false);
-  const [impresorasDisponibles, setImpresorasDisponibles] = useState<string[]>([]);
-  const [buscandoImpresoras, setBuscandoImpresoras] = useState(false);
+  const [impresorasPosDisponibles, setImpresorasPosDisponibles] = useState<string[]>([]);
+  const [impresorasEtiquetasDisponibles, setImpresorasEtiquetasDisponibles] = useState<string[]>([]);
+  const [buscandoImpresorasPos, setBuscandoImpresorasPos] = useState(false);
+  const [buscandoImpresorasEtiquetas, setBuscandoImpresorasEtiquetas] = useState(false);
   const [posPrinterName, setPosPrinterName] = useState<string>("");
   const [posLabelPrinterName, setPosLabelPrinterName] = useState<string>("");
   const [posPrinterWidth, setPosPrinterWidth] = useState<number>(48);
@@ -206,6 +208,7 @@ export default function ConfiguracionPage() {
   const [savingPos, setSavingPos] = useState(false);
   const [testImprimiendo, setTestImprimiendo] = useState(false);
   const [testCajon, setTestCajon] = useState(false);
+  const [testEtiquetas, setTestEtiquetas] = useState(false);
   const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
   const usaQZ = posPrintMode === "qz";
   const usaAgenteLocal = posPrintMode === "agent" || posPrintMode === "auto";
@@ -413,27 +416,45 @@ export default function ConfiguracionPage() {
     setConectandoQZ(false);
   };
 
-  const buscarImpresoras = async () => {
-    setBuscandoImpresoras(true);
+  const obtenerImpresorasDisponibles = useCallback(async (): Promise<string[]> => {
     try {
       if (usaQZ) {
-        const lista = await listarImpresoras();
-        setImpresorasDisponibles(lista);
-        return;
+        return await listarImpresoras();
       }
 
       if (usaAgenteLocal) {
         const printers = await listLabelPrinters();
-        setImpresorasDisponibles(printers.map((p) => p.name).filter(Boolean));
-        return;
+        return printers.map((p) => p.name).filter(Boolean);
       }
 
-      setImpresorasDisponibles([]);
+      return [];
     } catch {
-      setImpresorasDisponibles([]);
-    } finally {
-      setBuscandoImpresoras(false);
+      return [];
     }
+  }, [usaAgenteLocal, usaQZ]);
+
+  const buscarImpresorasPos = async () => {
+    setBuscandoImpresorasPos(true);
+    try {
+      const lista = await obtenerImpresorasDisponibles();
+      setImpresorasPosDisponibles(lista);
+    } finally {
+      setBuscandoImpresorasPos(false);
+    }
+  };
+
+  const buscarImpresorasEtiquetas = async () => {
+    setBuscandoImpresorasEtiquetas(true);
+    try {
+      const lista = await obtenerImpresorasDisponibles();
+      setImpresorasEtiquetasDisponibles(lista);
+    } finally {
+      setBuscandoImpresorasEtiquetas(false);
+    }
+  };
+
+  const buscarImpresoras = async () => {
+    await Promise.all([buscarImpresorasPos(), buscarImpresorasEtiquetas()]);
   };
 
   const guardarConfigPos = async () => {
@@ -527,6 +548,45 @@ export default function ConfiguracionPage() {
       }
     } finally {
       setTestCajon(false);
+    }
+  };
+
+  const testImprimirEtiqueta = async () => {
+    if (!usaAgenteLocal) {
+      messageApi.info("La prueba de etiquetas desde configuración requiere modo agente local.");
+      return;
+    }
+
+    const targetPrinter = String(posLabelPrinterName || "").trim();
+    if (!targetPrinter) {
+      setPosConfigTab("label-printer");
+      messageApi.warning("Selecciona primero la impresora de etiquetas en su pestaña.");
+      return;
+    }
+
+    setTestEtiquetas(true);
+    try {
+      if (typeof window !== "undefined") {
+        saveLabelTemplateConfig(labelTemplateConfig);
+      }
+
+      const nombreTienda = String(formAcademia.getFieldValue("nombre_academia") || "La Cosmetikera").trim() || "La Cosmetikera";
+      const items = [
+        {
+          name: "TEST",
+          price: 13400,
+          quantity: 3,
+          dataMatrix: "TEST|13400",
+          sku: "TEST",
+        },
+      ];
+
+      const result = await printPriceLabels(items, targetPrinter, nombreTienda);
+      messageApi.success(`Prueba enviada: ${result.totalLabels} etiqueta(s) en ${result.pages} página(s).`);
+    } catch (error: any) {
+      messageApi.error("No se pudo imprimir etiqueta de prueba: " + (error?.message || "desconocido"));
+    } finally {
+      setTestEtiquetas(false);
     }
   };
 
@@ -1728,7 +1788,7 @@ export default function ConfiguracionPage() {
             {qzEstado === "conectado" && (
               <Button
                 icon={<ReloadOutlined />}
-                loading={buscandoImpresoras}
+                loading={buscandoImpresorasPos || buscandoImpresorasEtiquetas}
                 onClick={buscarImpresoras}
               >
                 Detectar impresoras
@@ -1784,20 +1844,25 @@ export default function ConfiguracionPage() {
         items={[
           {
             key: "pos-printer",
-            label: "Impresora POS",
+            label: "Impresora POS (Tickets/Cajón)",
             children: (
               <Row gutter={[16, 16]}>
                 {(usaQZ || usaAgenteLocal) && (
                   <Col xs={24}>
+                    <Space style={{ marginBottom: 8 }}>
+                      <Button icon={<ReloadOutlined />} loading={buscandoImpresorasPos} onClick={buscarImpresorasPos}>
+                        Detectar impresoras POS
+                      </Button>
+                    </Space>
                     <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de tickets</div>
-                    {impresorasDisponibles.length > 0 ? (
+                    {impresorasPosDisponibles.length > 0 ? (
                       <Select
                         showSearch
                         value={posPrinterName || undefined}
                         placeholder="Selecciona la impresora"
                         style={{ width: "100%" }}
                         onChange={(v) => setPosPrinterName(v)}
-                        options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
+                        options={impresorasPosDisponibles.map((p) => ({ label: p, value: p }))}
                       />
                     ) : (
                       <Input
@@ -1833,13 +1898,21 @@ export default function ConfiguracionPage() {
           },
           {
             key: "label-printer",
-            label: "Impresora etiquetas",
+            label: "Impresora de etiquetas",
             children: (
               <Row gutter={[16, 16]}>
                 {(usaQZ || usaAgenteLocal) && (
                   <Col xs={24}>
+                    <Space style={{ marginBottom: 8 }}>
+                      <Button icon={<ReloadOutlined />} loading={buscandoImpresorasEtiquetas} onClick={buscarImpresorasEtiquetas}>
+                        Detectar impresoras de etiquetas
+                      </Button>
+                      <Button type="primary" icon={<TagsOutlined />} loading={testEtiquetas} onClick={testImprimirEtiqueta} style={{ background: "#d81b87", borderColor: "#d81b87" }}>
+                        Imprimir etiqueta de prueba
+                      </Button>
+                    </Space>
                     <div style={{ marginBottom: 8, fontWeight: 500 }}>Impresora de etiquetas</div>
-                    {impresorasDisponibles.length > 0 ? (
+                    {impresorasEtiquetasDisponibles.length > 0 ? (
                       <Select
                         showSearch
                         allowClear
@@ -1847,7 +1920,7 @@ export default function ConfiguracionPage() {
                         placeholder="Selecciona la impresora de etiquetas"
                         style={{ width: "100%" }}
                         onChange={(v) => setPosLabelPrinterName(v || "")}
-                        options={impresorasDisponibles.map((p) => ({ label: p, value: p }))}
+                        options={impresorasEtiquetasDisponibles.map((p) => ({ label: p, value: p }))}
                       />
                     ) : (
                       <Input
@@ -2092,24 +2165,55 @@ export default function ConfiguracionPage() {
 
       {/* Pruebas */}
       <Divider orientation="left">Pruebas</Divider>
-      <Space wrap>
-        <Button
-          icon={<PrinterOutlined />}
-          loading={testImprimiendo}
-          onClick={testImprimir}
-        >
-          Imprimir ticket de prueba
-        </Button>
-        {permiteCajon && (
-          <Button
-            icon={<span style={{ marginRight: 4 }}>💰</span>}
-            loading={testCajon}
-            onClick={testAbrirCajon}
-          >
-            Abrir cajón monedero
-          </Button>
-        )}
-      </Space>
+      <Tabs
+        defaultActiveKey="pruebas-pos"
+        items={[
+          {
+            key: "pruebas-pos",
+            label: "Pruebas POS",
+            children: (
+              <Space wrap>
+                <Button
+                  icon={<PrinterOutlined />}
+                  loading={testImprimiendo}
+                  onClick={testImprimir}
+                >
+                  Imprimir ticket de prueba
+                </Button>
+                {permiteCajon && (
+                  <Button
+                    icon={<span style={{ marginRight: 4 }}>💰</span>}
+                    loading={testCajon}
+                    onClick={testAbrirCajon}
+                  >
+                    Abrir cajón monedero
+                  </Button>
+                )}
+              </Space>
+            ),
+          },
+          {
+            key: "pruebas-etiquetas",
+            label: "Pruebas etiquetas",
+            children: (
+              <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                <Button
+                  type="primary"
+                  icon={<TagsOutlined />}
+                  loading={testEtiquetas}
+                  onClick={testImprimirEtiqueta}
+                  style={{ width: "fit-content", background: "#d81b87", borderColor: "#d81b87" }}
+                >
+                  Imprimir 3 etiquetas de prueba
+                </Button>
+                <div style={{ color: "#888", fontSize: 12 }}>
+                  Usa la impresora seleccionada en la pestaña de etiquetas y la plantilla guardada en este equipo.
+                </div>
+              </Space>
+            ),
+          },
+        ]}
+      />
       {permiteCajon && (
         <div style={{ marginTop: 12, color: "#888", fontSize: 12 }}>
           Asegúrate de que el cajón monedero esté conectado al puerto RJ-11 de la impresora.
