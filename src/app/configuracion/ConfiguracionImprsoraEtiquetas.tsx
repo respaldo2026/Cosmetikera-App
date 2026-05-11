@@ -22,16 +22,6 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { listLabelPrinters, printPriceLabels, DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, saveLabelTemplateConfig, type LabelTemplateConfig } from "@/utils/label-agent";
 import { Rnd } from "react-rnd";
 
-type CampoEtiqueta = "store" | "name" | "price" | "code" | "logo" | "freeText";
-
-const CAMPOS_ETIQUETA_OPTIONS: Array<{ label: string; value: CampoEtiqueta }> = [
-  { label: "Nombre tienda", value: "store" },
-  { label: "Precio", value: "price" },
-  { label: "Código", value: "code" },
-  { label: "Logo", value: "logo" },
-  { label: "Campo libre", value: "freeText" },
-];
-
 interface ConfiguracionImprsoraEtiquetasProps {
   formAcademia: any;
   onSaveRequest?: (data: { pos_label_printer_name: string; labelTemplateConfig: LabelTemplateConfig }) => Promise<void>;
@@ -75,7 +65,7 @@ export default function ConfiguracionImprsoraEtiquetas({
       if (typeof window !== "undefined") {
         const storedLabelPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
         setPosLabelPrinterName(storedLabelPrinter);
-        setLabelTemplateConfig({ ...getLabelTemplateConfig(), showProductName: false });
+        setLabelTemplateConfig(getLabelTemplateConfig());
         labelTemplateReadyRef.current = true;
       }
 
@@ -253,29 +243,6 @@ export default function ConfiguracionImprsoraEtiquetas({
       logoEnabled: false,
     }));
     messageApi.info("Logo removido");
-  };
-
-  const getCamposSeleccionados = (cfg: LabelTemplateConfig): CampoEtiqueta[] => {
-    const selected: CampoEtiqueta[] = [];
-    if (cfg.showStoreName) selected.push("store");
-    if (cfg.showPrice) selected.push("price");
-    if (cfg.showCode) selected.push("code");
-    if (cfg.logoEnabled) selected.push("logo");
-    if (cfg.showFreeText) selected.push("freeText");
-    return selected;
-  };
-
-  const setCamposSeleccionados = (campos: CampoEtiqueta[]) => {
-    const selected = new Set<CampoEtiqueta>(campos);
-    setLabelTemplateConfig((prev) => ({
-      ...prev,
-      showStoreName: selected.has("store"),
-      showProductName: false,
-      showPrice: selected.has("price"),
-      showCode: selected.has("code"),
-      logoEnabled: selected.has("logo") && Boolean(prev.logoDataUrl),
-      showFreeText: selected.has("freeText"),
-    }));
   };
 
   const updateBox = (
@@ -552,15 +519,33 @@ export default function ConfiguracionImprsoraEtiquetas({
           </Divider>
           <Row gutter={[12, 12]}>
             <Col xs={24} md={12}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Campos visibles en la etiqueta</div>
-              <Select
-                mode="multiple"
-                style={{ width: "100%" }}
-                value={getCamposSeleccionados(labelTemplateConfig)}
-                onChange={(values) => setCamposSeleccionados(values as CampoEtiqueta[])}
-                options={CAMPOS_ETIQUETA_OPTIONS}
-                placeholder="Selecciona los campos a imprimir"
-              />
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Campos visibles en la etiqueta</div>
+              <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Nombre de la tienda</span>
+                  <Switch checked={labelTemplateConfig.showStoreName} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showStoreName: checked }))} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Nombre del artículo</span>
+                  <Switch checked={labelTemplateConfig.showProductName} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showProductName: checked }))} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Precio</span>
+                  <Switch checked={labelTemplateConfig.showPrice} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showPrice: checked }))} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Código (QR/DataMatrix/Code128/Aztec)</span>
+                  <Switch checked={labelTemplateConfig.showCode} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showCode: checked }))} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Logo</span>
+                  <Switch checked={labelTemplateConfig.logoEnabled} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, logoEnabled: checked }))} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Campo libre</span>
+                  <Switch checked={labelTemplateConfig.showFreeText} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showFreeText: checked }))} />
+                </div>
+              </Space>
             </Col>
             <Col xs={24} md={12}>
               <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Campo libre (texto adicional)</div>
@@ -587,16 +572,12 @@ export default function ConfiguracionImprsoraEtiquetas({
               <InputNumber min={6} max={36} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.priceFontSize} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, priceFontSize: Number(v || prev.priceFontSize) }))} />
             </Col>
             <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Nombre: tamaño fuente</div>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Artículo: tamaño fuente</div>
               <InputNumber min={5} max={24} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.nameFontSize} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, nameFontSize: Number(v || prev.nameFontSize) }))} />
             </Col>
             <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Nombre: max caracteres</div>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Artículo: max caracteres</div>
               <InputNumber min={6} max={60} step={1} precision={0} style={{ width: "100%" }} value={labelTemplateConfig.nameMaxLen} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, nameMaxLen: Math.max(6, Number(v || prev.nameMaxLen)) }))} />
-            </Col>
-            <Col xs={12} md={6}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Mostrar nombre tienda</div>
-              <Switch checked={labelTemplateConfig.showStoreName} onChange={(checked) => setLabelTemplateConfig((prev) => ({ ...prev, showStoreName: checked }))} />
             </Col>
             <Col xs={12} md={6}>
               <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tienda: tamaño fuente</div>

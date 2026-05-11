@@ -296,7 +296,6 @@ export async function printPriceLabels(items: LabelPrintItem[], printerName: str
       items,
       template: {
         ...template,
-        showProductName: false,
         storeName,
       },
     }),
