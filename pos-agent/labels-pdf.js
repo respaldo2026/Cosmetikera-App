@@ -115,6 +115,17 @@ async function generarPdfEtiquetas(payload) {
     codeYMm: Number(payload?.template?.codeYMm || 3.1),
     codeWidthMm: Number(payload?.template?.codeWidthMm || 7.4),
     codeHeightMm: Number(payload?.template?.codeHeightMm || 7.4),
+    showProductName: payload?.template?.showProductName !== false,
+    showPrice: payload?.template?.showPrice !== false,
+    showCode: payload?.template?.showCode !== false,
+    showFreeText: Boolean(payload?.template?.showFreeText),
+    freeText: String(payload?.template?.freeText || "").trim(),
+    freeTextFontSize: Number(payload?.template?.freeTextFontSize || 5.8),
+    freeTextMaxLen: Number(payload?.template?.freeTextMaxLen || 28),
+    freeTextXMm: Number(payload?.template?.freeTextXMm || 1.2),
+    freeTextYMm: Number(payload?.template?.freeTextYMm || 12.1),
+    freeTextWidthMm: Number(payload?.template?.freeTextWidthMm || 20),
+    freeTextHeightMm: Number(payload?.template?.freeTextHeightMm || 2.3),
     storeName: String(payload?.template?.storeName || "La Cosmetikera").trim(),
     debugMarks: Boolean(payload?.template?.debugMarks),
   };
@@ -204,38 +215,57 @@ async function generarPdfEtiquetas(payload) {
       }
 
       // Nombre del artículo
-      doc
-        .fillColor("#000000")
-        .font("Helvetica-Bold")
-        .fontSize(settings.nameFontSize)
-        .text(normalizeText(label.name, settings.nameMaxLen), x + mmToPt(settings.nameXMm || 0), y + mmToPt(settings.nameYMm || 0), {
-          width: mmToPt(settings.nameWidthMm || 20),
-          height: mmToPt(settings.nameHeightMm || 3.5),
-          lineBreak: false,
-        });
+      if (settings.showProductName) {
+        doc
+          .fillColor("#000000")
+          .font("Helvetica-Bold")
+          .fontSize(settings.nameFontSize)
+          .text(normalizeText(label.name, settings.nameMaxLen), x + mmToPt(settings.nameXMm || 0), y + mmToPt(settings.nameYMm || 0), {
+            width: mmToPt(settings.nameWidthMm || 20),
+            height: mmToPt(settings.nameHeightMm || 3.5),
+            lineBreak: false,
+          });
+      }
 
       // Precio destacado
-      doc
-        .fillColor("#000000")
-        .font("Helvetica-Bold")
-        .fontSize(settings.priceFontSize)
-        .text(formatCop(label.price), x + mmToPt(settings.priceXMm || 1.1), y + mmToPt(settings.priceYMm || settings.priceTopMm), {
-          width: mmToPt(settings.priceWidthMm || 20),
-          height: mmToPt(settings.priceHeightMm || 7.2),
-          lineBreak: false,
-        });
+      if (settings.showPrice) {
+        doc
+          .fillColor("#000000")
+          .font("Helvetica-Bold")
+          .fontSize(settings.priceFontSize)
+          .text(formatCop(label.price), x + mmToPt(settings.priceXMm || 1.1), y + mmToPt(settings.priceYMm || settings.priceTopMm), {
+            width: mmToPt(settings.priceWidthMm || 20),
+            height: mmToPt(settings.priceHeightMm || 7.2),
+            lineBreak: false,
+          });
+      }
+
+      // Texto libre
+      if (settings.showFreeText && settings.freeText) {
+        doc
+          .fillColor("#000000")
+          .font("Helvetica")
+          .fontSize(settings.freeTextFontSize)
+          .text(normalizeText(settings.freeText, settings.freeTextMaxLen), x + mmToPt(settings.freeTextXMm || 0), y + mmToPt(settings.freeTextYMm || 0), {
+            width: mmToPt(settings.freeTextWidthMm || 20),
+            height: mmToPt(settings.freeTextHeightMm || 2.3),
+            lineBreak: false,
+          });
+      }
 
       // Codigo seleccionable (Data Matrix, QR o Code128)
-      try {
-        const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
-        if (dmBuffer) {
-          doc.image(dmBuffer, x + mmToPt(settings.codeXMm || 0), y + mmToPt(settings.codeYMm || 0), {
-            width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
-            height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
-          });
+      if (settings.showCode) {
+        try {
+          const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
+          if (dmBuffer) {
+            doc.image(dmBuffer, x + mmToPt(settings.codeXMm || 0), y + mmToPt(settings.codeYMm || 0), {
+              width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
+              height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
+            });
+          }
+        } catch (error) {
+          // No bloquear la etiqueta por error de Data Matrix
         }
-      } catch (error) {
-        // No bloquear la etiqueta por error de Data Matrix
       }
 
       doc.restore();

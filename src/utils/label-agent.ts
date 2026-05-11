@@ -59,6 +59,17 @@ export type LabelTemplateConfig = {
   codeWidthMm: number;
   codeHeightMm: number;
   enableVisualDesigner: boolean;
+  showProductName: boolean;
+  showPrice: boolean;
+  showCode: boolean;
+  showFreeText: boolean;
+  freeText: string;
+  freeTextFontSize: number;
+  freeTextMaxLen: number;
+  freeTextXMm: number;
+  freeTextYMm: number;
+  freeTextWidthMm: number;
+  freeTextHeightMm: number;
 };
 
 export const LABEL_TEMPLATE_STORAGE_KEY = "pos_label_template_v1";
@@ -110,6 +121,17 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
   codeWidthMm: 7.4,
   codeHeightMm: 7.4,
   enableVisualDesigner: true,
+  showProductName: true,
+  showPrice: true,
+  showCode: true,
+  showFreeText: false,
+  freeText: "",
+  freeTextFontSize: 5.8,
+  freeTextMaxLen: 28,
+  freeTextXMm: 1.2,
+  freeTextYMm: 12.1,
+  freeTextWidthMm: 20,
+  freeTextHeightMm: 2.3,
 };
 
 const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.1:17891").replace(/\/$/, "");
@@ -193,6 +215,17 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     codeWidthMm: asNumber(src.codeWidthMm, DEFAULT_LABEL_TEMPLATE.codeWidthMm, 1, 100),
     codeHeightMm: asNumber(src.codeHeightMm, DEFAULT_LABEL_TEMPLATE.codeHeightMm, 1, 100),
     enableVisualDesigner: asBool(src.enableVisualDesigner, DEFAULT_LABEL_TEMPLATE.enableVisualDesigner),
+    showProductName: asBool(src.showProductName, DEFAULT_LABEL_TEMPLATE.showProductName),
+    showPrice: asBool(src.showPrice, DEFAULT_LABEL_TEMPLATE.showPrice),
+    showCode: asBool(src.showCode, DEFAULT_LABEL_TEMPLATE.showCode),
+    showFreeText: asBool(src.showFreeText, DEFAULT_LABEL_TEMPLATE.showFreeText),
+    freeText: asString(src.freeText, DEFAULT_LABEL_TEMPLATE.freeText, 120),
+    freeTextFontSize: asNumber(src.freeTextFontSize, DEFAULT_LABEL_TEMPLATE.freeTextFontSize, 4, 18),
+    freeTextMaxLen: Math.round(asNumber(src.freeTextMaxLen, DEFAULT_LABEL_TEMPLATE.freeTextMaxLen, 4, 60)),
+    freeTextXMm: asNumber(src.freeTextXMm, DEFAULT_LABEL_TEMPLATE.freeTextXMm, 0, 100),
+    freeTextYMm: asNumber(src.freeTextYMm, DEFAULT_LABEL_TEMPLATE.freeTextYMm, 0, 100),
+    freeTextWidthMm: asNumber(src.freeTextWidthMm, DEFAULT_LABEL_TEMPLATE.freeTextWidthMm, 2, 100),
+    freeTextHeightMm: asNumber(src.freeTextHeightMm, DEFAULT_LABEL_TEMPLATE.freeTextHeightMm, 1, 100),
   };
 }
 

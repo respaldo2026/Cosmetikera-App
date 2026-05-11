@@ -22,6 +22,17 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { listLabelPrinters, printPriceLabels, DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, saveLabelTemplateConfig, type LabelTemplateConfig } from "@/utils/label-agent";
 import { Rnd } from "react-rnd";
 
+type CampoEtiqueta = "store" | "name" | "price" | "code" | "logo" | "freeText";
+
+const CAMPOS_ETIQUETA_OPTIONS: Array<{ label: string; value: CampoEtiqueta }> = [
+  { label: "Nombre tienda", value: "store" },
+  { label: "Nombre producto", value: "name" },
+  { label: "Precio", value: "price" },
+  { label: "Código", value: "code" },
+  { label: "Logo", value: "logo" },
+  { label: "Campo libre", value: "freeText" },
+];
+
 interface ConfiguracionImprsoraEtiquetasProps {
   formAcademia: any;
   onSaveRequest?: (data: { pos_label_printer_name: string; labelTemplateConfig: LabelTemplateConfig }) => Promise<void>;
@@ -220,8 +231,32 @@ export default function ConfiguracionImprsoraEtiquetas({
     messageApi.info("Logo removido");
   };
 
+  const getCamposSeleccionados = (cfg: LabelTemplateConfig): CampoEtiqueta[] => {
+    const selected: CampoEtiqueta[] = [];
+    if (cfg.showStoreName) selected.push("store");
+    if (cfg.showProductName) selected.push("name");
+    if (cfg.showPrice) selected.push("price");
+    if (cfg.showCode) selected.push("code");
+    if (cfg.logoEnabled) selected.push("logo");
+    if (cfg.showFreeText) selected.push("freeText");
+    return selected;
+  };
+
+  const setCamposSeleccionados = (campos: CampoEtiqueta[]) => {
+    const selected = new Set<CampoEtiqueta>(campos);
+    setLabelTemplateConfig((prev) => ({
+      ...prev,
+      showStoreName: selected.has("store"),
+      showProductName: selected.has("name"),
+      showPrice: selected.has("price"),
+      showCode: selected.has("code"),
+      logoEnabled: selected.has("logo") && Boolean(prev.logoDataUrl),
+      showFreeText: selected.has("freeText"),
+    }));
+  };
+
   const updateBox = (
-    key: "store" | "name" | "price" | "code" | "logo",
+    key: "store" | "name" | "price" | "code" | "logo" | "freeText",
     next: { x: number; y: number; w: number; h: number }
   ) => {
     const x = Math.max(0, next.x);
@@ -241,6 +276,9 @@ export default function ConfiguracionImprsoraEtiquetas({
       }
       if (key === "code") {
         return { ...prev, codeXMm: x, codeYMm: y, codeWidthMm: w, codeHeightMm: h };
+      }
+      if (key === "freeText") {
+        return { ...prev, freeTextXMm: x, freeTextYMm: y, freeTextWidthMm: w, freeTextHeightMm: h };
       }
       return { ...prev, logoXOffsetMm: x, logoYOffsetMm: y, logoWidthMm: w, logoHeightMm: h };
     });
@@ -292,43 +330,65 @@ export default function ConfiguracionImprsoraEtiquetas({
                   </Rnd>
                 )}
 
-                <Rnd
-                  bounds="parent"
-                  size={{ width: mmToPx(cfg.nameWidthMm), height: mmToPx(cfg.nameHeightMm) }}
-                  position={{ x: mmToPx(cfg.nameXMm), y: mmToPx(cfg.nameYMm) }}
-                  minWidth={mmToPx(4)}
-                  minHeight={mmToPx(1)}
-                  onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })}
-                  onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("name", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                >
-                  <div style={{ width: "100%", height: "100%", border: "1px dashed #2563eb", color: "#2563eb", fontSize: Math.max(9, cfg.nameFontSize * 1.8), fontWeight: 700, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(37,99,235,0.06)" }}>ACE Almendra</div>
-                </Rnd>
+                {cfg.showProductName && (
+                  <Rnd
+                    bounds="parent"
+                    size={{ width: mmToPx(cfg.nameWidthMm), height: mmToPx(cfg.nameHeightMm) }}
+                    position={{ x: mmToPx(cfg.nameXMm), y: mmToPx(cfg.nameYMm) }}
+                    minWidth={mmToPx(4)}
+                    minHeight={mmToPx(1)}
+                    onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })}
+                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("name", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                  >
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #2563eb", color: "#2563eb", fontSize: Math.max(9, cfg.nameFontSize * 1.8), fontWeight: 700, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(37,99,235,0.06)" }}>ACE Almendra</div>
+                  </Rnd>
+                )}
 
-                <Rnd
-                  bounds="parent"
-                  size={{ width: mmToPx(cfg.priceWidthMm), height: mmToPx(cfg.priceHeightMm) }}
-                  position={{ x: mmToPx(cfg.priceXMm), y: mmToPx(cfg.priceYMm) }}
-                  minWidth={mmToPx(6)}
-                  minHeight={mmToPx(2)}
-                  onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })}
-                  onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("price", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                >
-                  <div style={{ width: "100%", height: "100%", border: "1px dashed #16a34a", color: "#166534", fontSize: Math.max(12, cfg.priceFontSize * 1.55), fontWeight: 800, padding: 2, lineHeight: 1, background: "rgba(22,163,74,0.06)" }}>$13.400</div>
-                </Rnd>
+                {cfg.showPrice && (
+                  <Rnd
+                    bounds="parent"
+                    size={{ width: mmToPx(cfg.priceWidthMm), height: mmToPx(cfg.priceHeightMm) }}
+                    position={{ x: mmToPx(cfg.priceXMm), y: mmToPx(cfg.priceYMm) }}
+                    minWidth={mmToPx(6)}
+                    minHeight={mmToPx(2)}
+                    onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })}
+                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("price", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                  >
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #16a34a", color: "#166534", fontSize: Math.max(12, cfg.priceFontSize * 1.55), fontWeight: 800, padding: 2, lineHeight: 1, background: "rgba(22,163,74,0.06)" }}>$13.400</div>
+                  </Rnd>
+                )}
 
-                <Rnd
-                  bounds="parent"
-                  size={{ width: mmToPx(cfg.codeWidthMm), height: mmToPx(cfg.codeHeightMm) }}
-                  position={{ x: mmToPx(cfg.codeXMm), y: mmToPx(cfg.codeYMm) }}
-                  minWidth={mmToPx(3)}
-                  minHeight={mmToPx(3)}
-                  onDragStop={(_e, d) => updateBox("code", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.codeWidthMm, h: cfg.codeHeightMm })}
-                  onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("code", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                >
-                  <div style={{ width: "100%", height: "100%", border: "1px dashed #111827", background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 6px 6px", display: "flex", alignItems: "flex-end", justifyContent: "center", color: "#111", fontSize: 10, fontWeight: 700 }}>
-                    {cfg.codeType === "aztec" ? "AZ" : cfg.codeType === "qrcode" ? "QR" : cfg.codeType === "code128" ? "128" : "DM"}
-                  </div>
-                </Rnd>
+                {cfg.showCode && (
+                  <Rnd
+                    bounds="parent"
+                    size={{ width: mmToPx(cfg.codeWidthMm), height: mmToPx(cfg.codeHeightMm) }}
+                    position={{ x: mmToPx(cfg.codeXMm), y: mmToPx(cfg.codeYMm) }}
+                    minWidth={mmToPx(3)}
+                    minHeight={mmToPx(3)}
+                    onDragStop={(_e, d) => updateBox("code", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.codeWidthMm, h: cfg.codeHeightMm })}
+                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("code", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                  >
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #111827", background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 6px 6px", display: "flex", alignItems: "flex-end", justifyContent: "center", color: "#111", fontSize: 10, fontWeight: 700 }}>
+                      {cfg.codeType === "aztec" ? "AZ" : cfg.codeType === "qrcode" ? "QR" : cfg.codeType === "code128" ? "128" : "DM"}
+                    </div>
+                  </Rnd>
+                )}
+
+                {cfg.showFreeText && cfg.freeText.trim() && (
+                  <Rnd
+                    bounds="parent"
+                    size={{ width: mmToPx(cfg.freeTextWidthMm), height: mmToPx(cfg.freeTextHeightMm) }}
+                    position={{ x: mmToPx(cfg.freeTextXMm), y: mmToPx(cfg.freeTextYMm) }}
+                    minWidth={mmToPx(4)}
+                    minHeight={mmToPx(1)}
+                    onDragStop={(_e, d) => updateBox("freeText", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.freeTextWidthMm, h: cfg.freeTextHeightMm })}
+                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("freeText", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                  >
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #b45309", color: "#92400e", fontSize: Math.max(8, cfg.freeTextFontSize * 1.7), fontWeight: 600, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(251,191,36,0.15)" }}>
+                      {cfg.freeText}
+                    </div>
+                  </Rnd>
+                )}
 
                 {cfg.logoEnabled && cfg.logoDataUrl && (
                   <Rnd
@@ -468,6 +528,25 @@ export default function ConfiguracionImprsoraEtiquetas({
             Contenido y tipografía
           </Divider>
           <Row gutter={[12, 12]}>
+            <Col xs={24} md={12}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Campos visibles en la etiqueta</div>
+              <Select
+                mode="multiple"
+                style={{ width: "100%" }}
+                value={getCamposSeleccionados(labelTemplateConfig)}
+                onChange={(values) => setCamposSeleccionados(values as CampoEtiqueta[])}
+                options={CAMPOS_ETIQUETA_OPTIONS}
+                placeholder="Selecciona los campos a imprimir"
+              />
+            </Col>
+            <Col xs={24} md={12}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Campo libre (texto adicional)</div>
+              <Input
+                value={labelTemplateConfig.freeText}
+                onChange={(e) => setLabelTemplateConfig((prev) => ({ ...prev, freeText: e.target.value.slice(0, 120) }))}
+                placeholder="Ej: Promo válida hasta agotar existencias"
+              />
+            </Col>
             <Col xs={12} md={6}>
               <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Padding izq. contenido (mm)</div>
               <InputNumber min={0} max={10} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.contentPaddingLeftMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, contentPaddingLeftMm: Number(v || 0) }))} />
@@ -515,6 +594,14 @@ export default function ConfiguracionImprsoraEtiquetas({
             <Col xs={12} md={6}>
               <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Código: alto (mm)</div>
               <InputNumber min={3} max={30} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.codeHeightMm} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, codeHeightMm: Number(v || prev.codeHeightMm) }))} />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Campo libre: fuente</div>
+              <InputNumber min={4} max={18} step={0.1} style={{ width: "100%" }} value={labelTemplateConfig.freeTextFontSize} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, freeTextFontSize: Number(v || prev.freeTextFontSize) }))} />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Campo libre: max caracteres</div>
+              <InputNumber min={4} max={60} step={1} precision={0} style={{ width: "100%" }} value={labelTemplateConfig.freeTextMaxLen} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, freeTextMaxLen: Math.max(4, Number(v || prev.freeTextMaxLen)) }))} />
             </Col>
           </Row>
         </Col>

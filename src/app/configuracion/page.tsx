@@ -309,7 +309,7 @@ export default function ConfiguracionPage() {
       cargarMediosPago();
     } else if (key === "plantillas-whatsapp" && plantillasWhatsApp.length === 0) {
       cargarPlantillasWhatsApp();
-    } else if (key === "pos" && usaQZ) {
+    } else if ((key === "pos" || key === "etiquetas") && usaQZ) {
       // Verificar estado QZ al abrir pestaña POS si es necesario
       setQzEstado(qzActivo() ? "conectado" : "desconectado");
     }
@@ -1488,7 +1488,7 @@ export default function ConfiguracionPage() {
     </Spin>
   );
 
-  const posTab = (
+  const estadoImpresionHeader = (
     <div style={{ maxWidth: 1000 }}>
       {usaQZ ? (
         <>
@@ -1568,23 +1568,34 @@ export default function ConfiguracionPage() {
         />
       )}
 
-      {/* Componentes separados */}
-      <ConfiguracionImpresoraPOS
-        formAcademia={formAcademia}
-        ticketFields={ticketFields}
-      />
-
-      <Divider />
-
-      <ConfiguracionImprsoraEtiquetas
-        formAcademia={formAcademia}
-      />
-
       {permiteCajon && (
         <div style={{ marginTop: 16, padding: 12, background: "#fafafa", borderRadius: 4, fontSize: 12, color: "#666" }}>
           📌 <strong>Nota:</strong> Asegúrate de que el cajón monedero esté conectado al puerto RJ-11 de la impresora POS.
         </div>
       )}
+    </div>
+  );
+
+  const posTab = (
+    <div style={{ maxWidth: 1000 }}>
+      {estadoImpresionHeader}
+      <div style={{ marginTop: 16 }}>
+        <ConfiguracionImpresoraPOS
+          formAcademia={formAcademia}
+          ticketFields={ticketFields}
+        />
+      </div>
+    </div>
+  );
+
+  const etiquetasTab = (
+    <div style={{ maxWidth: 1000 }}>
+      {estadoImpresionHeader}
+      <div style={{ marginTop: 16 }}>
+        <ConfiguracionImprsoraEtiquetas
+          formAcademia={formAcademia}
+        />
+      </div>
     </div>
   );
 
@@ -1755,6 +1766,15 @@ export default function ConfiguracionPage() {
         </span>
       ),
       children: posTab,
+    },
+    {
+      key: "etiquetas",
+      label: (
+        <span>
+          <TagsOutlined /> Impresora Etiquetas
+        </span>
+      ),
+      children: etiquetasTab,
     },
     {
       key: "catalogos-articulos",
