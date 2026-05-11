@@ -110,6 +110,7 @@ async function generarPdfEtiquetas(payload) {
     codeWidthMm: Number(payload?.template?.codeWidthMm || 7.4),
     codeHeightMm: Number(payload?.template?.codeHeightMm || 7.4),
     storeName: String(payload?.template?.storeName || "La Cosmetikera").trim(),
+    debugMarks: Boolean(payload?.template?.debugMarks),
   };
 
   const labels = expandLabels(payload?.items || []);
@@ -148,6 +149,19 @@ async function generarPdfEtiquetas(payload) {
 
   for (let row = 0; row < rows; row += 1) {
     doc.addPage();
+    if (settings.debugMarks) {
+      const pageWidthPt = mmToPt(settings.pageWidthMm);
+      const pageHeightPt = mmToPt(settings.pageHeightMm);
+      doc.save();
+      doc.lineWidth(0.5);
+      doc.rect(1, 1, pageWidthPt - 2, pageHeightPt - 2).stroke();
+      doc.font("Helvetica").fontSize(6).fillColor("#000000");
+      doc.text(`W:${settings.pageWidthMm} H:${settings.pageHeightMm}`, 2, 1, { lineBreak: false });
+      doc.text("L", 2, pageHeightPt - 8, { lineBreak: false });
+      doc.text("C", pageWidthPt / 2 - 2, pageHeightPt - 8, { lineBreak: false });
+      doc.text("R", pageWidthPt - 6, pageHeightPt - 8, { lineBreak: false });
+      doc.restore();
+    }
 
     for (let col = 0; col < settings.columns; col += 1) {
       const idx = row * settings.columns + col;
