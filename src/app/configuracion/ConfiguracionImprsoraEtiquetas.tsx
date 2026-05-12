@@ -282,6 +282,24 @@ export default function ConfiguracionImprsoraEtiquetas({
   };
 
   const renderVisualEditor = () => {
+    // Estilos reutilizables para los handles de resize (visibles y clicables)
+    const rndHandle: React.CSSProperties = {
+      background: "#fff",
+      border: "1.5px solid #555",
+      borderRadius: 2,
+      width: 8,
+      height: 8,
+      zIndex: 20,
+    };
+    const rndCorner: React.CSSProperties = {
+      background: "#d81b87",
+      border: "1.5px solid #fff",
+      borderRadius: "50%",
+      width: 10,
+      height: 10,
+      zIndex: 20,
+    };
+
     const cfg = labelTemplateConfig;
     const pageWidthMm  = Math.max(30, Number(cfg.pageWidthMm  || 104));
     const pageHeightMm = Math.max(8,  Number(cfg.pageHeightMm || 15));
@@ -423,59 +441,119 @@ export default function ConfiguracionImprsoraEtiquetas({
         {/* ── Editor draggable ── */}
         <Row gutter={[12, 12]}>
           <Col xs={24} md={14}>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 6 }}>Editor — arrastra y redimensiona cada bloque</div>
-            <div style={{ width: labelWidthMm * designerScale, height: labelHeightMm * designerScale, maxWidth: "100%", border: "1px solid #d9d9d9", borderRadius: cfg.cornerRadiusMm * designerScale, background: "#fff", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", inset: 0, transform: `rotate(${cfg.contentRotationDeg || 0}deg)`, transformOrigin: "center center" }}>
-                <div style={{ position: "absolute", left: contentOffsetXPx, top: contentOffsetYPx, width: contentCanvasWidthPx, height: contentCanvasHeightPx }}>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 6 }}>Editor — arrastra y redimensiona cada bloque (handles en bordes y esquinas)</div>
+            {/* Padding de 8px para que los handles de resize no queden cortados por el borde */}
+            <div style={{ padding: 8, display: "inline-block", background: "#f0f0f0", borderRadius: cfg.cornerRadiusMm * designerScale + 4 }}>
+              <div style={{ width: labelWidthMm * designerScale, height: labelHeightMm * designerScale, border: "1.5px solid #bbb", borderRadius: cfg.cornerRadiusMm * designerScale, background: "#fff", position: "relative", overflow: "visible" }}>
+                {/* Capa de fondo visual con clip — no afecta handles */}
+                <div style={{ position: "absolute", inset: 0, borderRadius: cfg.cornerRadiusMm * designerScale, overflow: "hidden", pointerEvents: "none", zIndex: 0 }} />
+                <div style={{ position: "absolute", inset: 0, transform: `rotate(${cfg.contentRotationDeg || 0}deg)`, transformOrigin: "center center", zIndex: 1 }}>
+                  <div style={{ position: "absolute", left: contentOffsetXPx, top: contentOffsetYPx, width: contentCanvasWidthPx, height: contentCanvasHeightPx }}>
 
-                  {cfg.showStoreName && (
-                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.storeNameWidthMm), height: mmToPx(cfg.storeNameHeightMm) }} position={{ x: mmToPx(cfg.storeNameXMm), y: mmToPx(cfg.storeNameYMm) }} minWidth={mmToPx(4)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("store", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.storeNameWidthMm, h: cfg.storeNameHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("store", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
-                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(124,58,237,0.6)", fontSize: cfg.storeNameFontSize * ptToPx, fontWeight: 700, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.storeNameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
-                        {storeName.slice(0, cfg.storeNameMaxLen)}
-                      </div>
-                    </Rnd>
-                  )}
+                    {/* Handles compartidos: fondo blanco semitransparente + borde de color por tipo */}
+                    {cfg.showStoreName && (
+                      <Rnd
+                        bounds="parent"
+                        size={{ width: mmToPx(cfg.storeNameWidthMm), height: mmToPx(cfg.storeNameHeightMm) }}
+                        position={{ x: mmToPx(cfg.storeNameXMm), y: mmToPx(cfg.storeNameYMm) }}
+                        minWidth={mmToPx(4)} minHeight={mmToPx(2)}
+                        enableResizing={{ top: true, right: true, bottom: true, left: true, topRight: true, topLeft: true, bottomRight: true, bottomLeft: true }}
+                        resizeHandleStyles={{ top: rndHandle, bottom: rndHandle, left: rndHandle, right: rndHandle, topLeft: rndCorner, topRight: rndCorner, bottomLeft: rndCorner, bottomRight: rndCorner }}
+                        onDragStop={(_e, d) => updateBox("store", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.storeNameWidthMm, h: cfg.storeNameHeightMm })}
+                        onResizeStop={(_e, _dir, ref, _delta, pos) => updateBox("store", { x: pxToMm(pos.x), y: pxToMm(pos.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                      >
+                        <div style={{ width: "100%", height: "100%", border: "1.5px dashed #7c3aed", background: "rgba(124,58,237,0.04)", fontSize: cfg.storeNameFontSize * ptToPx, fontWeight: 700, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.storeNameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none", boxSizing: "border-box", padding: "0 2px" }}>
+                          {storeName.slice(0, cfg.storeNameMaxLen)}
+                        </div>
+                      </Rnd>
+                    )}
 
-                  {cfg.showProductName && (
-                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.nameWidthMm), height: mmToPx(cfg.nameHeightMm) }} position={{ x: mmToPx(cfg.nameXMm), y: mmToPx(cfg.nameYMm) }} minWidth={mmToPx(4)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("name", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
-                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(37,99,235,0.6)", fontSize: cfg.nameFontSize * ptToPx, fontWeight: 700, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.nameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
-                        {"ACE Almendra".slice(0, cfg.nameMaxLen)}
-                      </div>
-                    </Rnd>
-                  )}
+                    {cfg.showProductName && (
+                      <Rnd
+                        bounds="parent"
+                        size={{ width: mmToPx(cfg.nameWidthMm), height: mmToPx(cfg.nameHeightMm) }}
+                        position={{ x: mmToPx(cfg.nameXMm), y: mmToPx(cfg.nameYMm) }}
+                        minWidth={mmToPx(4)} minHeight={mmToPx(2)}
+                        enableResizing={{ top: true, right: true, bottom: true, left: true, topRight: true, topLeft: true, bottomRight: true, bottomLeft: true }}
+                        resizeHandleStyles={{ top: rndHandle, bottom: rndHandle, left: rndHandle, right: rndHandle, topLeft: rndCorner, topRight: rndCorner, bottomLeft: rndCorner, bottomRight: rndCorner }}
+                        onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })}
+                        onResizeStop={(_e, _dir, ref, _delta, pos) => updateBox("name", { x: pxToMm(pos.x), y: pxToMm(pos.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                      >
+                        <div style={{ width: "100%", height: "100%", border: "1.5px dashed #2563eb", background: "rgba(37,99,235,0.04)", fontSize: cfg.nameFontSize * ptToPx, fontWeight: 700, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.nameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none", boxSizing: "border-box", padding: "0 2px" }}>
+                          {"ACE Almendra".slice(0, cfg.nameMaxLen)}
+                        </div>
+                      </Rnd>
+                    )}
 
-                  {cfg.showPrice && (
-                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.priceWidthMm), height: mmToPx(cfg.priceHeightMm) }} position={{ x: mmToPx(cfg.priceXMm), y: mmToPx(cfg.priceYMm) }} minWidth={mmToPx(6)} minHeight={mmToPx(2)} onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("price", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
-                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(22,163,74,0.6)", fontSize: cfg.priceFontSize * ptToPx, fontWeight: 800, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.priceAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
-                        $13.400
-                      </div>
-                    </Rnd>
-                  )}
+                    {cfg.showPrice && (
+                      <Rnd
+                        bounds="parent"
+                        size={{ width: mmToPx(cfg.priceWidthMm), height: mmToPx(cfg.priceHeightMm) }}
+                        position={{ x: mmToPx(cfg.priceXMm), y: mmToPx(cfg.priceYMm) }}
+                        minWidth={mmToPx(6)} minHeight={mmToPx(3)}
+                        enableResizing={{ top: true, right: true, bottom: true, left: true, topRight: true, topLeft: true, bottomRight: true, bottomLeft: true }}
+                        resizeHandleStyles={{ top: rndHandle, bottom: rndHandle, left: rndHandle, right: rndHandle, topLeft: rndCorner, topRight: rndCorner, bottomLeft: rndCorner, bottomRight: rndCorner }}
+                        onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })}
+                        onResizeStop={(_e, _dir, ref, _delta, pos) => updateBox("price", { x: pxToMm(pos.x), y: pxToMm(pos.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                      >
+                        <div style={{ width: "100%", height: "100%", border: "1.5px dashed #16a34a", background: "rgba(22,163,74,0.04)", fontSize: cfg.priceFontSize * ptToPx, fontWeight: 800, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.priceAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none", boxSizing: "border-box", padding: "0 2px" }}>
+                          $13.400
+                        </div>
+                      </Rnd>
+                    )}
 
-                  {cfg.showCode && (
-                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.codeWidthMm), height: mmToPx(cfg.codeHeightMm) }} position={{ x: mmToPx(cfg.codeXMm), y: mmToPx(cfg.codeYMm) }} minWidth={mmToPx(3)} minHeight={mmToPx(3)} onDragStop={(_e, d) => updateBox("code", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.codeWidthMm, h: cfg.codeHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("code", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
-                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(17,24,39,0.6)", cursor: "move", overflow: "hidden" }}>
-                        <img src={barcodeSrc(mmToPx(cfg.codeWidthMm), mmToPx(cfg.codeHeightMm))} alt={cfg.codeType} style={{ width: "100%", height: "100%", imageRendering: "pixelated", display: "block" }} />
-                      </div>
-                    </Rnd>
-                  )}
+                    {cfg.showCode && (
+                      <Rnd
+                        bounds="parent"
+                        size={{ width: mmToPx(cfg.codeWidthMm), height: mmToPx(cfg.codeHeightMm) }}
+                        position={{ x: mmToPx(cfg.codeXMm), y: mmToPx(cfg.codeYMm) }}
+                        minWidth={mmToPx(3)} minHeight={mmToPx(3)}
+                        enableResizing={{ top: true, right: true, bottom: true, left: true, topRight: true, topLeft: true, bottomRight: true, bottomLeft: true }}
+                        resizeHandleStyles={{ top: rndHandle, bottom: rndHandle, left: rndHandle, right: rndHandle, topLeft: rndCorner, topRight: rndCorner, bottomLeft: rndCorner, bottomRight: rndCorner }}
+                        onDragStop={(_e, d) => updateBox("code", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.codeWidthMm, h: cfg.codeHeightMm })}
+                        onResizeStop={(_e, _dir, ref, _delta, pos) => updateBox("code", { x: pxToMm(pos.x), y: pxToMm(pos.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                      >
+                        <div style={{ width: "100%", height: "100%", border: "1.5px dashed #111827", cursor: "move", overflow: "hidden", boxSizing: "border-box" }}>
+                          <img src={barcodeSrc(mmToPx(cfg.codeWidthMm), mmToPx(cfg.codeHeightMm))} alt={cfg.codeType} style={{ width: "100%", height: "100%", imageRendering: "pixelated", display: "block", pointerEvents: "none" }} />
+                        </div>
+                      </Rnd>
+                    )}
 
-                  {cfg.showFreeText && cfg.freeText.trim() && (
-                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.freeTextWidthMm), height: mmToPx(cfg.freeTextHeightMm) }} position={{ x: mmToPx(cfg.freeTextXMm), y: mmToPx(cfg.freeTextYMm) }} minWidth={mmToPx(4)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("freeText", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.freeTextWidthMm, h: cfg.freeTextHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("freeText", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
-                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(180,83,9,0.6)", fontSize: cfg.freeTextFontSize * ptToPx, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.freeTextAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
-                        {cfg.freeText.slice(0, cfg.freeTextMaxLen)}
-                      </div>
-                    </Rnd>
-                  )}
+                    {cfg.showFreeText && cfg.freeText.trim() && (
+                      <Rnd
+                        bounds="parent"
+                        size={{ width: mmToPx(cfg.freeTextWidthMm), height: mmToPx(cfg.freeTextHeightMm) }}
+                        position={{ x: mmToPx(cfg.freeTextXMm), y: mmToPx(cfg.freeTextYMm) }}
+                        minWidth={mmToPx(4)} minHeight={mmToPx(2)}
+                        enableResizing={{ top: true, right: true, bottom: true, left: true, topRight: true, topLeft: true, bottomRight: true, bottomLeft: true }}
+                        resizeHandleStyles={{ top: rndHandle, bottom: rndHandle, left: rndHandle, right: rndHandle, topLeft: rndCorner, topRight: rndCorner, bottomLeft: rndCorner, bottomRight: rndCorner }}
+                        onDragStop={(_e, d) => updateBox("freeText", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.freeTextWidthMm, h: cfg.freeTextHeightMm })}
+                        onResizeStop={(_e, _dir, ref, _delta, pos) => updateBox("freeText", { x: pxToMm(pos.x), y: pxToMm(pos.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                      >
+                        <div style={{ width: "100%", height: "100%", border: "1.5px dashed #b45309", background: "rgba(180,83,9,0.04)", fontSize: cfg.freeTextFontSize * ptToPx, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.freeTextAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none", boxSizing: "border-box", padding: "0 2px" }}>
+                          {cfg.freeText.slice(0, cfg.freeTextMaxLen)}
+                        </div>
+                      </Rnd>
+                    )}
 
-                  {cfg.logoEnabled && cfg.logoDataUrl && (
-                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.logoWidthMm), height: mmToPx(cfg.logoHeightMm) }} position={{ x: mmToPx(cfg.logoXOffsetMm), y: mmToPx(cfg.logoYOffsetMm) }} minWidth={mmToPx(2)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("logo", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.logoWidthMm, h: cfg.logoHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("logo", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
-                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(216,27,135,0.6)", cursor: "move", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                        <img src={cfg.logoDataUrl} alt="Logo" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                      </div>
-                    </Rnd>
-                  )}
+                    {cfg.logoEnabled && cfg.logoDataUrl && (
+                      <Rnd
+                        bounds="parent"
+                        size={{ width: mmToPx(cfg.logoWidthMm), height: mmToPx(cfg.logoHeightMm) }}
+                        position={{ x: mmToPx(cfg.logoXOffsetMm), y: mmToPx(cfg.logoYOffsetMm) }}
+                        minWidth={mmToPx(2)} minHeight={mmToPx(2)}
+                        enableResizing={{ top: true, right: true, bottom: true, left: true, topRight: true, topLeft: true, bottomRight: true, bottomLeft: true }}
+                        resizeHandleStyles={{ top: rndHandle, bottom: rndHandle, left: rndHandle, right: rndHandle, topLeft: rndCorner, topRight: rndCorner, bottomLeft: rndCorner, bottomRight: rndCorner }}
+                        onDragStop={(_e, d) => updateBox("logo", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.logoWidthMm, h: cfg.logoHeightMm })}
+                        onResizeStop={(_e, _dir, ref, _delta, pos) => updateBox("logo", { x: pxToMm(pos.x), y: pxToMm(pos.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
+                      >
+                        <div style={{ width: "100%", height: "100%", border: "1.5px dashed #d81b87", cursor: "move", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", boxSizing: "border-box" }}>
+                          <img src={cfg.logoDataUrl} alt="Logo" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", pointerEvents: "none" }} />
+                        </div>
+                      </Rnd>
+                    )}
 
+                  </div>
                 </div>
               </div>
             </div>
