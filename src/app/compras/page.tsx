@@ -134,6 +134,7 @@ export default function ComprasPage() {
   const [loadingLabelPrinters, setLoadingLabelPrinters] = useState(false);
   const [printingLabels, setPrintingLabels] = useState(false);
   const [labelDraftItems, setLabelDraftItems] = useState<LabelDraftItem[]>([]);
+  const [nombreTienda, setNombreTienda] = useState("La Cosmetikera");
 
   const actualizarImpresoraEtiquetas = useCallback((value: string | null) => {
     const normalized = String(value || "").trim();
@@ -157,16 +158,18 @@ export default function ComprasPage() {
   // ── Carga inicial ─────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
     setLoading(true);
-    const [{ data: c }, { data: p }, { data: a }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: a }, { data: cfg }] = await Promise.all([
       supabaseBrowserClient.from("compras").select("*").order("fecha", { ascending: false }),
       supabaseBrowserClient.from("proveedores").select("id,nombre").order("nombre"),
       supabaseBrowserClient.from("articulos")
         .select("id,nombre,referencia,codigo_secundario,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
         .order("nombre"),
+      supabaseBrowserClient.from("configuracion").select("nombre_academia").limit(1).maybeSingle(),
     ]);
     setCompras(c || []);
     setProveedores(p || []);
     setArticulos(a || []);
+    if (cfg?.nombre_academia) setNombreTienda(String(cfg.nombre_academia).trim() || "La Cosmetikera");
     setLoading(false);
   }, []);
 
@@ -238,7 +241,7 @@ export default function ComprasPage() {
 
     setPrintingLabels(true);
     try {
-      const result = await printPriceLabels(itemsToPrint, printerName, "La Cosmetikera");
+      const result = await printPriceLabels(itemsToPrint, printerName, nombreTienda);
       actualizarImpresoraEtiquetas(printerName);
       message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
       setLabelModalOpen(false);

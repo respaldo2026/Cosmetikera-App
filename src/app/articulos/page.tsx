@@ -288,6 +288,7 @@ export default function ArticulosPage() {
   const [loadingLabelPrinters, setLoadingLabelPrinters] = useState(false);
   const [printingLabels, setPrintingLabels] = useState(false);
   const [labelItems, setLabelItems] = useState<{ articuloId: string; nombre: string; precio: number; cantidad: number; sku?: string }[]>([]);
+  const [nombreTienda, setNombreTienda] = useState("La Cosmetikera");
   const LABEL_PRINTER_STORAGE_KEY = "pos_label_printer_name_v1";
 
   const actualizarImpresoraEtiquetas = useCallback((value: string | null) => {
@@ -358,7 +359,7 @@ export default function ArticulosPage() {
     try {
       const { data, error } = await supabaseBrowserClient
         .from("configuracion")
-        .select("ticket_campos")
+        .select("ticket_campos, nombre_academia")
         .order("updated_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false, nullsFirst: false })
         .limit(1)
@@ -368,6 +369,7 @@ export default function ArticulosPage() {
         throw error;
       }
 
+      if (data?.nombre_academia) setNombreTienda(String(data.nombre_academia).trim() || "La Cosmetikera");
       const supabaseCatalogos = extractCatalogosFromTicketCampos(data?.ticket_campos);
       setCatalogosCustom(mergeCatalogos(localCatalogos, supabaseCatalogos));
     } catch (error) {
@@ -459,7 +461,7 @@ export default function ArticulosPage() {
 
     setPrintingLabels(true);
     try {
-      const result = await printPriceLabels(items, printerName, "La Cosmetikera");
+      const result = await printPriceLabels(items, printerName, nombreTienda);
       actualizarImpresoraEtiquetas(printerName);
       message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
       setLabelModalOpen(false);
