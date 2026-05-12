@@ -283,136 +283,205 @@ export default function ConfiguracionImprsoraEtiquetas({
 
   const renderVisualEditor = () => {
     const cfg = labelTemplateConfig;
-    const pageWidthMm = Math.max(30, Number(cfg.pageWidthMm || 104));
-    const pageHeightMm = Math.max(8, Number(cfg.pageHeightMm || 15));
-    const labelWidthMm = Math.max(8, Number(cfg.labelWidthMm || 32));
-    const labelHeightMm = Math.max(8, Number(cfg.labelHeightMm || 15));
-    const columns = Math.max(1, Math.round(Number(cfg.columns || 3)));
+    const pageWidthMm  = Math.max(30, Number(cfg.pageWidthMm  || 104));
+    const pageHeightMm = Math.max(8,  Number(cfg.pageHeightMm || 15));
+    const labelWidthMm  = Math.max(8,  Number(cfg.labelWidthMm  || 32));
+    const labelHeightMm = Math.max(8,  Number(cfg.labelHeightMm || 15));
+    const columns      = Math.max(1, Math.round(Number(cfg.columns || 3)));
     const marginLeftMm = Math.max(0, Number(cfg.marginLeftMm || 0));
-    const gapMm = Math.max(0, Number(cfg.gapHorizontalMm || 0));
-    const requiredWidthMm = marginLeftMm + (columns * labelWidthMm) + (Math.max(0, columns - 1) * gapMm);
+    const gapMm        = Math.max(0, Number(cfg.gapHorizontalMm || 0));
+    const requiredWidthMm = marginLeftMm + columns * labelWidthMm + Math.max(0, columns - 1) * gapMm;
     const overflow = requiredWidthMm > pageWidthMm + 0.001;
 
+    // Escala para la tira de vista previa (ajustada al ancho disponible)
     const rowScale = Math.max(2.4, Math.min(4.6, 520 / pageWidthMm));
-    const designerScale = 12;
-    const mmToPx = (mm: number) => mm * designerScale;
-    const pxToMm = (px: number) => Math.round((px / designerScale) * 100) / 100;
-    const contentOffsetXPx = mmToPx(Math.max(0, cfg.contentPaddingLeftMm || 0));
-    const contentOffsetYPx = mmToPx(Math.max(0, cfg.contentTopMm || 0));
-    const contentCanvasWidthPx = Math.max(1, labelWidthMm * designerScale - contentOffsetXPx);
+    // Escala del editor draggable (mayor → más cómodo para arrastrar)
+    const designerScale = 12; // px por mm
+    // Factor de conversión pt PDF → px diseñador: 1pt = 25.4/72 mm → × designerScale px/mm
+    const ptToPx = designerScale * (25.4 / 72); // ≈ 4.233
+
+    const mmToPx  = (mm: number) => mm * designerScale;
+    const pxToMm  = (px: number) => Math.round((px / designerScale) * 100) / 100;
+    const contentOffsetXPx      = mmToPx(Math.max(0, cfg.contentPaddingLeftMm || 0));
+    const contentOffsetYPx      = mmToPx(Math.max(0, cfg.contentTopMm || 0));
+    const contentCanvasWidthPx  = Math.max(1, labelWidthMm  * designerScale - contentOffsetXPx);
     const contentCanvasHeightPx = Math.max(1, labelHeightMm * designerScale - contentOffsetYPx);
+
+    const storeName = String(formAcademia?.getFieldValue?.("nombre_academia") || "La Cosmetikera").trim() || "La Cosmetikera";
+
+    // ── Generador de SVG de código de barras (simulación determinista, sin deps) ──
+    const buildBarcodeSvg = (wPx: number, hPx: number, type: string): string => {
+      const w = Math.max(4, wPx);
+      const h = Math.max(4, hPx);
+      if (type === "code128") {
+        const pat = [2,1,3,1,2,2,1,3,2,1,2,1,3,1,2,3,1,2,1,1,3,2,1,2];
+        const total = pat.reduce((a, b) => a + b, 0);
+        const unit = (w - 4) / total;
+        const bars: string[] = [];
+        let xp = 2;
+        pat.forEach((bw, i) => {
+          if (i % 2 === 0) bars.push(`<rect x="${xp.toFixed(2)}" y="1" width="${(bw * unit).toFixed(2)}" height="${(h - 2).toFixed(2)}" fill="#000"/>`);
+          xp += bw * unit;
+        });
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${bars.join("")}</svg>`;
+      }
+      const cells = type === "qrcode" ? 21 : 16;
+      const cs = Math.max(1, Math.floor(Math.min(w, h) / cells));
+      const rects: string[] = [];
+      for (let r = 0; r < cells; r++) {
+        for (let c = 0; c < cells; c++) {
+          const v = ((r * 31 + c * 17 + r * c * 3 + r + c + 5) >>> 0) % 256;
+          if (v < 130 || r === 0 || c === 0 || r === cells - 1 || c === cells - 1) {
+            rects.push(`<rect x="${c * cs}" y="${r * cs}" width="${cs}" height="${cs}" fill="#000"/>`);
+          }
+        }
+      }
+      if (type === "qrcode") {
+        const f = cs;
+        const tr = (cells - 7) * f;
+        const bl = (cells - 7) * f;
+        rects.push(
+          `<rect x="0" y="0" width="${7*f}" height="${7*f}" fill="#000"/>` +
+          `<rect x="${f}" y="${f}" width="${5*f}" height="${5*f}" fill="#fff"/>` +
+          `<rect x="${2*f}" y="${2*f}" width="${3*f}" height="${3*f}" fill="#000"/>`,
+          `<rect x="${tr}" y="0" width="${7*f}" height="${7*f}" fill="#000"/>` +
+          `<rect x="${tr+f}" y="${f}" width="${5*f}" height="${5*f}" fill="#fff"/>` +
+          `<rect x="${tr+2*f}" y="${2*f}" width="${3*f}" height="${3*f}" fill="#000"/>`,
+          `<rect x="0" y="${bl}" width="${7*f}" height="${7*f}" fill="#000"/>` +
+          `<rect x="${f}" y="${bl+f}" width="${5*f}" height="${5*f}" fill="#fff"/>` +
+          `<rect x="${2*f}" y="${bl+2*f}" width="${3*f}" height="${3*f}" fill="#000"/>`,
+        );
+      }
+      const sz = cells * cs;
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${sz} ${sz}">${rects.join("")}</svg>`;
+    };
+    const barcodeSrc = (wPx: number, hPx: number) => {
+      if (typeof btoa === "undefined") return "";
+      return `data:image/svg+xml;base64,${btoa(buildBarcodeSvg(Math.ceil(wPx), Math.ceil(hPx), cfg.codeType))}`;
+    };
+
+    // ── Render de una etiqueta estática sin handles (vista de impresión fiel) ──
+    const renderStaticLabel = (scale: number) => {
+      const pt2px = scale * (25.4 / 72);
+      const mm    = (v: number) => v * scale;
+      const offX  = mm(cfg.contentPaddingLeftMm || 0);
+      const offY  = mm(cfg.contentTopMm || 0);
+      const lw    = labelWidthMm  * scale;
+      const lh    = labelHeightMm * scale;
+      return (
+        <div style={{ width: lw, height: lh, borderRadius: mm(cfg.cornerRadiusMm), background: "#fff", position: "relative", overflow: "hidden", border: "1px solid #aaa", flexShrink: 0 }}>
+          <div style={{ position: "absolute", inset: 0, transform: cfg.contentRotationDeg ? `rotate(${cfg.contentRotationDeg}deg)` : undefined, transformOrigin: "center center" }}>
+            {cfg.logoEnabled && cfg.logoDataUrl && (
+              <img src={cfg.logoDataUrl} alt="" style={{ position: "absolute", left: offX + mm(cfg.logoXOffsetMm), top: offY + mm(cfg.logoYOffsetMm), width: mm(cfg.logoWidthMm), height: mm(cfg.logoHeightMm), objectFit: "contain" }} />
+            )}
+            {cfg.showStoreName && (
+              <div style={{ position: "absolute", left: offX + mm(cfg.storeNameXMm), top: offY + mm(cfg.storeNameYMm), width: mm(cfg.storeNameWidthMm), height: mm(cfg.storeNameHeightMm), fontSize: cfg.storeNameFontSize * pt2px, fontWeight: 700, fontFamily: "Helvetica, Arial, sans-serif", textAlign: cfg.storeNameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000" }}>
+                {storeName.slice(0, cfg.storeNameMaxLen)}
+              </div>
+            )}
+            {cfg.showProductName && (
+              <div style={{ position: "absolute", left: offX + mm(cfg.nameXMm), top: offY + mm(cfg.nameYMm), width: mm(cfg.nameWidthMm), height: mm(cfg.nameHeightMm), fontSize: cfg.nameFontSize * pt2px, fontWeight: 700, fontFamily: "Helvetica, Arial, sans-serif", textAlign: cfg.nameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000" }}>
+                {"ACE Almendra".slice(0, cfg.nameMaxLen)}
+              </div>
+            )}
+            {cfg.showPrice && (
+              <div style={{ position: "absolute", left: offX + mm(cfg.priceXMm), top: offY + mm(cfg.priceYMm), width: mm(cfg.priceWidthMm), height: mm(cfg.priceHeightMm), fontSize: cfg.priceFontSize * pt2px, fontWeight: 800, fontFamily: "Helvetica, Arial, sans-serif", textAlign: cfg.priceAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000" }}>
+                $13.400
+              </div>
+            )}
+            {cfg.showFreeText && cfg.freeText.trim() && (
+              <div style={{ position: "absolute", left: offX + mm(cfg.freeTextXMm), top: offY + mm(cfg.freeTextYMm), width: mm(cfg.freeTextWidthMm), height: mm(cfg.freeTextHeightMm), fontSize: cfg.freeTextFontSize * pt2px, fontFamily: "Helvetica, Arial, sans-serif", textAlign: cfg.freeTextAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000" }}>
+                {cfg.freeText.slice(0, cfg.freeTextMaxLen)}
+              </div>
+            )}
+            {cfg.showCode && (
+              <img src={barcodeSrc(mm(cfg.codeWidthMm), mm(cfg.codeHeightMm))} alt={cfg.codeType} style={{ position: "absolute", left: offX + mm(cfg.codeXMm), top: offY + mm(cfg.codeYMm), width: mm(cfg.codeWidthMm), height: mm(cfg.codeHeightMm), imageRendering: "pixelated" }} />
+            )}
+          </div>
+        </div>
+      );
+    };
 
     return (
       <>
-        <div style={{ width: pageWidthMm * rowScale, maxWidth: "100%", minHeight: pageHeightMm * rowScale + 18, border: "1px dashed #d9d9d9", borderRadius: 8, background: "repeating-linear-gradient(45deg,#fff,#fff 10px,#fcfcfc 10px,#fcfcfc 20px)", overflow: "hidden", position: "relative", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: gapMm * rowScale, paddingLeft: marginLeftMm * rowScale, paddingTop: 6 }}>
+        {/* ── Vista de impresión proporcional (fiel al resultado real) ── */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#444", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-block", width: 9, height: 9, background: "#52c41a", borderRadius: 2 }} />
+            Vista de impresión — representación proporcional real
+          </div>
+          <div style={{ background: "repeating-linear-gradient(45deg,#f9f9f9,#f9f9f9 10px,#f5f5f5 10px,#f5f5f5 20px)", border: "1px dashed #ccc", borderRadius: 8, padding: `10px 16px 10px ${marginLeftMm * rowScale + 16}px`, display: "flex", gap: gapMm * rowScale, alignItems: "flex-start", maxWidth: "100%", overflowX: "auto" }}>
             {Array.from({ length: columns }).map((_, idx) => (
-              <div key={`live-row-${idx}`} style={{ width: labelWidthMm * rowScale, height: labelHeightMm * rowScale, borderRadius: cfg.cornerRadiusMm * rowScale, border: "1px solid #e5e7eb", background: "#fff" }} />
+              <React.Fragment key={`sp-${idx}`}>{renderStaticLabel(rowScale)}</React.Fragment>
             ))}
           </div>
-          <div style={{ position: "absolute", right: 8, bottom: 6, fontSize: 11, color: "#666" }}>{pageWidthMm.toFixed(1)} x {pageHeightMm.toFixed(1)} mm</div>
+          <div style={{ fontSize: 11, color: "#888", marginTop: 5 }}>
+            Página {pageWidthMm.toFixed(1)} × {pageHeightMm.toFixed(1)} mm · {columns} col. · Etiqueta {labelWidthMm.toFixed(1)} × {labelHeightMm.toFixed(1)} mm
+          </div>
         </div>
 
+        {/* ── Editor draggable ── */}
         <Row gutter={[12, 12]}>
           <Col xs={24} md={14}>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 6 }}>Editor — arrastra y redimensiona cada bloque</div>
             <div style={{ width: labelWidthMm * designerScale, height: labelHeightMm * designerScale, maxWidth: "100%", border: "1px solid #d9d9d9", borderRadius: cfg.cornerRadiusMm * designerScale, background: "#fff", position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", inset: 0, transform: `rotate(${cfg.contentRotationDeg || 0}deg)`, transformOrigin: "center center" }}>
                 <div style={{ position: "absolute", left: contentOffsetXPx, top: contentOffsetYPx, width: contentCanvasWidthPx, height: contentCanvasHeightPx }}>
-                {cfg.showStoreName && (
-                  <Rnd
-                    bounds="parent"
-                    size={{ width: mmToPx(cfg.storeNameWidthMm), height: mmToPx(cfg.storeNameHeightMm) }}
-                    position={{ x: mmToPx(cfg.storeNameXMm), y: mmToPx(cfg.storeNameYMm) }}
-                    minWidth={mmToPx(4)}
-                    minHeight={mmToPx(1)}
-                    onDragStop={(_e, d) => updateBox("store", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.storeNameWidthMm, h: cfg.storeNameHeightMm })}
-                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("store", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                  >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #7c3aed", color: "#7c3aed", fontSize: Math.max(8, cfg.storeNameFontSize * 1.9), fontWeight: 700, padding: 2, overflow: "hidden", textAlign: cfg.storeNameAlign, background: "rgba(124,58,237,0.05)" }}>TIENDA</div>
-                  </Rnd>
-                )}
 
-                {cfg.showProductName && (
-                  <Rnd
-                    bounds="parent"
-                    size={{ width: mmToPx(cfg.nameWidthMm), height: mmToPx(cfg.nameHeightMm) }}
-                    position={{ x: mmToPx(cfg.nameXMm), y: mmToPx(cfg.nameYMm) }}
-                    minWidth={mmToPx(4)}
-                    minHeight={mmToPx(1)}
-                    onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })}
-                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("name", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                  >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #2563eb", color: "#2563eb", fontSize: Math.max(9, cfg.nameFontSize * 1.8), fontWeight: 700, padding: 2, overflow: "hidden", textAlign: cfg.nameAlign, background: "rgba(37,99,235,0.06)" }}>ACE Almendra</div>
-                  </Rnd>
-                )}
+                  {cfg.showStoreName && (
+                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.storeNameWidthMm), height: mmToPx(cfg.storeNameHeightMm) }} position={{ x: mmToPx(cfg.storeNameXMm), y: mmToPx(cfg.storeNameYMm) }} minWidth={mmToPx(4)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("store", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.storeNameWidthMm, h: cfg.storeNameHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("store", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
+                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(124,58,237,0.6)", fontSize: cfg.storeNameFontSize * ptToPx, fontWeight: 700, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.storeNameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
+                        {storeName.slice(0, cfg.storeNameMaxLen)}
+                      </div>
+                    </Rnd>
+                  )}
 
-                {cfg.showPrice && (
-                  <Rnd
-                    bounds="parent"
-                    size={{ width: mmToPx(cfg.priceWidthMm), height: mmToPx(cfg.priceHeightMm) }}
-                    position={{ x: mmToPx(cfg.priceXMm), y: mmToPx(cfg.priceYMm) }}
-                    minWidth={mmToPx(6)}
-                    minHeight={mmToPx(2)}
-                    onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })}
-                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("price", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                  >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #16a34a", color: "#166534", fontSize: Math.max(12, cfg.priceFontSize * 1.55), fontWeight: 800, padding: 2, lineHeight: 1, textAlign: cfg.priceAlign, background: "rgba(22,163,74,0.06)" }}>$13.400</div>
-                  </Rnd>
-                )}
+                  {cfg.showProductName && (
+                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.nameWidthMm), height: mmToPx(cfg.nameHeightMm) }} position={{ x: mmToPx(cfg.nameXMm), y: mmToPx(cfg.nameYMm) }} minWidth={mmToPx(4)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("name", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
+                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(37,99,235,0.6)", fontSize: cfg.nameFontSize * ptToPx, fontWeight: 700, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.nameAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
+                        {"ACE Almendra".slice(0, cfg.nameMaxLen)}
+                      </div>
+                    </Rnd>
+                  )}
 
-                {cfg.showCode && (
-                  <Rnd
-                    bounds="parent"
-                    size={{ width: mmToPx(cfg.codeWidthMm), height: mmToPx(cfg.codeHeightMm) }}
-                    position={{ x: mmToPx(cfg.codeXMm), y: mmToPx(cfg.codeYMm) }}
-                    minWidth={mmToPx(3)}
-                    minHeight={mmToPx(3)}
-                    onDragStop={(_e, d) => updateBox("code", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.codeWidthMm, h: cfg.codeHeightMm })}
-                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("code", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                  >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #111827", background: "repeating-conic-gradient(#111 0% 25%, #fff 0% 50%) 50% / 6px 6px", display: "flex", alignItems: "flex-end", justifyContent: "center", color: "#111", fontSize: 10, fontWeight: 700 }}>
-                      {cfg.codeType === "aztec" ? "AZ" : cfg.codeType === "qrcode" ? "QR" : cfg.codeType === "code128" ? "128" : "DM"}
-                    </div>
-                  </Rnd>
-                )}
+                  {cfg.showPrice && (
+                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.priceWidthMm), height: mmToPx(cfg.priceHeightMm) }} position={{ x: mmToPx(cfg.priceXMm), y: mmToPx(cfg.priceYMm) }} minWidth={mmToPx(6)} minHeight={mmToPx(2)} onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("price", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
+                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(22,163,74,0.6)", fontSize: cfg.priceFontSize * ptToPx, fontWeight: 800, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.priceAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
+                        $13.400
+                      </div>
+                    </Rnd>
+                  )}
 
-                {cfg.showFreeText && cfg.freeText.trim() && (
-                  <Rnd
-                    bounds="parent"
-                    size={{ width: mmToPx(cfg.freeTextWidthMm), height: mmToPx(cfg.freeTextHeightMm) }}
-                    position={{ x: mmToPx(cfg.freeTextXMm), y: mmToPx(cfg.freeTextYMm) }}
-                    minWidth={mmToPx(4)}
-                    minHeight={mmToPx(1)}
-                    onDragStop={(_e, d) => updateBox("freeText", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.freeTextWidthMm, h: cfg.freeTextHeightMm })}
-                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("freeText", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                  >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #b45309", color: "#92400e", fontSize: Math.max(8, cfg.freeTextFontSize * 1.7), fontWeight: 600, padding: 2, overflow: "hidden", textAlign: cfg.freeTextAlign, background: "rgba(251,191,36,0.15)" }}>
-                      {cfg.freeText}
-                    </div>
-                  </Rnd>
-                )}
+                  {cfg.showCode && (
+                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.codeWidthMm), height: mmToPx(cfg.codeHeightMm) }} position={{ x: mmToPx(cfg.codeXMm), y: mmToPx(cfg.codeYMm) }} minWidth={mmToPx(3)} minHeight={mmToPx(3)} onDragStop={(_e, d) => updateBox("code", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.codeWidthMm, h: cfg.codeHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("code", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
+                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(17,24,39,0.6)", cursor: "move", overflow: "hidden" }}>
+                        <img src={barcodeSrc(mmToPx(cfg.codeWidthMm), mmToPx(cfg.codeHeightMm))} alt={cfg.codeType} style={{ width: "100%", height: "100%", imageRendering: "pixelated", display: "block" }} />
+                      </div>
+                    </Rnd>
+                  )}
 
-                {cfg.logoEnabled && cfg.logoDataUrl && (
-                  <Rnd
-                    bounds="parent"
-                    size={{ width: mmToPx(cfg.logoWidthMm), height: mmToPx(cfg.logoHeightMm) }}
-                    position={{ x: mmToPx(cfg.logoXOffsetMm), y: mmToPx(cfg.logoYOffsetMm) }}
-                    minWidth={mmToPx(2)}
-                    minHeight={mmToPx(1)}
-                    onDragStop={(_e, d) => updateBox("logo", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.logoWidthMm, h: cfg.logoHeightMm })}
-                    onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("logo", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
-                  >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #d81b87", background: "rgba(216,27,135,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <img src={cfg.logoDataUrl} alt="Logo" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                    </div>
-                  </Rnd>
-                )}
+                  {cfg.showFreeText && cfg.freeText.trim() && (
+                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.freeTextWidthMm), height: mmToPx(cfg.freeTextHeightMm) }} position={{ x: mmToPx(cfg.freeTextXMm), y: mmToPx(cfg.freeTextYMm) }} minWidth={mmToPx(4)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("freeText", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.freeTextWidthMm, h: cfg.freeTextHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("freeText", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
+                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(180,83,9,0.6)", fontSize: cfg.freeTextFontSize * ptToPx, fontFamily: "Helvetica,Arial,sans-serif", textAlign: cfg.freeTextAlign, lineHeight: 1, overflow: "hidden", whiteSpace: "nowrap", color: "#000", cursor: "move", userSelect: "none" }}>
+                        {cfg.freeText.slice(0, cfg.freeTextMaxLen)}
+                      </div>
+                    </Rnd>
+                  )}
+
+                  {cfg.logoEnabled && cfg.logoDataUrl && (
+                    <Rnd bounds="parent" size={{ width: mmToPx(cfg.logoWidthMm), height: mmToPx(cfg.logoHeightMm) }} position={{ x: mmToPx(cfg.logoXOffsetMm), y: mmToPx(cfg.logoYOffsetMm) }} minWidth={mmToPx(2)} minHeight={mmToPx(1)} onDragStop={(_e, d) => updateBox("logo", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.logoWidthMm, h: cfg.logoHeightMm })} onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("logo", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}>
+                      <div style={{ width: "100%", height: "100%", outline: "1px dashed rgba(216,27,135,0.6)", cursor: "move", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                        <img src={cfg.logoDataUrl} alt="Logo" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                      </div>
+                    </Rnd>
+                  )}
+
                 </div>
               </div>
             </div>
           </Col>
           <Col xs={24} md={10}>
-            <Alert type="info" showIcon message="Editor visual tipo Bartender" description="Arrastra y redimensiona bloques." />
+            <Alert type="info" showIcon message="Editor visual" description="Arrastra y redimensiona bloques. La vista superior es la representación real de impresión." />
             <div style={{ marginTop: 10, fontSize: 12, color: "#555" }}>
               Fila: {columns} columnas. Requerido: {requiredWidthMm.toFixed(1)} mm / Página: {pageWidthMm.toFixed(1)} mm.
             </div>
