@@ -24,6 +24,18 @@ function normalizeAlign(input, fallback = "left") {
   return fallback;
 }
 
+/**
+ * Calcula la posición X real de inicio del texto según alineación.
+ * PDFKit ignora `align` cuando se usa `lineBreak: false`, por lo que
+ * se computa manualmente aquí.
+ */
+function alignedTextX(baseX, containerW, textW, align) {
+  const tw = Math.min(Math.max(0, textW), Math.max(1, containerW));
+  if (align === "center") return baseX + (containerW - tw) / 2;
+  if (align === "right")  return baseX + containerW - tw;
+  return baseX; // left o justify → desde la izquierda
+}
+
 function parseDataUrlImageBuffer(dataUrl) {
   const raw = String(dataUrl || "").trim();
   if (!raw.startsWith("data:image/")) return null;
@@ -77,66 +89,67 @@ async function buildCodePng(content, codeType = "datamatrix") {
 
 async function generarPdfEtiquetas(payload) {
   const settings = {
-    pageWidthMm: Number(payload?.template?.pageWidthMm || 104),
-    pageHeightMm: Number(payload?.template?.pageHeightMm || 15),
-    labelWidthMm: Number(payload?.template?.labelWidthMm || 32),
-    labelHeightMm: Number(payload?.template?.labelHeightMm || 15),
-    columns: Number(payload?.template?.columns || 3),
-    marginLeftMm: Number(payload?.template?.marginLeftMm || 2),
-    gapHorizontalMm: Number(payload?.template?.gapHorizontalMm || 2),
-    cornerRadiusMm: Number(payload?.template?.cornerRadiusMm || 3.2),
-    contentPaddingLeftMm: Number(payload?.template?.contentPaddingLeftMm || 1.2),
-    contentTopMm: Number(payload?.template?.contentTopMm || 0.6),
+    // Usar ?? (nullish coalescing) en vez de || para que valores 0 sean válidos
+    pageWidthMm: Number(payload?.template?.pageWidthMm ?? 104),
+    pageHeightMm: Number(payload?.template?.pageHeightMm ?? 15),
+    labelWidthMm: Number(payload?.template?.labelWidthMm ?? 32),
+    labelHeightMm: Number(payload?.template?.labelHeightMm ?? 15),
+    columns: Number(payload?.template?.columns ?? 3),
+    marginLeftMm: Number(payload?.template?.marginLeftMm ?? 2),
+    gapHorizontalMm: Number(payload?.template?.gapHorizontalMm ?? 2),
+    cornerRadiusMm: Number(payload?.template?.cornerRadiusMm ?? 3.2),
+    contentPaddingLeftMm: Number(payload?.template?.contentPaddingLeftMm ?? 1.2),
+    contentTopMm: Number(payload?.template?.contentTopMm ?? 0.6),
     showStoreName: payload?.template?.showStoreName !== false,
     storeNameAlign: normalizeAlign(payload?.template?.storeNameAlign, "left"),
-    storeNameMaxLen: Number(payload?.template?.storeNameMaxLen || 13),
-    storeNameFontSize: Number(payload?.template?.storeNameFontSize || 6.6),
-    nameMaxLen: Number(payload?.template?.nameMaxLen || 16),
+    storeNameMaxLen: Number(payload?.template?.storeNameMaxLen ?? 13),
+    storeNameFontSize: Number(payload?.template?.storeNameFontSize ?? 6.6),
+    nameMaxLen: Number(payload?.template?.nameMaxLen ?? 16),
     nameAlign: normalizeAlign(payload?.template?.nameAlign, "left"),
-    nameFontSize: Number(payload?.template?.nameFontSize || 7.1),
-    priceFontSize: Number(payload?.template?.priceFontSize || 15.4),
+    nameFontSize: Number(payload?.template?.nameFontSize ?? 7.1),
+    priceFontSize: Number(payload?.template?.priceFontSize ?? 15.4),
     priceAlign: normalizeAlign(payload?.template?.priceAlign, "left"),
-    priceTopMm: Number(payload?.template?.priceTopMm || 7.1),
-    dataMatrixSizeMm: Number(payload?.template?.dataMatrixSizeMm || 7.4),
-    dataMatrixXPaddingMm: Number(payload?.template?.dataMatrixXPaddingMm || 1.1),
-    dataMatrixYPaddingMm: Number(payload?.template?.dataMatrixYPaddingMm || 3.1),
+    priceTopMm: Number(payload?.template?.priceTopMm ?? 7.1),
+    dataMatrixSizeMm: Number(payload?.template?.dataMatrixSizeMm ?? 7.4),
+    dataMatrixXPaddingMm: Number(payload?.template?.dataMatrixXPaddingMm ?? 1.1),
+    dataMatrixYPaddingMm: Number(payload?.template?.dataMatrixYPaddingMm ?? 3.1),
     logoEnabled: Boolean(payload?.template?.logoEnabled),
-    logoDataUrl: String(payload?.template?.logoDataUrl || ""),
-    logoWidthMm: Number(payload?.template?.logoWidthMm || 6.5),
-    logoHeightMm: Number(payload?.template?.logoHeightMm || 2.6),
-    logoXOffsetMm: Number(payload?.template?.logoXOffsetMm || 1.2),
-    logoYOffsetMm: Number(payload?.template?.logoYOffsetMm || 0.7),
-    codeType: String(payload?.template?.codeType || "datamatrix").toLowerCase(),
-    contentRotationDeg: Number(payload?.template?.contentRotationDeg || 0),
-    storeNameXMm: Number(payload?.template?.storeNameXMm || 1.2),
-    storeNameYMm: Number(payload?.template?.storeNameYMm || 0.6),
-    storeNameWidthMm: Number(payload?.template?.storeNameWidthMm || 20),
-    storeNameHeightMm: Number(payload?.template?.storeNameHeightMm || 2.8),
-    nameXMm: Number(payload?.template?.nameXMm || 1.2),
-    nameYMm: Number(payload?.template?.nameYMm || 3.2),
-    nameWidthMm: Number(payload?.template?.nameWidthMm || 20),
-    nameHeightMm: Number(payload?.template?.nameHeightMm || 3.5),
-    priceXMm: Number(payload?.template?.priceXMm || 1.1),
-    priceYMm: Number(payload?.template?.priceYMm || 7.1),
-    priceWidthMm: Number(payload?.template?.priceWidthMm || 20),
-    priceHeightMm: Number(payload?.template?.priceHeightMm || 7.2),
-    codeXMm: Number(payload?.template?.codeXMm || 23.5),
-    codeYMm: Number(payload?.template?.codeYMm || 3.1),
-    codeWidthMm: Number(payload?.template?.codeWidthMm || 7.4),
-    codeHeightMm: Number(payload?.template?.codeHeightMm || 7.4),
+    logoDataUrl: String(payload?.template?.logoDataUrl ?? ""),
+    logoWidthMm: Number(payload?.template?.logoWidthMm ?? 6.5),
+    logoHeightMm: Number(payload?.template?.logoHeightMm ?? 2.6),
+    logoXOffsetMm: Number(payload?.template?.logoXOffsetMm ?? 1.2),
+    logoYOffsetMm: Number(payload?.template?.logoYOffsetMm ?? 0.7),
+    codeType: String(payload?.template?.codeType ?? "datamatrix").toLowerCase(),
+    contentRotationDeg: Number(payload?.template?.contentRotationDeg ?? 0),
+    storeNameXMm: Number(payload?.template?.storeNameXMm ?? 1.2),
+    storeNameYMm: Number(payload?.template?.storeNameYMm ?? 0.6),
+    storeNameWidthMm: Number(payload?.template?.storeNameWidthMm ?? 20),
+    storeNameHeightMm: Number(payload?.template?.storeNameHeightMm ?? 2.8),
+    nameXMm: Number(payload?.template?.nameXMm ?? 1.2),
+    nameYMm: Number(payload?.template?.nameYMm ?? 3.2),
+    nameWidthMm: Number(payload?.template?.nameWidthMm ?? 20),
+    nameHeightMm: Number(payload?.template?.nameHeightMm ?? 3.5),
+    priceXMm: Number(payload?.template?.priceXMm ?? 1.1),
+    priceYMm: Number(payload?.template?.priceYMm ?? 7.1),
+    priceWidthMm: Number(payload?.template?.priceWidthMm ?? 20),
+    priceHeightMm: Number(payload?.template?.priceHeightMm ?? 7.2),
+    codeXMm: Number(payload?.template?.codeXMm ?? 23.5),
+    codeYMm: Number(payload?.template?.codeYMm ?? 3.1),
+    codeWidthMm: Number(payload?.template?.codeWidthMm ?? 7.4),
+    codeHeightMm: Number(payload?.template?.codeHeightMm ?? 7.4),
     showProductName: payload?.template?.showProductName !== false,
     showPrice: payload?.template?.showPrice !== false,
     showCode: payload?.template?.showCode !== false,
     showFreeText: Boolean(payload?.template?.showFreeText),
-    freeText: String(payload?.template?.freeText || "").trim(),
+    freeText: String(payload?.template?.freeText ?? "").trim(),
     freeTextAlign: normalizeAlign(payload?.template?.freeTextAlign, "left"),
-    freeTextFontSize: Number(payload?.template?.freeTextFontSize || 5.8),
-    freeTextMaxLen: Number(payload?.template?.freeTextMaxLen || 28),
-    freeTextXMm: Number(payload?.template?.freeTextXMm || 1.2),
-    freeTextYMm: Number(payload?.template?.freeTextYMm || 12.1),
-    freeTextWidthMm: Number(payload?.template?.freeTextWidthMm || 20),
-    freeTextHeightMm: Number(payload?.template?.freeTextHeightMm || 2.3),
-    storeName: String(payload?.template?.storeName || "La Cosmetikera").trim(),
+    freeTextFontSize: Number(payload?.template?.freeTextFontSize ?? 5.8),
+    freeTextMaxLen: Number(payload?.template?.freeTextMaxLen ?? 28),
+    freeTextXMm: Number(payload?.template?.freeTextXMm ?? 1.2),
+    freeTextYMm: Number(payload?.template?.freeTextYMm ?? 12.1),
+    freeTextWidthMm: Number(payload?.template?.freeTextWidthMm ?? 20),
+    freeTextHeightMm: Number(payload?.template?.freeTextHeightMm ?? 2.3),
+    storeName: String(payload?.template?.storeName ?? "La Cosmetikera").trim(),
     debugMarks: Boolean(payload?.template?.debugMarks),
   };
 
@@ -215,58 +228,58 @@ async function generarPdfEtiquetas(payload) {
       }
 
       if (settings.showStoreName) {
-        doc
-          .fillColor("#000000")
-          .font("Helvetica-Bold")
-          .fontSize(settings.storeNameFontSize)
-          .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + contentOffsetXPt + mmToPt(settings.storeNameXMm || 0), y + contentOffsetYPt + mmToPt(settings.storeNameYMm || 0), {
-            width: mmToPt(settings.storeNameWidthMm || 20),
-            height: mmToPt(settings.storeNameHeightMm || 2.8),
-            align: settings.storeNameAlign,
-            lineBreak: false,
-          });
+        const _sText = normalizeText(settings.storeName, settings.storeNameMaxLen);
+        doc.font("Helvetica-Bold").fontSize(settings.storeNameFontSize);
+        const _sRenderX = alignedTextX(
+          x + contentOffsetXPt + mmToPt(settings.storeNameXMm),
+          mmToPt(settings.storeNameWidthMm),
+          doc.widthOfString(_sText),
+          settings.storeNameAlign
+        );
+        doc.fillColor("#000000")
+          .text(_sText, _sRenderX, y + contentOffsetYPt + mmToPt(settings.storeNameYMm), { lineBreak: false });
       }
 
       // Nombre del artículo
       if (settings.showProductName) {
-        doc
-          .fillColor("#000000")
-          .font("Helvetica-Bold")
-          .fontSize(settings.nameFontSize)
-          .text(normalizeText(label.name, settings.nameMaxLen), x + contentOffsetXPt + mmToPt(settings.nameXMm || 0), y + contentOffsetYPt + mmToPt(settings.nameYMm || 0), {
-            width: mmToPt(settings.nameWidthMm || 20),
-            height: mmToPt(settings.nameHeightMm || 3.5),
-            align: settings.nameAlign,
-            lineBreak: false,
-          });
+        const _nText = normalizeText(label.name, settings.nameMaxLen);
+        doc.font("Helvetica-Bold").fontSize(settings.nameFontSize);
+        const _nRenderX = alignedTextX(
+          x + contentOffsetXPt + mmToPt(settings.nameXMm),
+          mmToPt(settings.nameWidthMm),
+          doc.widthOfString(_nText),
+          settings.nameAlign
+        );
+        doc.fillColor("#000000")
+          .text(_nText, _nRenderX, y + contentOffsetYPt + mmToPt(settings.nameYMm), { lineBreak: false });
       }
 
       // Precio destacado
       if (settings.showPrice) {
-        doc
-          .fillColor("#000000")
-          .font("Helvetica-Bold")
-          .fontSize(settings.priceFontSize)
-          .text(formatCop(label.price), x + contentOffsetXPt + mmToPt(settings.priceXMm || 1.1), y + contentOffsetYPt + mmToPt(settings.priceYMm || settings.priceTopMm), {
-            width: mmToPt(settings.priceWidthMm || 20),
-            height: mmToPt(settings.priceHeightMm || 7.2),
-            align: settings.priceAlign,
-            lineBreak: false,
-          });
+        const _pText = formatCop(label.price);
+        doc.font("Helvetica-Bold").fontSize(settings.priceFontSize);
+        const _pRenderX = alignedTextX(
+          x + contentOffsetXPt + mmToPt(settings.priceXMm),
+          mmToPt(settings.priceWidthMm),
+          doc.widthOfString(_pText),
+          settings.priceAlign
+        );
+        doc.fillColor("#000000")
+          .text(_pText, _pRenderX, y + contentOffsetYPt + mmToPt(settings.priceYMm), { lineBreak: false });
       }
 
       // Texto libre
       if (settings.showFreeText && settings.freeText) {
-        doc
-          .fillColor("#000000")
-          .font("Helvetica")
-          .fontSize(settings.freeTextFontSize)
-          .text(normalizeText(settings.freeText, settings.freeTextMaxLen), x + contentOffsetXPt + mmToPt(settings.freeTextXMm || 0), y + contentOffsetYPt + mmToPt(settings.freeTextYMm || 0), {
-            width: mmToPt(settings.freeTextWidthMm || 20),
-            height: mmToPt(settings.freeTextHeightMm || 2.3),
-            align: settings.freeTextAlign,
-            lineBreak: false,
-          });
+        const _fText = normalizeText(settings.freeText, settings.freeTextMaxLen);
+        doc.font("Helvetica").fontSize(settings.freeTextFontSize);
+        const _fRenderX = alignedTextX(
+          x + contentOffsetXPt + mmToPt(settings.freeTextXMm),
+          mmToPt(settings.freeTextWidthMm),
+          doc.widthOfString(_fText),
+          settings.freeTextAlign
+        );
+        doc.fillColor("#000000")
+          .text(_fText, _fRenderX, y + contentOffsetYPt + mmToPt(settings.freeTextYMm), { lineBreak: false });
       }
 
       // Codigo seleccionable (Data Matrix, QR o Code128)
@@ -274,7 +287,7 @@ async function generarPdfEtiquetas(payload) {
         try {
           const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
           if (dmBuffer) {
-            doc.image(dmBuffer, x + contentOffsetXPt + mmToPt(settings.codeXMm || 0), y + contentOffsetYPt + mmToPt(settings.codeYMm || 0), {
+            doc.image(dmBuffer, x + contentOffsetXPt + mmToPt(settings.codeXMm), y + contentOffsetYPt + mmToPt(settings.codeYMm), {
               width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
               height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
             });
