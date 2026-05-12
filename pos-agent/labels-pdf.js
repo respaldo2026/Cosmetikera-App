@@ -18,6 +18,12 @@ function normalizeText(input, maxLen) {
   return `${text.slice(0, Math.max(1, maxLen - 1))}…`;
 }
 
+function normalizeAlign(input, fallback = "left") {
+  const value = String(input || "").toLowerCase();
+  if (value === "center" || value === "right" || value === "justify") return value;
+  return fallback;
+}
+
 function parseDataUrlImageBuffer(dataUrl) {
   const raw = String(dataUrl || "").trim();
   if (!raw.startsWith("data:image/")) return null;
@@ -82,11 +88,14 @@ async function generarPdfEtiquetas(payload) {
     contentPaddingLeftMm: Number(payload?.template?.contentPaddingLeftMm || 1.2),
     contentTopMm: Number(payload?.template?.contentTopMm || 0.6),
     showStoreName: payload?.template?.showStoreName !== false,
+    storeNameAlign: normalizeAlign(payload?.template?.storeNameAlign, "left"),
     storeNameMaxLen: Number(payload?.template?.storeNameMaxLen || 13),
     storeNameFontSize: Number(payload?.template?.storeNameFontSize || 6.6),
     nameMaxLen: Number(payload?.template?.nameMaxLen || 16),
+    nameAlign: normalizeAlign(payload?.template?.nameAlign, "left"),
     nameFontSize: Number(payload?.template?.nameFontSize || 7.1),
     priceFontSize: Number(payload?.template?.priceFontSize || 15.4),
+    priceAlign: normalizeAlign(payload?.template?.priceAlign, "left"),
     priceTopMm: Number(payload?.template?.priceTopMm || 7.1),
     dataMatrixSizeMm: Number(payload?.template?.dataMatrixSizeMm || 7.4),
     dataMatrixXPaddingMm: Number(payload?.template?.dataMatrixXPaddingMm || 1.1),
@@ -120,6 +129,7 @@ async function generarPdfEtiquetas(payload) {
     showCode: payload?.template?.showCode !== false,
     showFreeText: Boolean(payload?.template?.showFreeText),
     freeText: String(payload?.template?.freeText || "").trim(),
+    freeTextAlign: normalizeAlign(payload?.template?.freeTextAlign, "left"),
     freeTextFontSize: Number(payload?.template?.freeTextFontSize || 5.8),
     freeTextMaxLen: Number(payload?.template?.freeTextMaxLen || 28),
     freeTextXMm: Number(payload?.template?.freeTextXMm || 1.2),
@@ -151,6 +161,8 @@ async function generarPdfEtiquetas(payload) {
   const logoHeightPt = mmToPt(settings.logoHeightMm);
   const logoXOffsetPt = mmToPt(settings.logoXOffsetMm);
   const logoYOffsetPt = mmToPt(settings.logoYOffsetMm);
+  const contentOffsetXPt = mmToPt(settings.contentPaddingLeftMm || 0);
+  const contentOffsetYPt = mmToPt(settings.contentTopMm || 0);
 
   const rows = Math.ceil(labels.length / settings.columns);
 
@@ -193,7 +205,7 @@ async function generarPdfEtiquetas(payload) {
 
       if (logoBuffer) {
         try {
-          doc.image(logoBuffer, x + logoXOffsetPt, y + logoYOffsetPt, {
+          doc.image(logoBuffer, x + contentOffsetXPt + logoXOffsetPt, y + contentOffsetYPt + logoYOffsetPt, {
             width: logoWidthPt,
             height: logoHeightPt,
           });
@@ -207,9 +219,10 @@ async function generarPdfEtiquetas(payload) {
           .fillColor("#000000")
           .font("Helvetica-Bold")
           .fontSize(settings.storeNameFontSize)
-          .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + mmToPt(settings.storeNameXMm || 0), y + mmToPt(settings.storeNameYMm || 0), {
+          .text(normalizeText(settings.storeName, settings.storeNameMaxLen), x + contentOffsetXPt + mmToPt(settings.storeNameXMm || 0), y + contentOffsetYPt + mmToPt(settings.storeNameYMm || 0), {
             width: mmToPt(settings.storeNameWidthMm || 20),
             height: mmToPt(settings.storeNameHeightMm || 2.8),
+            align: settings.storeNameAlign,
             lineBreak: false,
           });
       }
@@ -220,9 +233,10 @@ async function generarPdfEtiquetas(payload) {
           .fillColor("#000000")
           .font("Helvetica-Bold")
           .fontSize(settings.nameFontSize)
-          .text(normalizeText(label.name, settings.nameMaxLen), x + mmToPt(settings.nameXMm || 0), y + mmToPt(settings.nameYMm || 0), {
+          .text(normalizeText(label.name, settings.nameMaxLen), x + contentOffsetXPt + mmToPt(settings.nameXMm || 0), y + contentOffsetYPt + mmToPt(settings.nameYMm || 0), {
             width: mmToPt(settings.nameWidthMm || 20),
             height: mmToPt(settings.nameHeightMm || 3.5),
+            align: settings.nameAlign,
             lineBreak: false,
           });
       }
@@ -233,9 +247,10 @@ async function generarPdfEtiquetas(payload) {
           .fillColor("#000000")
           .font("Helvetica-Bold")
           .fontSize(settings.priceFontSize)
-          .text(formatCop(label.price), x + mmToPt(settings.priceXMm || 1.1), y + mmToPt(settings.priceYMm || settings.priceTopMm), {
+          .text(formatCop(label.price), x + contentOffsetXPt + mmToPt(settings.priceXMm || 1.1), y + contentOffsetYPt + mmToPt(settings.priceYMm || settings.priceTopMm), {
             width: mmToPt(settings.priceWidthMm || 20),
             height: mmToPt(settings.priceHeightMm || 7.2),
+            align: settings.priceAlign,
             lineBreak: false,
           });
       }
@@ -246,9 +261,10 @@ async function generarPdfEtiquetas(payload) {
           .fillColor("#000000")
           .font("Helvetica")
           .fontSize(settings.freeTextFontSize)
-          .text(normalizeText(settings.freeText, settings.freeTextMaxLen), x + mmToPt(settings.freeTextXMm || 0), y + mmToPt(settings.freeTextYMm || 0), {
+          .text(normalizeText(settings.freeText, settings.freeTextMaxLen), x + contentOffsetXPt + mmToPt(settings.freeTextXMm || 0), y + contentOffsetYPt + mmToPt(settings.freeTextYMm || 0), {
             width: mmToPt(settings.freeTextWidthMm || 20),
             height: mmToPt(settings.freeTextHeightMm || 2.3),
+            align: settings.freeTextAlign,
             lineBreak: false,
           });
       }
@@ -258,7 +274,7 @@ async function generarPdfEtiquetas(payload) {
         try {
           const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
           if (dmBuffer) {
-            doc.image(dmBuffer, x + mmToPt(settings.codeXMm || 0), y + mmToPt(settings.codeYMm || 0), {
+            doc.image(dmBuffer, x + contentOffsetXPt + mmToPt(settings.codeXMm || 0), y + contentOffsetYPt + mmToPt(settings.codeYMm || 0), {
               width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
               height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
             });

@@ -12,6 +12,8 @@ export type LabelPrintItem = {
   sku?: string;
 };
 
+export type LabelTextAlign = "left" | "center" | "right" | "justify";
+
 export type LabelTemplateConfig = {
   printOrientation: "portrait" | "landscape";
   contentRotationDeg: 0 | 90 | 180 | 270;
@@ -26,11 +28,14 @@ export type LabelTemplateConfig = {
   contentPaddingLeftMm: number;
   contentTopMm: number;
   showStoreName: boolean;
+  storeNameAlign: LabelTextAlign;
   storeNameMaxLen: number;
   storeNameFontSize: number;
   nameMaxLen: number;
+  nameAlign: LabelTextAlign;
   nameFontSize: number;
   priceFontSize: number;
+  priceAlign: LabelTextAlign;
   priceTopMm: number;
   dataMatrixSizeMm: number;
   dataMatrixXPaddingMm: number;
@@ -64,6 +69,7 @@ export type LabelTemplateConfig = {
   showCode: boolean;
   showFreeText: boolean;
   freeText: string;
+  freeTextAlign: LabelTextAlign;
   freeTextFontSize: number;
   freeTextMaxLen: number;
   freeTextXMm: number;
@@ -88,11 +94,14 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
   contentPaddingLeftMm: 1.2,
   contentTopMm: 0.6,
   showStoreName: false,
+  storeNameAlign: "left",
   storeNameMaxLen: 13,
   storeNameFontSize: 6.6,
   nameMaxLen: 8,
+  nameAlign: "left",
   nameFontSize: 6.0,
   priceFontSize: 14.8,
+  priceAlign: "left",
   priceTopMm: 7.1,
   dataMatrixSizeMm: 7.4,
   dataMatrixXPaddingMm: 1.1,
@@ -126,6 +135,7 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
   showCode: true,
   showFreeText: false,
   freeText: "",
+  freeTextAlign: "left",
   freeTextFontSize: 5.8,
   freeTextMaxLen: 28,
   freeTextXMm: 1.2,
@@ -167,6 +177,11 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     if (n === 90 || n === 180 || n === 270) return n;
     return 0;
   };
+  const asAlign = (value: unknown, fallback: LabelTextAlign): LabelTextAlign => {
+    const v = String(value || "").toLowerCase();
+    if (v === "center" || v === "right" || v === "justify") return v;
+    return fallback;
+  };
 
   return {
     printOrientation: asOrientation(src.printOrientation),
@@ -182,11 +197,14 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     contentPaddingLeftMm: asNumber(src.contentPaddingLeftMm, DEFAULT_LABEL_TEMPLATE.contentPaddingLeftMm, 0, 10),
     contentTopMm: asNumber(src.contentTopMm, DEFAULT_LABEL_TEMPLATE.contentTopMm, 0, 10),
     showStoreName: asBool(src.showStoreName, DEFAULT_LABEL_TEMPLATE.showStoreName),
+    storeNameAlign: asAlign(src.storeNameAlign, DEFAULT_LABEL_TEMPLATE.storeNameAlign),
     storeNameMaxLen: Math.round(asNumber(src.storeNameMaxLen, DEFAULT_LABEL_TEMPLATE.storeNameMaxLen, 6, 40)),
     storeNameFontSize: asNumber(src.storeNameFontSize, DEFAULT_LABEL_TEMPLATE.storeNameFontSize, 4, 20),
     nameMaxLen: Math.round(asNumber(src.nameMaxLen, DEFAULT_LABEL_TEMPLATE.nameMaxLen, 6, 60)),
+    nameAlign: asAlign(src.nameAlign, DEFAULT_LABEL_TEMPLATE.nameAlign),
     nameFontSize: asNumber(src.nameFontSize, DEFAULT_LABEL_TEMPLATE.nameFontSize, 5, 24),
     priceFontSize: asNumber(src.priceFontSize, DEFAULT_LABEL_TEMPLATE.priceFontSize, 6, 36),
+    priceAlign: asAlign(src.priceAlign, DEFAULT_LABEL_TEMPLATE.priceAlign),
     priceTopMm: asNumber(src.priceTopMm, DEFAULT_LABEL_TEMPLATE.priceTopMm, 0, 30),
     dataMatrixSizeMm: asNumber(src.dataMatrixSizeMm, DEFAULT_LABEL_TEMPLATE.dataMatrixSizeMm, 3, 20),
     dataMatrixXPaddingMm: asNumber(src.dataMatrixXPaddingMm, DEFAULT_LABEL_TEMPLATE.dataMatrixXPaddingMm, 0, 20),
@@ -220,6 +238,7 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     showCode: asBool(src.showCode, DEFAULT_LABEL_TEMPLATE.showCode),
     showFreeText: asBool(src.showFreeText, DEFAULT_LABEL_TEMPLATE.showFreeText),
     freeText: asString(src.freeText, DEFAULT_LABEL_TEMPLATE.freeText, 120),
+    freeTextAlign: asAlign(src.freeTextAlign, DEFAULT_LABEL_TEMPLATE.freeTextAlign),
     freeTextFontSize: asNumber(src.freeTextFontSize, DEFAULT_LABEL_TEMPLATE.freeTextFontSize, 4, 18),
     freeTextMaxLen: Math.round(asNumber(src.freeTextMaxLen, DEFAULT_LABEL_TEMPLATE.freeTextMaxLen, 4, 60)),
     freeTextXMm: asNumber(src.freeTextXMm, DEFAULT_LABEL_TEMPLATE.freeTextXMm, 0, 100),

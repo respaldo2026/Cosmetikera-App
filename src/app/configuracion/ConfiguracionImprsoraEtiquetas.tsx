@@ -19,7 +19,7 @@ import {
 } from "antd";
 import { ReloadOutlined, TagsOutlined, UploadOutlined } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
-import { listLabelPrinters, printPriceLabels, DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, saveLabelTemplateConfig, type LabelTemplateConfig } from "@/utils/label-agent";
+import { listLabelPrinters, printPriceLabels, DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, saveLabelTemplateConfig, type LabelTemplateConfig, type LabelTextAlign } from "@/utils/label-agent";
 import { Rnd } from "react-rnd";
 
 interface ConfiguracionImprsoraEtiquetasProps {
@@ -32,6 +32,13 @@ const LOGO_STORAGE_BUCKET = "branding";
 
 const posPrintMode = (process.env.NEXT_PUBLIC_POS_PRINT_MODE ?? "auto").toLowerCase();
 const usaAgenteLocal = posPrintMode === "agent" || posPrintMode === "auto";
+
+const TEXT_ALIGN_OPTIONS: Array<{ label: string; value: LabelTextAlign }> = [
+  { label: "Izquierda", value: "left" },
+  { label: "Centro", value: "center" },
+  { label: "Derecha", value: "right" },
+  { label: "Justificado", value: "justify" },
+];
 
 export default function ConfiguracionImprsoraEtiquetas({
   formAcademia,
@@ -290,6 +297,10 @@ export default function ConfiguracionImprsoraEtiquetas({
     const designerScale = 12;
     const mmToPx = (mm: number) => mm * designerScale;
     const pxToMm = (px: number) => Math.round((px / designerScale) * 100) / 100;
+    const contentOffsetXPx = mmToPx(Math.max(0, cfg.contentPaddingLeftMm || 0));
+    const contentOffsetYPx = mmToPx(Math.max(0, cfg.contentTopMm || 0));
+    const contentCanvasWidthPx = Math.max(1, labelWidthMm * designerScale - contentOffsetXPx);
+    const contentCanvasHeightPx = Math.max(1, labelHeightMm * designerScale - contentOffsetYPx);
 
     return (
       <>
@@ -306,6 +317,7 @@ export default function ConfiguracionImprsoraEtiquetas({
           <Col xs={24} md={14}>
             <div style={{ width: labelWidthMm * designerScale, height: labelHeightMm * designerScale, maxWidth: "100%", border: "1px solid #d9d9d9", borderRadius: cfg.cornerRadiusMm * designerScale, background: "#fff", position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", inset: 0, transform: `rotate(${cfg.contentRotationDeg || 0}deg)`, transformOrigin: "center center" }}>
+                <div style={{ position: "absolute", left: contentOffsetXPx, top: contentOffsetYPx, width: contentCanvasWidthPx, height: contentCanvasHeightPx }}>
                 {cfg.showStoreName && (
                   <Rnd
                     bounds="parent"
@@ -316,7 +328,7 @@ export default function ConfiguracionImprsoraEtiquetas({
                     onDragStop={(_e, d) => updateBox("store", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.storeNameWidthMm, h: cfg.storeNameHeightMm })}
                     onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("store", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
                   >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #7c3aed", color: "#7c3aed", fontSize: Math.max(8, cfg.storeNameFontSize * 1.9), fontWeight: 700, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(124,58,237,0.05)" }}>TIENDA</div>
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #7c3aed", color: "#7c3aed", fontSize: Math.max(8, cfg.storeNameFontSize * 1.9), fontWeight: 700, padding: 2, overflow: "hidden", textAlign: cfg.storeNameAlign, background: "rgba(124,58,237,0.05)" }}>TIENDA</div>
                   </Rnd>
                 )}
 
@@ -330,7 +342,7 @@ export default function ConfiguracionImprsoraEtiquetas({
                     onDragStop={(_e, d) => updateBox("name", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.nameWidthMm, h: cfg.nameHeightMm })}
                     onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("name", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
                   >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #2563eb", color: "#2563eb", fontSize: Math.max(9, cfg.nameFontSize * 1.8), fontWeight: 700, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(37,99,235,0.06)" }}>ACE Almendra</div>
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #2563eb", color: "#2563eb", fontSize: Math.max(9, cfg.nameFontSize * 1.8), fontWeight: 700, padding: 2, overflow: "hidden", textAlign: cfg.nameAlign, background: "rgba(37,99,235,0.06)" }}>ACE Almendra</div>
                   </Rnd>
                 )}
 
@@ -344,7 +356,7 @@ export default function ConfiguracionImprsoraEtiquetas({
                     onDragStop={(_e, d) => updateBox("price", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.priceWidthMm, h: cfg.priceHeightMm })}
                     onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("price", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
                   >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #16a34a", color: "#166534", fontSize: Math.max(12, cfg.priceFontSize * 1.55), fontWeight: 800, padding: 2, lineHeight: 1, background: "rgba(22,163,74,0.06)" }}>$13.400</div>
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #16a34a", color: "#166534", fontSize: Math.max(12, cfg.priceFontSize * 1.55), fontWeight: 800, padding: 2, lineHeight: 1, textAlign: cfg.priceAlign, background: "rgba(22,163,74,0.06)" }}>$13.400</div>
                   </Rnd>
                 )}
 
@@ -374,7 +386,7 @@ export default function ConfiguracionImprsoraEtiquetas({
                     onDragStop={(_e, d) => updateBox("freeText", { x: pxToMm(d.x), y: pxToMm(d.y), w: cfg.freeTextWidthMm, h: cfg.freeTextHeightMm })}
                     onResizeStop={(_e, _dir, ref, _delta, position) => updateBox("freeText", { x: pxToMm(position.x), y: pxToMm(position.y), w: pxToMm(ref.offsetWidth), h: pxToMm(ref.offsetHeight) })}
                   >
-                    <div style={{ width: "100%", height: "100%", border: "1px dashed #b45309", color: "#92400e", fontSize: Math.max(8, cfg.freeTextFontSize * 1.7), fontWeight: 600, padding: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "rgba(251,191,36,0.15)" }}>
+                    <div style={{ width: "100%", height: "100%", border: "1px dashed #b45309", color: "#92400e", fontSize: Math.max(8, cfg.freeTextFontSize * 1.7), fontWeight: 600, padding: 2, overflow: "hidden", textAlign: cfg.freeTextAlign, background: "rgba(251,191,36,0.15)" }}>
                       {cfg.freeText}
                     </div>
                   </Rnd>
@@ -395,6 +407,7 @@ export default function ConfiguracionImprsoraEtiquetas({
                     </div>
                   </Rnd>
                 )}
+                </div>
               </div>
             </div>
           </Col>
@@ -586,6 +599,22 @@ export default function ConfiguracionImprsoraEtiquetas({
             <Col xs={12} md={6}>
               <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tienda: max caracteres</div>
               <InputNumber min={6} max={40} step={1} precision={0} style={{ width: "100%" }} value={labelTemplateConfig.storeNameMaxLen} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, storeNameMaxLen: Math.max(6, Number(v || prev.storeNameMaxLen)) }))} />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alineación tienda</div>
+              <Select value={labelTemplateConfig.storeNameAlign} style={{ width: "100%" }} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, storeNameAlign: v }))} options={TEXT_ALIGN_OPTIONS} />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alineación artículo</div>
+              <Select value={labelTemplateConfig.nameAlign} style={{ width: "100%" }} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, nameAlign: v }))} options={TEXT_ALIGN_OPTIONS} />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alineación precio</div>
+              <Select value={labelTemplateConfig.priceAlign} style={{ width: "100%" }} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, priceAlign: v }))} options={TEXT_ALIGN_OPTIONS} />
+            </Col>
+            <Col xs={12} md={6}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Alineación campo libre</div>
+              <Select value={labelTemplateConfig.freeTextAlign} style={{ width: "100%" }} onChange={(v) => setLabelTemplateConfig((prev) => ({ ...prev, freeTextAlign: v }))} options={TEXT_ALIGN_OPTIONS} />
             </Col>
             <Col xs={12} md={6}>
               <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tipo de código</div>
