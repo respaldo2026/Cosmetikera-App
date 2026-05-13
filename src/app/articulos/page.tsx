@@ -1987,12 +1987,42 @@ export default function ArticulosPage() {
         title={editing ? "Editar artículo" : "Nuevo artículo"}
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
-        onOk={handleGuardar}
         confirmLoading={saving}
-        okText={editing ? "Guardar cambios" : "Crear artículo"}
-        cancelText="Cancelar"
         width={isMobile ? "calc(100vw - 16px)" : 600}
         style={isMobile ? { top: 8 } : undefined}
+        footer={(_, { OkBtn, CancelBtn }) => (
+          <Space style={{ justifyContent: "space-between", width: "100%", display: "flex" }}>
+            <Button
+              icon={<PrinterOutlined />}
+              style={{ color: "#9c27b0", borderColor: "#9c27b0" }}
+              disabled={!editing}
+              title={editing ? "Imprimir etiqueta de este artículo" : "Guarda el artículo primero para imprimir"}
+              onClick={() => {
+                if (!editing) return;
+                const vals = form.getFieldsValue();
+                const barras = String(vals.codigo_barras || editing.codigo_barras || "").trim();
+                const codigoCorto = String(vals.codigo_secundario || editing.codigo_secundario || (barras ? barras.slice(-6) : "") || "").trim();
+                const art: Articulo = {
+                  ...editing,
+                  nombre: vals.nombre || editing.nombre,
+                  precio_venta: vals.precio_venta ?? editing.precio_venta,
+                  codigo_barras: barras || undefined,
+                  codigo_secundario: codigoCorto || undefined,
+                };
+                void abrirModalEtiquetaArticulo(art);
+              }}
+            >
+              Imprimir etiqueta
+            </Button>
+            <Space>
+              <CancelBtn />
+              <OkBtn />
+            </Space>
+          </Space>
+        )}
+        onOk={handleGuardar}
+        okText={editing ? "Guardar cambios" : "Crear artículo"}
+        cancelText="Cancelar"
       >
         <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
 
