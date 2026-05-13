@@ -81,8 +81,11 @@ export default function ArticuloDetallePage() {
   const searchParams = useSearchParams();
   const { message } = App.useApp();
   const id = params.id as string;
-  const backQuery = searchParams.toString();
-  const backToListHref = backQuery ? `/articulos?${backQuery}` : "/articulos";
+  const backQueryParams = new URLSearchParams(searchParams.toString());
+  backQueryParams.delete("edit");
+  const backQueryStr = backQueryParams.toString();
+  const backToListHref = backQueryStr ? `/articulos?${backQueryStr}` : "/articulos";
+  const startInEditMode = searchParams.get("edit") === "1";
 
   const [articulo, setArticulo] = useState<Articulo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +93,7 @@ export default function ArticuloDetallePage() {
   const [loadingVentas, setLoadingVentas] = useState(false);
   const [editandoPromo, setEditandoPromo] = useState(false);
   const [savingPromo, setSavingPromo] = useState(false);
-  const [editandoFicha, setEditandoFicha] = useState(false);
+  const [editandoFicha, setEditandoFicha] = useState(startInEditMode);
   const [savingFicha, setSavingFicha] = useState(false);
   const [formPromo] = Form.useForm();
   const [formFicha] = Form.useForm();
@@ -190,6 +193,14 @@ export default function ArticuloDetallePage() {
     cargarVentas();
     void cargarCatalogosCompartidos();
   }, [cargarArticulo, cargarVentas, cargarCatalogosCompartidos]);
+
+  // Auto-generar codigo_secundario = últimos 6 dígitos del codigo_barras
+  useEffect(() => {
+    if (!editandoFicha) return;
+    const barras = String(codigoBarrasValue || "").trim();
+    const generado = barras.length >= 1 ? barras.slice(-6) : "";
+    formFicha.setFieldValue("codigo_secundario", generado || undefined);
+  }, [codigoBarrasValue, editandoFicha, formFicha]);
 
   const catalogosDisponibles = useMemo(
     () => mergeCatalogos(
@@ -466,8 +477,18 @@ export default function ArticuloDetallePage() {
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={8}>
-                        <Form.Item name="codigo_secundario" label="Referencia / 2° código">
-                          <Input placeholder="REF-001" prefix={<BarcodeOutlined />} />
+                        <Form.Item
+                          name="codigo_secundario"
+                          label="Código secundario (auto)"
+                          tooltip="Se genera automáticamente con los últimos 6 dígitos del código de barras. Es el código que aparece en el QR de la etiqueta."
+                        >
+                          <Input
+                            readOnly
+                            disabled
+                            prefix={<BarcodeOutlined />}
+                            placeholder="Se genera del código de barras"
+                            style={{ background: "#f5f5f5", cursor: "default" }}
+                          />
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={8}>

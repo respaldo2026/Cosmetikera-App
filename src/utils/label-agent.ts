@@ -10,6 +10,7 @@ export type LabelPrintItem = {
   quantity: number;
   dataMatrix: string;
   sku?: string;
+  shortCode?: string;
 };
 
 export type LabelTextAlign = "left" | "center" | "right" | "justify";
@@ -68,6 +69,7 @@ export type LabelTemplateConfig = {
   showPrice: boolean;
   showCode: boolean;
   showFreeText: boolean;
+  showShortCodeAboveQr: boolean;
   freeText: string;
   freeTextAlign: LabelTextAlign;
   freeTextFontSize: number;
@@ -134,6 +136,7 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplateConfig = {
   showPrice: true,
   showCode: true,
   showFreeText: false,
+  showShortCodeAboveQr: true,
   freeText: "",
   freeTextAlign: "left",
   freeTextFontSize: 5.8,
@@ -237,6 +240,7 @@ function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined)
     showPrice: asBool(src.showPrice, DEFAULT_LABEL_TEMPLATE.showPrice),
     showCode: asBool(src.showCode, DEFAULT_LABEL_TEMPLATE.showCode),
     showFreeText: asBool(src.showFreeText, DEFAULT_LABEL_TEMPLATE.showFreeText),
+    showShortCodeAboveQr: asBool(src.showShortCodeAboveQr, DEFAULT_LABEL_TEMPLATE.showShortCodeAboveQr),
     freeText: asString(src.freeText, DEFAULT_LABEL_TEMPLATE.freeText, 120),
     freeTextAlign: asAlign(src.freeTextAlign, DEFAULT_LABEL_TEMPLATE.freeTextAlign),
     freeTextFontSize: asNumber(src.freeTextFontSize, DEFAULT_LABEL_TEMPLATE.freeTextFontSize, 4, 18),
@@ -306,7 +310,7 @@ export async function listLabelPrinters(): Promise<LabelPrinter[]> {
   return res.printers || [];
 }
 
-export async function printPriceLabels(items: LabelPrintItem[], printerName: string, storeName = "La Cosmetikera") {
+export async function printPriceLabels(items: LabelPrintItem[], printerName: string, storeName = "La Cosmetikera", showShortCodeAboveQr = true) {
   const template = getLabelTemplateConfig();
   return callLabelAgent<{ ok: boolean; totalLabels: number; pages: number }>("/print-labels", {
     method: "POST",
@@ -316,6 +320,7 @@ export async function printPriceLabels(items: LabelPrintItem[], printerName: str
       template: {
         ...template,
         storeName,
+        showShortCodeAboveQr,
       },
     }),
   });

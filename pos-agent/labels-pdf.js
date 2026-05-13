@@ -60,6 +60,7 @@ function expandLabels(items) {
         name: String(item?.name || "").trim(),
         price: Number(item?.price || 0),
         dataMatrix: String(item?.dataMatrix || item?.sku || item?.name || "").trim(),
+        shortCode: item?.shortCode ? String(item.shortCode).trim() : null,
       });
     }
   }
@@ -140,6 +141,7 @@ async function generarPdfEtiquetas(payload) {
     showProductName: payload?.template?.showProductName !== false,
     showPrice: payload?.template?.showPrice !== false,
     showCode: payload?.template?.showCode !== false,
+    showShortCodeAboveQr: payload?.template?.showShortCodeAboveQr !== false,
     showFreeText: Boolean(payload?.template?.showFreeText),
     freeText: String(payload?.template?.freeText ?? "").trim(),
     freeTextAlign: normalizeAlign(payload?.template?.freeTextAlign, "left"),
@@ -287,7 +289,23 @@ async function generarPdfEtiquetas(payload) {
         try {
           const dmBuffer = await buildCodePng(label.dataMatrix, settings.codeType);
           if (dmBuffer) {
-            doc.image(dmBuffer, x + contentOffsetXPt + mmToPt(settings.codeXMm), y + contentOffsetYPt + mmToPt(settings.codeYMm), {
+            const codeX = x + contentOffsetXPt + mmToPt(settings.codeXMm);
+            const codeY = y + contentOffsetYPt + mmToPt(settings.codeYMm);
+
+            // Renderizar código corto encima del QR
+            if (settings.showShortCodeAboveQr && label.shortCode) {
+              const shortText = String(label.shortCode).trim();
+              if (shortText) {
+                doc.font("Helvetica-Bold").fontSize(5.0);
+                const codeWidthPt = mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm);
+                const textW = doc.widthOfString(shortText);
+                const textX = alignedTextX(codeX, codeWidthPt, textW, "center");
+                const textY = codeY - mmToPt(2.2);
+                doc.fillColor("#000000").text(shortText, textX, textY, { lineBreak: false });
+              }
+            }
+
+            doc.image(dmBuffer, codeX, codeY, {
               width: mmToPt(settings.codeWidthMm || settings.dataMatrixSizeMm),
               height: mmToPt(settings.codeHeightMm || settings.dataMatrixSizeMm),
             });

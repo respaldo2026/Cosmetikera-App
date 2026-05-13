@@ -287,7 +287,8 @@ export default function ArticulosPage() {
   const [selectedLabelPrinter, setSelectedLabelPrinter] = useState<string | null>(null);
   const [loadingLabelPrinters, setLoadingLabelPrinters] = useState(false);
   const [printingLabels, setPrintingLabels] = useState(false);
-  const [labelItems, setLabelItems] = useState<{ articuloId: string; nombre: string; precio: number; cantidad: number; sku?: string }[]>([]);
+  const [labelItems, setLabelItems] = useState<{ articuloId: string; nombre: string; precio: number; cantidad: number; sku?: string; codigoCorto?: string }[]>([]);
+  const [mostrarCodigoCortoEnEtiqueta, setMostrarCodigoCortoEnEtiqueta] = useState(true);
   const [nombreTienda, setNombreTienda] = useState("La Cosmetikera");
   const LABEL_PRINTER_STORAGE_KEY = "pos_label_printer_name_v1";
 
@@ -380,6 +381,14 @@ export default function ArticulosPage() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
+  // Auto-generar codigo_secundario = últimos 6 dígitos del codigo_barras
+  useEffect(() => {
+    if (!modalOpen) return;
+    const barras = String(codigoBarrasValue || "").trim();
+    const generado = barras.length >= 1 ? barras.slice(-6) : "";
+    form.setFieldValue("codigo_secundario", generado || undefined);
+  }, [codigoBarrasValue, modalOpen, form]);
+
   const cargarImpresorasEtiquetas = useCallback(async () => {
     setLoadingLabelPrinters(true);
     try {
@@ -404,14 +413,19 @@ export default function ArticulosPage() {
   }, [LABEL_PRINTER_STORAGE_KEY, actualizarImpresoraEtiquetas, message]);
 
   const resolverCodigoEtiqueta = useCallback((articulo: Partial<Articulo>) => {
+    // El codigo_secundario es siempre los últimos 6 dígitos del codigo_barras
+    const barras = String(articulo.codigo_barras || "").trim();
     return String(
-      articulo.referencia || articulo.codigo_secundario || articulo.codigo_barras || articulo.id || ""
+      articulo.codigo_secundario ||
+      (barras ? barras.slice(-6) : "") ||
+      barras ||
+      articulo.id || ""
     ).trim();
   }, []);
 
   const abrirModalEtiquetaArticulo = useCallback(async (articulo: Articulo) => {
     const codigoEtiqueta = resolverCodigoEtiqueta(articulo);
-    setLabelItems([{ articuloId: articulo.id, nombre: articulo.nombre, precio: articulo.precio_venta, cantidad: 1, sku: codigoEtiqueta }]);
+    setLabelItems([{ articuloId: articulo.id, nombre: articulo.nombre, precio: articulo.precio_venta, cantidad: 1, sku: codigoEtiqueta, codigoCorto: codigoEtiqueta }]);
     setLabelModalOpen(true);
     await cargarImpresorasEtiquetas();
   }, [cargarImpresorasEtiquetas, resolverCodigoEtiqueta]);
@@ -431,6 +445,7 @@ export default function ArticulosPage() {
         precio: a.precio_venta,
         cantidad: 1,
         sku: resolverCodigoEtiqueta(a),
+        codigoCorto: resolverCodigoEtiqueta(a),
       }))
     );
     setLabelModalOpen(true);
@@ -452,6 +467,7 @@ export default function ArticulosPage() {
         quantity: i.cantidad,
         dataMatrix: String(i.sku || i.articuloId).trim(),
         sku: i.sku,
+        shortCode: i.codigoCorto,
       }));
 
     if (!items.length) {
@@ -461,7 +477,7 @@ export default function ArticulosPage() {
 
     setPrintingLabels(true);
     try {
-      const result = await printPriceLabels(items, printerName, nombreTienda);
+      const result = await printPriceLabels(items, printerName, nombreTienda, mostrarCodigoCortoEnEtiqueta);
       actualizarImpresoraEtiquetas(printerName);
       message.success(`Etiquetas enviadas: ${result.totalLabels} (${result.pages} fila(s))`);
       setLabelModalOpen(false);
@@ -470,7 +486,7 @@ export default function ArticulosPage() {
     } finally {
       setPrintingLabels(false);
     }
-  }, [actualizarImpresoraEtiquetas, labelItems, message, selectedLabelPrinter]);
+  }, [actualizarImpresoraEtiquetas, labelItems, message, mostrarCodigoCortoEnEtiqueta, nombreTienda, selectedLabelPrinter]);
 
   useEffect(() => {
     void cargarCatalogosCompartidos();
@@ -1190,6 +1206,25 @@ export default function ArticulosPage() {
     router.push(`/articulos/show/${id}${suffix}`);
   };
 
+  const irAEditar = (id: string) => {
+    const params = new URLSearchParams();
+    const query = search.trim();
+
+    if (query) params.set("q", query);
+    if (filtroCategoria) params.set("categoria", filtroCategoria);
+    for (const marca of filtroMarca) {
+      const marcaTrimmed = marca.trim();
+      if (marcaTrimmed) params.append("marca", marcaTrimmed);
+    }
+    if (filtroProveedor.trim()) params.set("proveedor", filtroProveedor.trim());
+    if (filtroTamano.trim()) params.set("tamano", filtroTamano.trim());
+    if (filtroEmpaque.trim()) params.set("empaque", filtroEmpaque.trim());
+    if (vista) params.set("vista", vista);
+    params.set("edit", "1");
+
+    router.push(`/articulos/show/${id}?${params.toString()}`);
+  };
+
   const detenerEvento = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
   };
@@ -1231,8 +1266,8 @@ export default function ArticulosPage() {
           <Tooltip key="view" title="Ver detalle">
             <EyeOutlined onClick={(event) => { detenerEvento(event); irADetalle(art.id); }} />
           </Tooltip>,
-          <Tooltip key="edit" title="Editar detalle">
-            <EditOutlined onClick={(event) => { detenerEvento(event); irADetalle(art.id); }} />
+          <Tooltip key="edit" title="Editar artículo">
+            <EditOutlined onClick={(event) => { detenerEvento(event); irAEditar(art.id); }} />
           </Tooltip>,
           <Tooltip key="copy" title="Duplicar artículo">
             <CopyOutlined style={{ color: "#1677ff" }} onClick={(event) => { detenerEvento(event); duplicarArticulo(art); }} />
@@ -1506,7 +1541,7 @@ export default function ArticulosPage() {
                     </Col>
                     <Col>
                       <Space size={4}>
-                        <Button size="small" icon={<EditOutlined />} onClick={(e) => { detenerEvento(e); irADetalle(a.id); }} />
+                        <Button size="small" icon={<EditOutlined />} onClick={(e) => { detenerEvento(e); irAEditar(a.id); }} />
                         <Button size="small" danger icon={<DeleteOutlined />} onClick={(e) => { detenerEvento(e); handleEliminar(a); }} />
                         <Button size="small" icon={<PrinterOutlined />} style={{ color: "#9c27b0", borderColor: "#9c27b0" }} onClick={(e) => { detenerEvento(e); abrirModalEtiquetaArticulo(a); }} />
                       </Space>
@@ -1588,7 +1623,7 @@ export default function ArticulosPage() {
                 render: (_: unknown, a: Articulo) => (
                   <Space size={4}>
                     <Tooltip title="Ver"><Button size="small" icon={<EyeOutlined />} onClick={(event) => { detenerEvento(event); irADetalle(a.id); }} /></Tooltip>
-                    <Tooltip title="Editar detalle"><Button size="small" icon={<EditOutlined />} onClick={(event) => { detenerEvento(event); irADetalle(a.id); }} /></Tooltip>
+                    <Tooltip title="Editar artículo"><Button size="small" icon={<EditOutlined />} onClick={(event) => { detenerEvento(event); irAEditar(a.id); }} /></Tooltip>
                     <Tooltip title="Duplicar"><Button size="small" icon={<CopyOutlined />} onClick={(event) => { detenerEvento(event); duplicarArticulo(a); }} /></Tooltip>
                     <Tooltip title="Eliminar"><Button size="small" danger icon={<DeleteOutlined />} onClick={(event) => { detenerEvento(event); handleEliminar(a); }} /></Tooltip>
                     <Tooltip title="Imprimir etiqueta"><Button size="small" icon={<PrinterOutlined />} style={{ color: "#9c27b0", borderColor: "#9c27b0" }} onClick={(event) => { detenerEvento(event); abrirModalEtiquetaArticulo(a); }} /></Tooltip>
@@ -1965,8 +2000,18 @@ export default function ArticulosPage() {
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="codigo_secundario" label="2° código (opcional)">
-                <Input placeholder="REF-001" prefix={<BarcodeOutlined />} />
+              <Form.Item
+                name="codigo_secundario"
+                label="Código secundario (auto)"
+                tooltip="Se genera automáticamente con los últimos 6 dígitos del código de barras. Es el código que se usa en el QR de la etiqueta."
+              >
+                <Input
+                  readOnly
+                  disabled
+                  prefix={<BarcodeOutlined />}
+                  placeholder="Se genera del código de barras"
+                  style={{ background: "#f5f5f5", cursor: "default" }}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -2189,6 +2234,15 @@ export default function ArticulosPage() {
             </Text>
           </div>
 
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Switch
+              checked={mostrarCodigoCortoEnEtiqueta}
+              onChange={setMostrarCodigoCortoEnEtiqueta}
+              size="small"
+            />
+            <Text style={{ fontSize: 13 }}>Mostrar código corto (6 dígitos) encima del QR</Text>
+          </div>
+
           <Table
             dataSource={labelItems}
             rowKey="articuloId"
@@ -2197,6 +2251,12 @@ export default function ArticulosPage() {
             scroll={{ y: 260 }}
             columns={[
               { title: "Artículo", dataIndex: "nombre", ellipsis: true },
+              {
+                title: "Código QR",
+                dataIndex: "codigoCorto",
+                width: 110,
+                render: (v?: string) => v ? <Tag color="geekblue" style={{ fontSize: 10 }}>{v}</Tag> : <Text type="secondary">—</Text>,
+              },
               { title: "Precio", dataIndex: "precio", width: 100, render: (v: number) => `$${Number(v).toLocaleString()}` },
               {
                 title: "Cantidad", dataIndex: "cantidad", width: 120,
