@@ -332,7 +332,7 @@ export default function ArticuloDetallePage() {
       <Card style={{ marginBottom: 16, borderRadius: 12 }} bodyStyle={{ padding: "12px 16px" }}>
         <Row gutter={[16, 12]} align="middle">
           <Col>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(backToListHref)}>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => router.back()}>
               Volver
             </Button>
           </Col>
@@ -458,7 +458,7 @@ export default function ArticuloDetallePage() {
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={8}>
-                        <Form.Item name="codigo_barras" label="Código de barras">
+                        <Form.Item name="codigo_barras" label="Código de barras (principal)">
                           <EscanerCodigo
                             value={codigoBarrasValue}
                             onChange={(value) => formFicha.setFieldValue("codigo_barras", value)}
@@ -472,14 +472,9 @@ export default function ArticuloDetallePage() {
                     </Row>
                     <Row gutter={16}>
                       <Col xs={24} md={8}>
-                        <Form.Item name="referencia" label="Código principal">
-                          <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} md={8}>
                         <Form.Item
                           name="codigo_secundario"
-                          label="Código secundario (auto)"
+                          label="Código corto QR (auto)"
                           tooltip="Se genera automáticamente con los últimos 6 dígitos del código de barras. Es el código que aparece en el QR de la etiqueta."
                         >
                           <Input
@@ -579,14 +574,15 @@ export default function ArticuloDetallePage() {
                 ) : (
                   <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
                     <Descriptions.Item label="Nombre">{articulo.nombre}</Descriptions.Item>
-                    <Descriptions.Item label="Código de barras">
-                      {articulo.codigo_barras || <Text type="secondary">—</Text>}
+                    <Descriptions.Item label="Código de barras (principal)">
+                      {articulo.codigo_barras
+                        ? <Tag color="blue">{articulo.codigo_barras}</Tag>
+                        : <Text type="secondary">—</Text>}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Referencia / SKU">
-                      {articulo.referencia || <Text type="secondary">—</Text>}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Código secundario">
-                      {articulo.codigo_secundario || <Text type="secondary">—</Text>}
+                    <Descriptions.Item label="Código corto QR">
+                      {articulo.codigo_secundario
+                        ? <Tag color="geekblue">{articulo.codigo_secundario}</Tag>
+                        : <Text type="secondary">—</Text>}
                     </Descriptions.Item>
                     <Descriptions.Item label="Categoría">
                       {articulo.categoria ? <Tag color="purple">{articulo.categoria}</Tag> : <Text type="secondary">—</Text>}

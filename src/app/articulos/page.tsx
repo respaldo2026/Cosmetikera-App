@@ -588,15 +588,7 @@ export default function ArticulosPage() {
     }
     return map;
   }, [articulos, editing?.id]);
-  const referenciaIndex = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const a of articulos) {
-      const ref = normalizeText(a.referencia);
-      if (!ref || a.id === editing?.id) continue;
-      map.set(ref, a.nombre);
-    }
-    return map;
-  }, [articulos, editing?.id]);
+
   const catalogosDisponibles = useMemo(
     () => mergeCatalogos(
       {
@@ -824,7 +816,6 @@ export default function ArticulosPage() {
       stock_minimo: art.stock_minimo,
       imagen_url: art.imagen_url,
       activo: true,
-      referencia: undefined, // se omite el código intencionalmente
       codigo_secundario: undefined,
     });
     setModalOpen(true);
@@ -1531,7 +1522,8 @@ export default function ArticulosPage() {
                       <Text strong style={{ fontSize: 13, color: "#1677ff", display: "block" }}>{a.nombre}</Text>
                       <Space size={4} wrap style={{ marginTop: 4 }}>
                         {a.marca && <Text type="secondary" style={{ fontSize: 11 }}>{a.marca}</Text>}
-                        {a.referencia && <Tag color="blue" style={{ fontSize: 10 }}>{a.referencia}</Tag>}
+                        {a.codigo_barras && <Tag color="blue" style={{ fontSize: 10 }}>{a.codigo_barras}</Tag>}
+                        {a.codigo_secundario && <Tag color="geekblue" style={{ fontSize: 10 }}>QR: {a.codigo_secundario}</Tag>}
                         {a.categoria && <Tag color="purple" style={{ fontSize: 10 }}>{a.categoria}</Tag>}
                         {getStockTag(a)}
                       </Space>
@@ -1578,9 +1570,9 @@ export default function ArticulosPage() {
                 title: "Código", key: "ref", width: 130,
                 render: (_: unknown, a: Articulo) => (
                   <Space direction="vertical" size={2}>
-                    {a.referencia && <Tag color="blue" style={{ fontSize: 10 }}>{a.referencia}</Tag>}
-                    {a.codigo_secundario && <Tag color="geekblue" style={{ fontSize: 10 }}>{a.codigo_secundario}</Tag>}
-                    {!a.referencia && !a.codigo_secundario && <Text type="secondary">—</Text>}
+                    {a.codigo_barras && <Tag color="blue" style={{ fontSize: 10 }}>{a.codigo_barras}</Tag>}
+                    {a.codigo_secundario && <Tag color="geekblue" style={{ fontSize: 10 }}>QR: {a.codigo_secundario}</Tag>}
+                    {!a.codigo_barras && !a.codigo_secundario && <Text type="secondary">—</Text>}
                   </Space>
                 ),
               },
@@ -1981,40 +1973,20 @@ export default function ArticulosPage() {
             />
           </Form.Item>
 
-          {/* 2. Referencia interna */}
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="referencia"
-                label="Referencia / código interno"
-                validateTrigger={["onBlur"]}
-                rules={[{
-                  validator: async (_, value) => {
-                    if (!value) return;
-                    const existeNombre = referenciaIndex.get(normalizeText(value));
-                    if (existeNombre) return Promise.reject(`Referencia ya usada: "${existeNombre}"`);
-                  },
-                }]}
-              >
-                <Input placeholder="COD-001" prefix={<BarcodeOutlined />} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="codigo_secundario"
-                label="Código secundario (auto)"
-                tooltip="Se genera automáticamente con los últimos 6 dígitos del código de barras. Es el código que se usa en el QR de la etiqueta."
-              >
-                <Input
-                  readOnly
-                  disabled
-                  prefix={<BarcodeOutlined />}
-                  placeholder="Se genera del código de barras"
-                  style={{ background: "#f5f5f5", cursor: "default" }}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          {/* Código secundario auto-generado */}
+          <Form.Item
+            name="codigo_secundario"
+            label="Código corto (auto — últimos 6 dígitos)"
+            tooltip="Se genera automáticamente con los últimos 6 dígitos del código de barras. Es el código que se usa en el QR de la etiqueta."
+          >
+            <Input
+              readOnly
+              disabled
+              prefix={<BarcodeOutlined />}
+              placeholder="Se genera del código de barras"
+              style={{ background: "#f5f5f5", cursor: "default" }}
+            />
+          </Form.Item>
 
           {/* 3. Nombre + precio venta (esenciales) */}
           <Form.Item name="nombre" label="Nombre del artículo" rules={[{ required: true, message: "Requerido" }]}>
