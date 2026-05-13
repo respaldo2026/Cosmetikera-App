@@ -321,37 +321,46 @@ export default function ArticulosPage() {
   const cargar = useCallback(async () => {
     setLoading(true);
     const pageSize = 1000;
-    let from = 0;
-    let allRows: Articulo[] = [];
-    let keepFetching = true;
-
-    while (keepFetching) {
-      const { data, error } = await supabaseBrowserClient
-        .from("articulos")
-        .select("*")
-        .order("nombre")
-        .range(from, from + pageSize - 1);
-
-      if (error) {
-        // Tabla puede no existir aún
-        setArticulos([]);
-        setLoading(false);
-        return;
-      }
-
-      const batch = (data || []) as Articulo[];
-      allRows = allRows.concat(batch);
-      keepFetching = batch.length === pageSize;
-      from += pageSize;
-    }
-
-    setArticulos(allRows.map((a) => ({
+    const norm = (a: Articulo): Articulo => ({
       ...a,
       categoria: normalizeTagField(a.categoria),
       marca: normalizeTagField(a.marca),
       proveedor: normalizeTagField(a.proveedor),
-    })));
+    });
+
+    // Obtener primera página + total en una sola petición
+    const { data: firstBatch, error, count } = await supabaseBrowserClient
+      .from("articulos")
+      .select("*", { count: "exact" })
+      .order("nombre")
+      .range(0, pageSize - 1);
+
+    if (error) {
+      setArticulos([]);
+      setLoading(false);
+      return;
+    }
+
+    // Mostrar datos inmediatamente sin esperar páginas restantes
+    setArticulos((firstBatch || []).map(norm) as Articulo[]);
     setLoading(false);
+
+    // Cargar páginas adicionales en paralelo (si hay más de 1000 artículos)
+    if (count && count > pageSize) {
+      const remainingPages = Math.ceil((count - pageSize) / pageSize);
+      const requests = Array.from({ length: remainingPages }, (_, i) =>
+        supabaseBrowserClient
+          .from("articulos")
+          .select("*")
+          .order("nombre")
+          .range((i + 1) * pageSize, (i + 2) * pageSize - 1)
+      );
+      const results = await Promise.all(requests);
+      const extra = results.flatMap((r) => (r.data || []).map(norm)) as Articulo[];
+      if (extra.length > 0) {
+        setArticulos((prev) => [...prev, ...extra]);
+      }
+    }
   }, []);
 
   const cargarCatalogosCompartidos = useCallback(async () => {
@@ -661,11 +670,25 @@ export default function ArticulosPage() {
       if (!res.ok && res.status !== 207) throw new Error(json.error || "Error de servidor");
       if (json.errores > 0) message.warning(`${json.errores} artículo(s) no se pudieron actualizar`);
       else message.success(`✅ ${articulosAjuste.length} artículo(s) actualizados`);
+      // Actualizar precios en estado local sin re-fetch
+      const preciosMap = new Map(
+        articulosAjuste.map((a) => [a.id, { nuevo_precio_venta: a.nuevo_precio_venta, nuevo_precio_costo: a.nuevo_precio_costo }])
+      );
+      setArticulos((prev) =>
+        prev.map((a) => {
+          const upd = preciosMap.get(a.id);
+          if (!upd) return a;
+          return {
+            ...a,
+            ...(ajusteCampo !== "precio_costo" ? { precio_venta: upd.nuevo_precio_venta } : {}),
+            ...(ajusteCampo !== "precio_venta" ? { precio_costo: upd.nuevo_precio_costo } : {}),
+          };
+        })
+      );
       setAjusteOpen(false);
       setAjusteValor(0);
       setAjusteFiltroCategoria([]);
       setAjusteFiltrMarca([]);
-      cargar();
     } catch (e: unknown) {
       message.error((e as Error)?.message || "Error al aplicar ajuste masivo");
     } finally {
@@ -760,7 +783,6 @@ export default function ArticulosPage() {
 
   const openModal = (art?: Articulo) => {
     setEditing(art || null);
-    void cargarCatalogosCompartidos();
     form.setFieldsValue(art ? {
       ...art,
       categoria: art.categoria ? [art.categoria] : undefined,
@@ -838,6 +860,12 @@ export default function ArticulosPage() {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Error al actualizar");
+        // Actualizar estado local sin re-fetch
+        setArticulos((prev) =>
+          prev.map((a) =>
+            a.id === editing.id ? { ...a, ...(datosNormalizados as Partial<Articulo>) } : a
+          )
+        );
         message.success("Artículo actualizado");
       } else {
         const res = await fetch("/api/articulos", {
@@ -847,10 +875,22 @@ export default function ArticulosPage() {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Error al crear");
+        // Agregar al estado local sin re-fetch
+        const created = (json.data as Articulo[] | undefined)?.[0];
+        if (created) {
+          setArticulos((prev) => [
+            {
+              ...created,
+              categoria: normalizeTagField(created.categoria),
+              marca: normalizeTagField(created.marca),
+              proveedor: normalizeTagField(created.proveedor),
+            },
+            ...prev,
+          ]);
+        }
         message.success("Artículo creado");
       }
       setModalOpen(false);
-      cargar();
     } catch (e: unknown) {
       message.error((e as Error)?.message || "Error al guardar");
     } finally {
@@ -869,8 +909,8 @@ export default function ArticulosPage() {
         const res = await fetch(`/api/articulos?id=${art.id}`, { method: "DELETE" });
         const json = await res.json();
         if (!res.ok) { message.error(json.error || "Error al eliminar"); return; }
+        setArticulos((prev) => prev.filter((a) => a.id !== art.id));
         message.success("Eliminado");
-        cargar();
       },
     });
   };
@@ -901,8 +941,12 @@ export default function ArticulosPage() {
         if (okCount > 0) message.success(`${okCount} artículo(s) eliminado(s)`);
         if (failCount > 0) message.warning(`${failCount} artículo(s) no se pudieron eliminar`);
 
+        // Quitar del estado local los que se eliminaron con éxito
+        const eliminadosIds = new Set(
+          selectedIds.filter((_, i) => results[i]).map(String)
+        );
+        setArticulos((prev) => prev.filter((a) => !eliminadosIds.has(a.id)));
         setSelectedIds([]);
-        cargar();
       },
     });
   };
@@ -948,9 +992,17 @@ export default function ArticulosPage() {
       if (okCount > 0) message.success(`${okCount} artículo(s) actualizado(s)`);
       if (failCount > 0) message.warning(`${failCount} artículo(s) no se pudieron actualizar`);
 
+      // Actualizar estado local de los que tuvieron éxito
+      const actualizadosIds = new Set(
+        selectedIds.filter((_, i) => results[i]).map(String)
+      );
+      setArticulos((prev) =>
+        prev.map((a) =>
+          actualizadosIds.has(a.id) ? { ...a, ...(payload as Partial<Articulo>) } : a
+        )
+      );
       setBulkEditOpen(false);
       bulkForm.resetFields();
-      cargar();
     } catch {
       message.error("Error al aplicar cambios masivos");
     } finally {

@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await supabase.from("articulos").insert(rows).select("id,nombre");
+    const { data, error } = await supabase.from("articulos").insert(rows).select("*");
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
     return NextResponse.json({ data }, { status: 201 });
