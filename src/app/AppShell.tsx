@@ -311,50 +311,21 @@ const CustomSider: React.FC<CustomSiderProps> = ({
           const labelNode = disabled || !route ? (
             <span>{labelText}</span>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 2 }}>
-              <Link
-                to={route ?? ""}
-                style={{
-                  flex: 1,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {labelText}
-              </Link>
-              {!siderCollapsed && (
-                <Tooltip title="Abrir en nueva ventana" placement="right">
-                  <span
-                    role="button"
-                    aria-label={`Abrir ${labelText} en nueva ventana`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      window.open(route, "_blank", "noopener,noreferrer");
-                    }}
-                    style={{
-                      color: token.colorTextTertiary,
-                      fontSize: 11,
-                      padding: "2px 3px",
-                      borderRadius: 4,
-                      cursor: "pointer",
-                      flexShrink: 0,
-                      lineHeight: 1,
-                      transition: "color 0.15s",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLSpanElement).style.color = token.colorPrimary;
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLSpanElement).style.color = token.colorTextTertiary;
-                    }}
-                  >
-                    <ExportOutlined />
-                  </span>
-                </Tooltip>
-              )}
-            </div>
+            <a
+              href={route}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "block",
+                width: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {labelText}
+            </a>
           );
 
           return {
@@ -366,7 +337,7 @@ const CustomSider: React.FC<CustomSiderProps> = ({
         })
         .filter(Boolean) as MenuProps["items"];
     },
-    [Link, activeItemDisabled, selectedKey, siderCollapsed, token],
+    [activeItemDisabled, selectedKey],
   );
 
   const menuStructure = useMemo(() => {
