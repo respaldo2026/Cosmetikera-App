@@ -150,8 +150,9 @@ export default function ConfiguracionImprsoraEtiquetas({
       const lista = await obtenerImpresorasDisponibles();
       setImpresorasDisponibles(lista);
       if (lista.length === 1) {
-        setPosLabelPrinterName(lista[0]);
-        messageApi.success(`Impresora detectada y seleccionada: ${lista[0]}`);
+        const nombreImpresora = lista[0]!;
+        setPosLabelPrinterName(nombreImpresora);
+        messageApi.success(`Impresora detectada y seleccionada: ${nombreImpresora}`);
       } else if (lista.length > 1) {
         messageApi.info(`Se detectaron ${lista.length} impresoras. Selecciona la de etiquetas.`);
       } else {
