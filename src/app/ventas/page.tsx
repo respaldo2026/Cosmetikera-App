@@ -899,60 +899,16 @@ export default function VentasPage() {
 
   const panelProductos = (
     <div>
-      {/* Buscador de cliente */}
-      <div style={{ marginBottom: 16, padding: 12, background: "#fff9fe", borderRadius: 10, border: "2px solid #f0d6ff" }}>
-        <Row gutter={8} align="middle">
-          <Col flex="auto" style={{ minWidth: 0 }}>
-            <Select
-              showSearch
-              allowClear
-              placeholder="👤 Buscar cliente por nombre, cédula..."
-              size="large"
-              style={{ width: "100%", fontSize: 12 }}
-              value={clienteId}
-              onChange={setClienteId}
-              filterOption={false}
-              notFoundContent={null}
-              onSearch={(input) => {
-                const q = input.trim();
-                if (q.length < 3) {
-                  setClientesFiltrados([]);
-                  return;
-                }
-                const ql = q.toLowerCase();
-                const qd = q.replace(/\D/g, "");
-                const matches = clientesBusqueda
-                  .filter((c) =>
-                    c.searchText.includes(ql) ||
-                    (qd && c.telefonoDigits.includes(qd))
-                  )
-                  .map(({ searchText, telefonoDigits, ...cliente }) => cliente)
-                  .slice(0, 5);
-                setClientesFiltrados(matches);
-              }}
-              options={opcionesClientesRapidos}
-            />
-          </Col>
-          <Col>
-            <Button
-              type="primary"
-              size="large"
-              icon={<PlusOutlined />}
-              onClick={() => setNuevoClienteOpen(true)}
-              style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)", border: "none" }}
-            >
-              Nuevo
-            </Button>
-          </Col>
-        </Row>
-        {clienteSeleccionado && (
-          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
-            <Text strong style={{ fontSize: 11, color: "#7a1b6f" }}>{clienteSeleccionado.nombre_completo}</Text>
-            {clienteSeleccionado.puntos_fidelidad !== undefined && (
-              <Text type="secondary" style={{ fontSize: 10 }}>🎁 {clienteSeleccionado.puntos_fidelidad} pts</Text>
-            )}
-          </div>
-        )}
+      {/* Barra única: escáner + búsqueda manual - GRANDE Y VISIBLE */}
+      <div style={{ marginBottom: 20, padding: 12, background: "#fff9fe", borderRadius: 10, border: "2px solid #f0d6ff" }}>
+        <EscanerCodigo
+          onCodigo={buscarPorCodigo}
+          value={search}
+          onChange={setSearch}
+          placeholder="🔍 Escanear o buscar por nombre, marca, referencia o código..."
+          conCamara
+          size="large"
+        />
       </div>
 
       {/* Resultados solo cuando hay 3+ caracteres */}
@@ -1395,14 +1351,60 @@ export default function VentasPage() {
             </Space>
           </Col>
           <Col flex="auto" style={{ minWidth: 0 }}>
-            <EscanerCodigo
-              onCodigo={buscarPorCodigo}
-              value={search}
-              onChange={setSearch}
-              placeholder="🔍 Escanear o buscar por nombre, marca, referencia o código..."
-              conCamara
-              size="large"
-            />
+            <Row gutter={8} align="middle">
+              <Col flex="auto" style={{ minWidth: 0 }}>
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder="👤 Buscar cliente por nombre, cédula..."
+                  size="large"
+                  style={{ width: "100%", fontSize: 12 }}
+                  value={clienteId}
+                  onChange={setClienteId}
+                  filterOption={false}
+                  notFoundContent={null}
+                  onSearch={(input) => {
+                    const q = input.trim();
+                    if (q.length < 3) {
+                      setClientesFiltrados([]);
+                      return;
+                    }
+                    const ql = q.toLowerCase();
+                    const qd = q.replace(/\D/g, "");
+                    const matches = clientesBusqueda
+                      .filter((c) =>
+                        c.searchText.includes(ql) ||
+                        (qd && c.telefonoDigits.includes(qd))
+                      )
+                      .map(({ searchText, telefonoDigits, ...cliente }) => cliente)
+                      .slice(0, 5);
+                    setClientesFiltrados(matches);
+                  }}
+                  options={opcionesClientesRapidos}
+                />
+              </Col>
+              <Col flex="100px">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<PlusOutlined />}
+                  onClick={() => setNuevoClienteOpen(true)}
+                  style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)", border: "none" }}
+                >
+                  Nuevo
+                </Button>
+              </Col>
+            </Row>
+          </Col>
+          <Col flex="100px">
+            {clienteSeleccionado && (
+              <div style={{ textAlign: "right" }}>
+                <Text strong style={{ fontSize: 11, display: "block", color: "#7a1b6f" }}>{clienteSeleccionado.nombre_completo.split(" ")[0]}</Text>
+                {clienteSeleccionado.puntos_fidelidad !== undefined && (
+                  <Text type="secondary" style={{ fontSize: 10 }}>🎁 {clienteSeleccionado.puntos_fidelidad} pts</Text>
+                )}
+              </div>
+            )}
           </Col>
           <Col>
             <Button size="small" icon={<ReloadOutlined />} onClick={cargar} loading={loading} />
