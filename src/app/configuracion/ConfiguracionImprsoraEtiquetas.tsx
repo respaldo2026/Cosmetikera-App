@@ -113,7 +113,7 @@ export default function ConfiguracionImprsoraEtiquetas({
         try {
           const { listLabelPrinters: lp } = await import("@/utils/label-agent");
           const printers = await lp();
-          const names = printers.map((p) => p.name).filter(Boolean);
+          const names = printers.map((p) => p.name).filter((n): n is string => Boolean(n));
           setImpresorasDisponibles(names);
           if (names.length === 1) {
             // Solo una → selección automática
