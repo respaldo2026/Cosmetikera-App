@@ -117,8 +117,9 @@ export default function ConfiguracionImprsoraEtiquetas({
           setImpresorasDisponibles(names);
           if (names.length === 1) {
             // Solo una → selección automática
-            setPosLabelPrinterName(names[0]);
-            messageApi.success(`Impresora detectada y seleccionada: ${names[0]}`);
+            const nombreImpresora = names[0]!;
+            setPosLabelPrinterName(nombreImpresora);
+            messageApi.success(`Impresora detectada y seleccionada: ${nombreImpresora}`);
           } else if (names.length > 1) {
             messageApi.info(`Se detectaron ${names.length} impresoras. Selecciona la de etiquetas.`);
           }
