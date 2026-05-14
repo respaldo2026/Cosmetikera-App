@@ -52,6 +52,7 @@ export default function ConfiguracionImprsoraEtiquetas({
   const [posLabelPrinterName, setPosLabelPrinterName] = useState<string>("");
   const [labelTemplateConfig, setLabelTemplateConfig] = useState<LabelTemplateConfig>(DEFAULT_LABEL_TEMPLATE);
   const labelTemplateReadyRef = useRef(false);
+  const printerReadyRef = useRef(false); // true una vez que la carga inicial termina
   const [testEtiquetas, setTestEtiquetas] = useState(false);
   const [savingEtiquetas, setSavingEtiquetas] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -61,6 +62,19 @@ export default function ConfiguracionImprsoraEtiquetas({
     cargarConfigEtiquetas();
   }, []);
 
+  // Auto-guardar impresora en localStorage cuando el usuario la cambia (después de la carga inicial)
+  useEffect(() => {
+    if (!printerReadyRef.current) return;
+    const normalized = String(posLabelPrinterName || "").trim();
+    if (typeof window !== "undefined") {
+      if (normalized) {
+        window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, normalized);
+      } else {
+        window.localStorage.removeItem(LABEL_PRINTER_STORAGE_KEY);
+      }
+    }
+  }, [posLabelPrinterName]);
+
   // Guardar template config cuando cambia
   useEffect(() => {
     if (!labelTemplateReadyRef.current) return;
@@ -69,26 +83,56 @@ export default function ConfiguracionImprsoraEtiquetas({
 
   const cargarConfigEtiquetas = useCallback(async () => {
     try {
+      let storedPrinter = "";
       if (typeof window !== "undefined") {
-        const storedLabelPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
-        setPosLabelPrinterName(storedLabelPrinter);
+        storedPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
+        setPosLabelPrinterName(storedPrinter);
         setLabelTemplateConfig(getLabelTemplateConfig());
         labelTemplateReadyRef.current = true;
       }
 
-      // También intentar desde Supabase como fallback
-      const { data } = await supabaseBrowserClient
-        .from("configuracion")
-        .select("pos_printer_name")
-        .limit(1)
-        .maybeSingle();
-      if (data && !posLabelPrinterName) {
-        setPosLabelPrinterName(data.pos_printer_name ?? "");
+      // Fallback: intentar desde Supabase si no hay en localStorage
+      if (!storedPrinter) {
+        const { data } = await supabaseBrowserClient
+          .from("configuracion")
+          .select("pos_printer_name")
+          .limit(1)
+          .maybeSingle();
+        if (data?.pos_printer_name) {
+          setPosLabelPrinterName(data.pos_printer_name);
+          storedPrinter = data.pos_printer_name;
+        }
+      }
+
+      // Marcar carga inicial completa ANTES de posible auto-detección
+      printerReadyRef.current = true;
+
+      // Auto-detectar si no hay impresora configurada
+      if (!storedPrinter && usaAgenteLocal) {
+        setBuscandoImpresoras(true);
+        try {
+          const { listLabelPrinters: lp } = await import("@/utils/label-agent");
+          const printers = await lp();
+          const names = printers.map((p) => p.name).filter(Boolean);
+          setImpresorasDisponibles(names);
+          if (names.length === 1) {
+            // Solo una → selección automática
+            setPosLabelPrinterName(names[0]);
+            messageApi.success(`Impresora detectada y seleccionada: ${names[0]}`);
+          } else if (names.length > 1) {
+            messageApi.info(`Se detectaron ${names.length} impresoras. Selecciona la de etiquetas.`);
+          }
+        } catch {
+          // sin agente disponible, no pasa nada
+        } finally {
+          setBuscandoImpresoras(false);
+        }
       }
     } catch (error) {
       console.error("Error cargando config etiquetas:", error);
+      printerReadyRef.current = true;
     }
-  }, [posLabelPrinterName]);
+  }, [messageApi]);
 
   const obtenerImpresorasDisponibles = useCallback(async (): Promise<string[]> => {
     try {
@@ -104,6 +148,14 @@ export default function ConfiguracionImprsoraEtiquetas({
     try {
       const lista = await obtenerImpresorasDisponibles();
       setImpresorasDisponibles(lista);
+      if (lista.length === 1) {
+        setPosLabelPrinterName(lista[0]);
+        messageApi.success(`Impresora detectada y seleccionada: ${lista[0]}`);
+      } else if (lista.length > 1) {
+        messageApi.info(`Se detectaron ${lista.length} impresoras. Selecciona la de etiquetas.`);
+      } else {
+        messageApi.warning("No se detectaron impresoras. Escríbela manualmente.");
+      }
     } finally {
       setBuscandoImpresoras(false);
     }
@@ -581,6 +633,43 @@ export default function ConfiguracionImprsoraEtiquetas({
       <Row gutter={[16, 16]}>
         {usaAgenteLocal && (
           <Col xs={24}>
+            {/* Banner de configuración pendiente */}
+            {!posLabelPrinterName && !buscandoImpresoras && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="Impresora de etiquetas no configurada en este equipo"
+                description={
+                  <Space direction="vertical" size={4}>
+                    <span>Haz clic en <strong>Detectar impresoras</strong> para que la app encuentre automáticamente las impresoras instaladas en este PC.</span>
+                    <span style={{ fontSize: 12, color: "#888" }}>Esta configuración se guarda solo en este navegador/equipo, no afecta a otros puestos.</span>
+                  </Space>
+                }
+                action={
+                  <Button size="small" icon={<ReloadOutlined />} loading={buscandoImpresoras} onClick={buscarImpresoras}>
+                    Detectar ahora
+                  </Button>
+                }
+              />
+            )}
+
+            {/* Impresora activa */}
+            {posLabelPrinterName && (
+              <Alert
+                type="success"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={
+                  <Space>
+                    <span>Impresora activa en este equipo:</span>
+                    <strong>{posLabelPrinterName}</strong>
+                  </Space>
+                }
+                description="Configuración guardada automáticamente en este navegador."
+              />
+            )}
+
             <Space style={{ marginBottom: 16 }} wrap>
               <Button
                 icon={<ReloadOutlined />}
@@ -594,7 +683,8 @@ export default function ConfiguracionImprsoraEtiquetas({
                 icon={<TagsOutlined />}
                 loading={testEtiquetas}
                 onClick={() => testImprimirEtiqueta(3)}
-                style={{ background: "#d81b87", borderColor: "#d81b87" }}
+                disabled={!posLabelPrinterName}
+                style={posLabelPrinterName ? { background: "#d81b87", borderColor: "#d81b87" } : undefined}
               >
                 Probar etiquetas x3
               </Button>
@@ -617,10 +707,17 @@ export default function ConfiguracionImprsoraEtiquetas({
                 onChange={(e) => setPosLabelPrinterName(e.target.value)}
                 placeholder="Ej: 4BARCODE 4B-2054TG"
                 prefix={<TagsOutlined />}
+                onBlur={(e) => {
+                  // Guardar al salir del campo de texto también
+                  const val = e.target.value.trim();
+                  if (val && typeof window !== "undefined") {
+                    window.localStorage.setItem(LABEL_PRINTER_STORAGE_KEY, val);
+                  }
+                }}
               />
             )}
             <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
-              Se usa en Artículos y Compras en este equipo/navegador.
+              Se guarda automáticamente en este equipo/navegador. Cada PC puede tener su propia impresora configurada.
             </div>
           </Col>
         )}
