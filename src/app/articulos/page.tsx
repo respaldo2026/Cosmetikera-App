@@ -106,7 +106,9 @@ type ImportArticuloDraft = {
 };
 
 const normalizeText = (value: unknown) =>
-  typeof value === "string" ? value.toLowerCase().trim() : "";
+  typeof value === "string"
+    ? value.toLowerCase().trim().normalize("NFD").replace(/\p{Mn}/gu, "")
+    : "";
 
 const getArticuloProveedor = (articulo: Articulo) =>
   normalizeText((articulo as Articulo & { proveedor_nombre?: string; proveedor_label?: string }).proveedor)
@@ -546,20 +548,46 @@ export default function ArticulosPage() {
 
   const articulosFiltrados = useMemo(() => {
     const normalizedSearch = normalizeText(deferredSearch);
+    const tokens = normalizedSearch ? normalizedSearch.split(/\s+/).filter(Boolean) : [];
     const normalizedProveedor = normalizeText(filtroProveedor);
     const normalizedTamano = normalizeText(filtroTamano);
     const normalizedEmpaque = normalizeText(filtroEmpaque);
 
-    return articulosIndex
-      .filter((item) => {
-        const a = item.articulo;
-        const matchSearch = !normalizedSearch || item.searchableText.includes(normalizedSearch);
-        const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
-        const matchMarca = filtroMarca.length === 0 || filtroMarca.includes(a.marca || "");
-        const matchProveedor = !normalizedProveedor || item.proveedorSource.includes(normalizedProveedor);
-        const matchTamano = !normalizedTamano || item.tamanoSource.includes(normalizedTamano);
-        const matchEmpaque = !normalizedEmpaque || item.empaqueSource.includes(normalizedEmpaque);
-        return matchSearch && matchCat && matchMarca && matchProveedor && matchTamano && matchEmpaque;
+    const filtered = articulosIndex.filter((item) => {
+      const a = item.articulo;
+      // Búsqueda por tokens: todos deben estar presentes (AND)
+      const matchSearch = tokens.length === 0 || tokens.every((t) => item.searchableText.includes(t));
+      const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
+      const matchMarca = filtroMarca.length === 0 || filtroMarca.includes(a.marca || "");
+      const matchProveedor = !normalizedProveedor || item.proveedorSource.includes(normalizedProveedor);
+      const matchTamano = !normalizedTamano || item.tamanoSource.includes(normalizedTamano);
+      const matchEmpaque = !normalizedEmpaque || item.empaqueSource.includes(normalizedEmpaque);
+      return matchSearch && matchCat && matchMarca && matchProveedor && matchTamano && matchEmpaque;
+    });
+
+    if (tokens.length === 0) return filtered.map((item) => item.articulo);
+
+    // Ranking: código exacto → nombre empieza con query → resto
+    const firstToken = tokens[0]!;
+    return filtered
+      .sort((a, b) => {
+        const ra = a.articulo;
+        const rb = b.articulo;
+        const exactA = (
+          normalizeText(ra.codigo_barras) === normalizedSearch ||
+          normalizeText(ra.codigo_secundario) === normalizedSearch ||
+          normalizeText(ra.referencia) === normalizedSearch
+        ) ? 0 : 1;
+        const exactB = (
+          normalizeText(rb.codigo_barras) === normalizedSearch ||
+          normalizeText(rb.codigo_secundario) === normalizedSearch ||
+          normalizeText(rb.referencia) === normalizedSearch
+        ) ? 0 : 1;
+        if (exactA !== exactB) return exactA - exactB;
+        const startA = normalizeText(ra.nombre).startsWith(firstToken) ? 0 : 1;
+        const startB = normalizeText(rb.nombre).startsWith(firstToken) ? 0 : 1;
+        if (startA !== startB) return startA - startB;
+        return normalizeText(ra.nombre).localeCompare(normalizeText(rb.nombre));
       })
       .map((item) => item.articulo);
   }, [articulosIndex, deferredSearch, filtroCategoria, filtroMarca, filtroProveedor, filtroTamano, filtroEmpaque]);
