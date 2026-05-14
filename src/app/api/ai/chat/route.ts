@@ -1798,14 +1798,15 @@ export async function POST(request: NextRequest) {
       body?.phone_number_id || body?.meta_phone_number_id || body?.to_phone_number_id || ""
     ).trim();
 
-    // Rechazar requests que pertenezcan a otro bot (distinto phone_number_id)
+    // Rechazar requests que pertenezcan a otro bot (distinto phone_number_id).
+    // Devolvemos 200 para que Make no reintente ni marque el paso como error.
     if (!isCorrectPhoneNumberId(sourcePhoneNumberId)) {
       console.warn(
-        `[ai/chat] Rechazado: phone_number_id "${sourcePhoneNumberId}" no coincide con este bot. Teléfono: ${rawTelefono}`
+        `[ai/chat] Ignorado: phone_number_id "${sourcePhoneNumberId}" no coincide con este bot (${process.env.WHATSAPP_PHONE_NUMBER_ID}). Tel: ${rawTelefono}`
       );
       return NextResponse.json(
-        { error: "phone_number_id no corresponde a este bot" },
-        { status: 403 }
+        { ignored: true, reason: "phone_number_id_mismatch" },
+        { status: 200 }
       );
     }
 
