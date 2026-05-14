@@ -1695,6 +1695,17 @@ function isAuthorized(req: NextRequest): boolean {
   return received === expected;
 }
 
+/**
+ * Verifica que el phone_number_id del request coincida con el de este bot.
+ * Si el request no incluye phone_number_id, se permite (Make antiguo sin ese campo).
+ * Si incluye uno distinto, se rechaza: es de otro bot (ej. Academia Crystal Diamante).
+ */
+function isCorrectPhoneNumberId(sourcePhoneNumberId: string): boolean {
+  const ownId = (process.env.WHATSAPP_PHONE_NUMBER_ID || "").trim();
+  if (!sourcePhoneNumberId || !ownId) return true; // sin datos suficientes → permitir
+  return sourcePhoneNumberId === ownId;
+}
+
 async function generateWithModelFallback(
   genAI: GoogleGenerativeAI,
   prompt: string,
@@ -1786,6 +1797,18 @@ export async function POST(request: NextRequest) {
     const sourcePhoneNumberId = String(
       body?.phone_number_id || body?.meta_phone_number_id || body?.to_phone_number_id || ""
     ).trim();
+
+    // Rechazar requests que pertenezcan a otro bot (distinto phone_number_id)
+    if (!isCorrectPhoneNumberId(sourcePhoneNumberId)) {
+      console.warn(
+        `[ai/chat] Rechazado: phone_number_id "${sourcePhoneNumberId}" no coincide con este bot. Teléfono: ${rawTelefono}`
+      );
+      return NextResponse.json(
+        { error: "phone_number_id no corresponde a este bot" },
+        { status: 403 }
+      );
+    }
+
     const activePhoneNumberId = sourcePhoneNumberId || String(process.env.WHATSAPP_PHONE_NUMBER_ID || "").trim();
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
