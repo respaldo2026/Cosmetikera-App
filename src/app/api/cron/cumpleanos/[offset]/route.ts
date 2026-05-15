@@ -38,7 +38,12 @@ async function triggerBirthdayReminder(
     );
   }
 
-  const endpoint = new URL("/api/whatsapp/send-birthday-reminder", request.url);
+  // Usar VERCEL_URL (variable automática de Vercel) para evitar dependencia del
+  // dominio personalizado, que puede estar caído o en proceso de propagación DNS.
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : new URL(request.url).origin;
+  const endpoint = new URL("/api/whatsapp/send-birthday-reminder", baseUrl);
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
