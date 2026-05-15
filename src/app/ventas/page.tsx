@@ -467,12 +467,19 @@ export default function VentasPage() {
 
   const articulosFiltrados = useMemo(() =>
     articulos.filter((a) => {
-      const query = deferredSearch.toLowerCase();
-      const matchSearch = !query ||
-        a.nombre.toLowerCase().includes(query) ||
-        (a.marca || "").toLowerCase().includes(query) ||
-        (a.referencia || "").toLowerCase().includes(query) ||
-        (a.codigo_barras || "").toLowerCase().includes(query);
+      // Dividir en tokens para búsqueda por palabras independiente del orden
+      const tokens = deferredSearch.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      const hayBusqueda = tokens.length > 0;
+      const campos = [
+        a.nombre,
+        a.marca,
+        a.referencia,
+        a.codigo_barras,
+        a.codigo_secundario,
+        a.categoria,
+      ].map((v) => (v || "").toLowerCase());
+      const matchSearch = !hayBusqueda ||
+        tokens.every((token) => campos.some((campo) => campo.includes(token)));
       const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
       return matchSearch && matchCat;
     }),
