@@ -10,7 +10,15 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS } from "@utils/pos-hardware";
 import { DEFAULT_LABEL_TEMPLATE, type LabelTemplateConfig } from "@/utils/label-agent";
-import { DEFAULT_TICKET_FIELDS, crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
+import {
+  DEFAULT_TICKET_FIELDS,
+  DEFAULT_TICKET_PROMO_CONFIG,
+  crearTemplateTicketPOS,
+  crearTicketPruebaPOS,
+  invalidarConfigTicketPOS,
+  normalizarTicketPromoConfig,
+  type TicketPromoConfig,
+} from "@utils/pos-ticket-template";
 import { getCatalogosArticulosLocal, mergeCatalogos, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
 import { MODULES, type ModuleDefinition } from "@/constants/modules";
 import { ROLES } from "@/constants/roles";
@@ -46,12 +54,19 @@ const extractCatalogosFromConfig = (raw: unknown): CatalogosArticulos => {
   return mergeCatalogos(catalogos as Partial<CatalogosArticulos>);
 };
 
+const extractTicketPromoFromConfig = (raw: unknown): TicketPromoConfig => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return normalizarTicketPromoConfig(source.promo_config);
+};
+
 const buildTicketCamposPayload = (
   ticketFields: typeof DEFAULT_TICKET_FIELDS,
   catalogosArticulos: CatalogosArticulos,
+  ticketPromoConfig: TicketPromoConfig,
 ) => ({
   ...ticketFields,
   catalogos_articulos: mergeCatalogos(catalogosArticulos),
+  promo_config: normalizarTicketPromoConfig(ticketPromoConfig),
 });
 
 // Interfaces
@@ -116,6 +131,7 @@ export default function ConfiguracionPage() {
   const [nuevoFabricante, setNuevoFabricante] = useState("");
 
   const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
+  const [ticketPromoConfig, setTicketPromoConfig] = useState<TicketPromoConfig>(DEFAULT_TICKET_PROMO_CONFIG);
 
   const previewNombreAcademia = Form.useWatch("nombre_academia", formAcademia) as string | undefined;
   const previewRuc = Form.useWatch("ruc", formAcademia) as string | undefined;
@@ -358,7 +374,7 @@ export default function ConfiguracionPage() {
         throw configError;
       }
 
-      const payloadTicketCampos = buildTicketCamposPayload(ticketFields, nextCatalogos);
+      const payloadTicketCampos = buildTicketCamposPayload(ticketFields, nextCatalogos, ticketPromoConfig);
 
       if (configRow?.id) {
         const { error: updateError } = await supabaseBrowserClient
@@ -380,7 +396,7 @@ export default function ConfiguracionPage() {
       console.error("Error guardando catálogos en Supabase:", error);
       messageApi.error("No se pudieron sincronizar los catálogos en Supabase");
     }
-  }, [messageApi, ticketFields]);
+  }, [messageApi, ticketFields, ticketPromoConfig]);
 
   // ==================== FUNCIONES POS / IMPRESORA ====================
   const conectarQZ = async () => {
@@ -416,8 +432,10 @@ export default function ConfiguracionPage() {
 
   const renderTicketDesigner = () => {
     const defaultPosPrinterWidth = 48; // 80mm default para ticket
-    const ticketTemplate = crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields);
+    const ticketTemplate = crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields, ticketPromoConfig);
     const ticketPreview = crearTicketPruebaPOS(ticketTemplate);
+    const promoFontSize = ticketPromoConfig.fontSize === "lg" ? 14 : ticketPromoConfig.fontSize === "sm" ? 11 : 12;
+    const promoTextAlign: "left" | "center" = ticketPromoConfig.align === "left" ? "left" : "center";
 
     return (
       <>
@@ -442,6 +460,46 @@ export default function ConfiguracionPage() {
           <Col span={24}>
             <Form.Item label="Mensaje adicional" name="ticket_nota">
               <TextArea rows={3} placeholder="Indicaciones, campaña o mensaje comercial para el ticket" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item label="Tamaño publicidad">
+              <Radio.Group
+                value={ticketPromoConfig.fontSize}
+                onChange={(e) => setTicketPromoConfig((prev) => ({ ...prev, fontSize: e.target.value }))}
+              >
+                <Radio.Button value="sm">Pequeña</Radio.Button>
+                <Radio.Button value="md">Normal</Radio.Button>
+                <Radio.Button value="lg">Grande</Radio.Button>
+              </Radio.Group>
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item label="Alineación publicidad">
+              <Select
+                value={ticketPromoConfig.align}
+                onChange={(value: TicketPromoConfig["align"]) => setTicketPromoConfig((prev) => ({ ...prev, align: value }))}
+                options={[
+                  { label: "Centrada", value: "center" },
+                  { label: "Izquierda", value: "left" },
+                ]}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item label="Estilo publicidad">
+              <Space>
+                <Switch
+                  checked={ticketPromoConfig.bold}
+                  onChange={(checked) => setTicketPromoConfig((prev) => ({ ...prev, bold: checked }))}
+                />
+                <span>Negrita</span>
+                <Switch
+                  checked={ticketPromoConfig.boxed}
+                  onChange={(checked) => setTicketPromoConfig((prev) => ({ ...prev, boxed: checked }))}
+                />
+                <span>Recuadro</span>
+              </Space>
             </Form.Item>
           </Col>
         </Row>
@@ -554,7 +612,25 @@ export default function ConfiguracionPage() {
                       </div>
                     ) : null}
                     {ticketPreview.mensaje ? <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>{ticketPreview.mensaje}</div> : null}
-                    {ticketPreview.nota ? <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>{ticketPreview.nota}</div> : null}
+                    {ticketPreview.nota ? (
+                      <div
+                        style={{
+                          fontSize: promoFontSize,
+                          color: "#374151",
+                          marginTop: 8,
+                          textAlign: promoTextAlign,
+                          fontWeight: ticketPromoConfig.bold ? 700 : 500,
+                          background: ticketPromoConfig.boxed ? "#fff8e1" : "transparent",
+                          border: ticketPromoConfig.boxed ? "1px dashed #f5a623" : "none",
+                          borderRadius: ticketPromoConfig.boxed ? 4 : 0,
+                          padding: ticketPromoConfig.boxed ? "6px 8px" : 0,
+                          lineHeight: 1.35,
+                          whiteSpace: "pre-line",
+                        }}
+                      >
+                        {ticketPreview.nota}
+                      </div>
+                    ) : null}
                     {ticketPreview.pie ? <div style={{ fontSize: 12, color: "#6b7280", marginTop: 10 }}>{ticketPreview.pie}</div> : null}
                     {ticketPreview.puntosAcumulados !== undefined ? (
                       <div style={{ marginTop: 10, background: "#fff8e1", border: "1px dashed #f5a623", borderRadius: 4, padding: "6px 8px", textAlign: "center", fontSize: 11 }}>
@@ -602,6 +678,7 @@ export default function ConfiguracionPage() {
         if (data.ticket_campos && typeof data.ticket_campos === "object") {
           const ticketCamposRaw = data.ticket_campos;
           setTicketFields(extractTicketFieldsFromConfig(ticketCamposRaw));
+          setTicketPromoConfig(extractTicketPromoFromConfig(ticketCamposRaw));
 
           const catalogosSupabase = extractCatalogosFromConfig(ticketCamposRaw);
           const localCatalogos = getCatalogosArticulosLocal();
@@ -731,7 +808,7 @@ export default function ConfiguracionPage() {
 
       const datosNormalizados = normalizarDatosFormulario({
         ...valuesSinId,
-        ticket_campos: buildTicketCamposPayload(ticketFields, catalogosArticulos),
+        ticket_campos: buildTicketCamposPayload(ticketFields, catalogosArticulos, ticketPromoConfig),
       });
       const { error } = await supabaseBrowserClient
         .from("configuracion")
@@ -1612,6 +1689,7 @@ export default function ConfiguracionPage() {
         <ConfiguracionImpresoraPOS
           formAcademia={formAcademia}
           ticketFields={ticketFields}
+          ticketPromoConfig={ticketPromoConfig}
         />
       </div>
       <div style={{ marginTop: 20 }}>

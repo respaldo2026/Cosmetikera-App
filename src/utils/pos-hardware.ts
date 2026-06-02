@@ -268,6 +268,23 @@ export type LineaTicket =
   | { tipo: "texto"; texto: string }
   | { tipo: "espacio" };
 
+export type PromoFontSize = "sm" | "md" | "lg";
+export type PromoAlign = "left" | "center";
+
+export interface PromoTextConfig {
+  fontSize: PromoFontSize;
+  align: PromoAlign;
+  bold: boolean;
+  boxed: boolean;
+}
+
+export const DEFAULT_PROMO_TEXT_CONFIG: PromoTextConfig = {
+  fontSize: "md",
+  align: "center",
+  bold: false,
+  boxed: false,
+};
+
 export type DatosTicket = {
   nombreTienda: string;
   nit?: string;
@@ -285,6 +302,7 @@ export type DatosTicket = {
   nivelFidelidad?: string;      // nivel actual del cliente
   mensaje?: string;
   nota?: string;
+  promoConfig?: PromoTextConfig;
   pie?: string;
 };
 
@@ -314,6 +332,64 @@ function lineaTotalEscpos(etiqueta: string, valor: number, ancho = 32): string {
   const valStr = formatearPrecio(valor);
   const espacio = ancho - etiqueta.length - valStr.length;
   return etiqueta + " ".repeat(Math.max(1, espacio)) + valStr;
+}
+
+function envolverTextoEscpos(texto: string, ancho: number): string[] {
+  const lineasSalida: string[] = [];
+  const lineasEntrada = texto
+    .split(/\r?\n/)
+    .map((linea) => linea.trim())
+    .filter(Boolean);
+
+  for (const linea of lineasEntrada) {
+    const palabras = linea.split(/\s+/).filter(Boolean);
+    if (!palabras.length) continue;
+
+    let actual = "";
+    for (const palabra of palabras) {
+      if (palabra.length >= ancho) {
+        if (actual) {
+          lineasSalida.push(actual);
+          actual = "";
+        }
+
+        let restante = palabra;
+        while (restante.length > ancho) {
+          lineasSalida.push(restante.slice(0, ancho));
+          restante = restante.slice(ancho);
+        }
+        if (restante) actual = restante;
+        continue;
+      }
+
+      const candidate = actual ? `${actual} ${palabra}` : palabra;
+      if (candidate.length <= ancho) {
+        actual = candidate;
+      } else {
+        lineasSalida.push(actual);
+        actual = palabra;
+      }
+    }
+
+    if (actual) {
+      lineasSalida.push(actual);
+    }
+  }
+
+  return lineasSalida;
+}
+
+function normalizarPromoConfig(config?: Partial<PromoTextConfig> | null): PromoTextConfig {
+  return {
+    fontSize: config?.fontSize === "sm" || config?.fontSize === "md" || config?.fontSize === "lg"
+      ? config.fontSize
+      : DEFAULT_PROMO_TEXT_CONFIG.fontSize,
+    align: config?.align === "left" || config?.align === "center"
+      ? config.align
+      : DEFAULT_PROMO_TEXT_CONFIG.align,
+    bold: typeof config?.bold === "boolean" ? config.bold : DEFAULT_PROMO_TEXT_CONFIG.bold,
+    boxed: typeof config?.boxed === "boolean" ? config.boxed : DEFAULT_PROMO_TEXT_CONFIG.boxed,
+  };
 }
 
 function construirComandoQREscpos(url: string, moduleSize = 4): string {
@@ -440,7 +516,37 @@ function construirComandosEscpos(datos: DatosTicket, ancho = 32): string[] {
   cmds.push(sep + LF);
   cmds.push(`${ESC}a\x01`);
   if (datos.mensaje) cmds.push(datos.mensaje + LF);
-  if (datos.nota) cmds.push(datos.nota + LF);
+  if (datos.nota) {
+    const promoConfig = normalizarPromoConfig(datos.promoConfig);
+    const promoLineas = envolverTextoEscpos(datos.nota, Math.max(16, ancho - 2));
+
+    if (promoConfig.boxed) {
+      cmds.push(sep + LF);
+    }
+
+    cmds.push(`${ESC}a${promoConfig.align === "center" ? "\x01" : "\x00"}`);
+    cmds.push(`${ESC}E${promoConfig.bold ? "\x01" : "\x00"}`);
+
+    if (promoConfig.fontSize === "lg") {
+      cmds.push(`${ESC}!\x30`);
+    } else if (promoConfig.fontSize === "sm") {
+      cmds.push(`${ESC}!\x01`);
+    } else {
+      cmds.push(`${ESC}!\x00`);
+    }
+
+    for (const lineaPromo of promoLineas) {
+      cmds.push(lineaPromo + LF);
+    }
+
+    cmds.push(`${ESC}!\x00`);
+    cmds.push(`${ESC}E\x00`);
+    cmds.push(`${ESC}a\x01`);
+
+    if (promoConfig.boxed) {
+      cmds.push(sep + LF);
+    }
+  }
   const qrUrl = APP_CLUB_URL;
   if (qrUrl) {
     cmds.push("Escanea para abrir la app" + LF);
@@ -684,7 +790,16 @@ export function imprimirTicketNavegador(datos: DatosTicket): void {
   const cambioHtml = datos.cambio !== undefined && datos.cambio > 0
     ? `<p class="cambio">Cambio: <strong>${fmtPrecio(datos.cambio)}</strong></p>` : "";
 
-  const notaHtml = datos.nota ? `<p style="margin-top:8px">${esc(datos.nota)}</p>` : "";
+  const promoConfig = normalizarPromoConfig(datos.promoConfig);
+  const promoSize = promoConfig.fontSize === "lg" ? "13px" : promoConfig.fontSize === "sm" ? "10px" : "11px";
+  const promoAlign = promoConfig.align === "left" ? "left" : "center";
+  const promoWeight = promoConfig.bold ? "700" : "500";
+  const promoBg = promoConfig.boxed ? "#fff8e1" : "transparent";
+  const promoBorder = promoConfig.boxed ? "1px dashed #f5a623" : "none";
+  const promoPadding = promoConfig.boxed ? "6px 8px" : "0";
+  const notaHtml = datos.nota
+    ? `<div class="promo-note" style="margin-top:8px;text-align:${promoAlign};font-size:${promoSize};font-weight:${promoWeight};background:${promoBg};border:${promoBorder};border-radius:4px;padding:${promoPadding};line-height:1.35;">${esc(datos.nota).replace(/\n/g, "<br/>")}</div>`
+    : "";
   const qrUrl = APP_CLUB_URL;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=96x96&data=${encodeURIComponent(qrUrl)}`;
   const qrHtml = qrUrl

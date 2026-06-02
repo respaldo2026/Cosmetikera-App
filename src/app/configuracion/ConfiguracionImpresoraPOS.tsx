@@ -6,10 +6,12 @@ import { ReloadOutlined, PrinterOutlined } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
 import { crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
+import type { TicketPromoConfig } from "@utils/pos-ticket-template";
 
 interface ConfiguracionImpresoraPOSProps {
   formAcademia: any;
   ticketFields: Record<string, boolean>;
+  ticketPromoConfig?: TicketPromoConfig;
   onSaveRequest?: (data: { pos_printer_name: string; pos_printer_width: number }) => Promise<void>;
 }
 
@@ -21,6 +23,7 @@ const permiteCajon = usaQZ || usaAgenteLocal;
 export default function ConfiguracionImpresoraPOS({
   formAcademia,
   ticketFields,
+  ticketPromoConfig,
   onSaveRequest,
 }: ConfiguracionImpresoraPOSProps) {
   const [messageApi, contextHolder] = message.useMessage();
@@ -144,7 +147,7 @@ export default function ConfiguracionImpresoraPOS({
     setTestImprimiendo(true);
     try {
       const ticket = crearTicketPruebaPOS(
-        crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields)
+        crearTemplateTicketPOS(formAcademia.getFieldsValue(), ticketFields, ticketPromoConfig)
       );
       const result = await imprimirTicketTermico(
         ticket,

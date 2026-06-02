@@ -17,6 +17,23 @@ export type TicketFieldsConfig = {
   titulo: boolean;
 };
 
+export type TicketPromoFontSize = "sm" | "md" | "lg";
+export type TicketPromoAlign = "left" | "center";
+
+export interface TicketPromoConfig {
+  fontSize: TicketPromoFontSize;
+  align: TicketPromoAlign;
+  bold: boolean;
+  boxed: boolean;
+}
+
+export const DEFAULT_TICKET_PROMO_CONFIG: TicketPromoConfig = {
+  fontSize: "md",
+  align: "center",
+  bold: false,
+  boxed: false,
+};
+
 export interface PosTicketTemplateConfig {
   nombreNegocio: string;
   ruc: string;
@@ -28,6 +45,7 @@ export interface PosTicketTemplateConfig {
   ticketFooter: string;
   ticketNote: string;
   ticketFields: TicketFieldsConfig;
+  promoConfig: TicketPromoConfig;
 }
 
 type ConfiguracionTicketRow = {
@@ -41,7 +59,7 @@ type ConfiguracionTicketRow = {
   ticket_titulo?: string | null;
   ticket_pie?: string | null;
   ticket_nota?: string | null;
-  ticket_campos?: Partial<TicketFieldsConfig> | null;
+  ticket_campos?: Record<string, unknown> | null;
 };
 
 export const DEFAULT_TICKET_FIELDS: TicketFieldsConfig = {
@@ -66,8 +84,37 @@ function normalizarTexto(value: string | null | undefined, fallback = ""): strin
   return (value ?? fallback).trim();
 }
 
-function normalizarTicketFields(value?: Partial<TicketFieldsConfig> | null): TicketFieldsConfig {
-  return { ...DEFAULT_TICKET_FIELDS, ...(value ?? {}) };
+function normalizarTicketFields(value?: unknown): TicketFieldsConfig {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const next = { ...DEFAULT_TICKET_FIELDS };
+
+  for (const key of Object.keys(DEFAULT_TICKET_FIELDS) as Array<keyof TicketFieldsConfig>) {
+    if (typeof source[key] === "boolean") {
+      next[key] = source[key] as boolean;
+    }
+  }
+
+  return next;
+}
+
+export function normalizarTicketPromoConfig(value?: unknown): TicketPromoConfig {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+  const fontSize =
+    source.fontSize === "sm" || source.fontSize === "md" || source.fontSize === "lg"
+      ? source.fontSize
+      : DEFAULT_TICKET_PROMO_CONFIG.fontSize;
+
+  const align = source.align === "left" || source.align === "center"
+    ? source.align
+    : DEFAULT_TICKET_PROMO_CONFIG.align;
+
+  return {
+    fontSize,
+    align,
+    bold: typeof source.bold === "boolean" ? source.bold : DEFAULT_TICKET_PROMO_CONFIG.bold,
+    boxed: typeof source.boxed === "boolean" ? source.boxed : DEFAULT_TICKET_PROMO_CONFIG.boxed,
+  };
 }
 
 function limpiarLineas(lineas: LineaTicket[]): LineaTicket[] {
@@ -91,6 +138,8 @@ function limpiarLineas(lineas: LineaTicket[]): LineaTicket[] {
 }
 
 function construirTemplateDesdeFila(data?: ConfiguracionTicketRow | null): PosTicketTemplateConfig {
+  const ticketCampos = data?.ticket_campos;
+
   return {
     nombreNegocio: normalizarTexto(data?.nombre_academia, process.env.NEXT_PUBLIC_TIENDA_NOMBRE ?? "La Cosmetikera"),
     ruc: normalizarTexto(data?.ruc ?? data?.nit, process.env.NEXT_PUBLIC_TIENDA_NIT ?? ""),
@@ -101,7 +150,12 @@ function construirTemplateDesdeFila(data?: ConfiguracionTicketRow | null): PosTi
     ticketTitle: normalizarTexto(data?.ticket_titulo, "Detalle de venta"),
     ticketFooter: normalizarTexto(data?.ticket_pie, process.env.NEXT_PUBLIC_TIENDA_MENSAJE_TICKET ?? "Gracias por tu compra"),
     ticketNote: normalizarTexto(data?.ticket_nota, ""),
-    ticketFields: normalizarTicketFields(data?.ticket_campos),
+    ticketFields: normalizarTicketFields(ticketCampos),
+    promoConfig: normalizarTicketPromoConfig(
+      ticketCampos && typeof ticketCampos === "object"
+        ? (ticketCampos as Record<string, unknown>).promo_config
+        : undefined
+    ),
   };
 }
 
@@ -128,8 +182,26 @@ export function invalidarConfigTicketPOS(): void {
   cachedTicketTemplate = null;
 }
 
-export function crearTemplateTicketPOS(values: Partial<ConfiguracionTicketRow>, ticketFields?: Partial<TicketFieldsConfig>): PosTicketTemplateConfig {
-  return construirTemplateDesdeFila({ ...values, ticket_campos: { ...(values.ticket_campos ?? {}), ...(ticketFields ?? {}) } });
+export function crearTemplateTicketPOS(
+  values: Partial<ConfiguracionTicketRow>,
+  ticketFields?: Partial<TicketFieldsConfig>,
+  promoConfig?: Partial<TicketPromoConfig>
+): PosTicketTemplateConfig {
+  const ticketCamposBase = values.ticket_campos && typeof values.ticket_campos === "object"
+    ? values.ticket_campos
+    : {};
+
+  return construirTemplateDesdeFila({
+    ...values,
+    ticket_campos: {
+      ...ticketCamposBase,
+      ...(ticketFields ?? {}),
+      promo_config: {
+        ...(ticketCamposBase as Record<string, unknown>).promo_config as Record<string, unknown> | undefined,
+        ...(promoConfig ?? {}),
+      },
+    },
+  });
 }
 
 export function aplicarPlantillaTicketPOS(baseTicket: DatosTicket, template: PosTicketTemplateConfig): DatosTicket {
@@ -171,6 +243,7 @@ export function aplicarPlantillaTicketPOS(baseTicket: DatosTicket, template: Pos
     puntosAcumulados: template.ticketFields.puntos ? baseTicket.puntosAcumulados : undefined,
     nivelFidelidad: template.ticketFields.puntos ? baseTicket.nivelFidelidad : undefined,
     nota: template.ticketFields.nota ? template.ticketNote || undefined : undefined,
+    promoConfig: template.promoConfig,
     pie: template.ticketFields.pie ? template.ticketFooter || undefined : undefined,
     lineas,
   };
