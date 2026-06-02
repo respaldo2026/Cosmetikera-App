@@ -765,10 +765,36 @@ export default function HistorialPage() {
   }, [exactRange, periodRanges.current, periodRanges.previous, previousExactRange]);
 
   const stats = useMemo(() => {
-    const entradas = operacionesFiltradas
+    const ventasIds = new Set(
+      operacionesFiltradas
+        .filter((item) => item.tipo === "venta")
+        .map((item) => item.id)
+    );
+
+    const ventaPosKeys = new Set(
+      operacionesFiltradas
+        .filter((item) => item.tipo === "venta")
+        .map((item) => extractPosOperationKey(item))
+        .filter(Boolean) as string[]
+    );
+
+    const operacionesMonetarias = operacionesFiltradas.filter((item) => {
+      if (typeof item.monto !== "number") return false;
+      if (item.tipo !== "movimiento") return true;
+
+      const referencia = String(item.referencia || "").trim();
+      const byReference = referencia ? ventasIds.has(referencia) : false;
+      const movimientoPosKey = extractPosOperationKey(item);
+      const byPosKey = Boolean(movimientoPosKey && ventaPosKeys.has(movimientoPosKey));
+
+      // Si ya existe la venta POS asociada, no duplicamos su asiento de caja en los KPIs monetarios.
+      return !(byReference || byPosKey);
+    });
+
+    const entradas = operacionesMonetarias
       .filter((item) => item.direccion === "entrada" && typeof item.monto === "number")
       .reduce((acc, item) => acc + Number(item.monto || 0), 0);
-    const salidas = operacionesFiltradas
+    const salidas = operacionesMonetarias
       .filter((item) => item.direccion === "salida" && typeof item.monto === "number")
       .reduce((acc, item) => acc + Number(item.monto || 0), 0);
     const puntosNetos = operacionesFiltradas.reduce((acc, item) => acc + Number(item.puntos || 0), 0);
