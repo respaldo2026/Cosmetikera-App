@@ -1,32 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient, resolveTenantContext } from "../../_utils/tenant-resolver";
 import { mergeClubRules } from "@/utils/club-rules";
-
-function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
-}
 
 /**
  * GET /api/configuracion/club
  * Devuelve el catálogo de recompensas y las reglas del club.
  * Si las tablas están vacías, responde con arreglo vacío / objeto vacío.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const supabase = getAdminClient();
 
     const [recompensasRes, reglasRes] = await Promise.all([
       supabase
         .from("club_recompensas_config")
         .select("*")
+        .eq("tenant_id", tenantId)
         .order("orden", { ascending: true }),
       supabase
         .from("club_reglas_config")
-        .select("clave,valor,descripcion,updated_at"),
+        .select("clave,valor,descripcion,updated_at")
+        .eq("tenant_id", tenantId),
     ]);
 
     if (recompensasRes.error) throw recompensasRes.error;
@@ -59,6 +54,7 @@ export async function GET() {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { reglas } = await request.json();
     if (!reglas || typeof reglas !== "object") {
       return NextResponse.json({ error: "Body debe tener { reglas: { clave: valor } }" }, { status: 400 });
@@ -69,7 +65,7 @@ export async function PATCH(request: NextRequest) {
     const updates = Object.entries(reglas).map(([clave, valor]) =>
       supabase
         .from("club_reglas_config")
-        .upsert({ clave, valor: String(valor) }, { onConflict: "clave" })
+        .upsert({ tenant_id: tenantId, clave, valor: String(valor) }, { onConflict: "tenant_id,clave" })
     );
 
     await Promise.all(updates);

@@ -20,6 +20,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { WhatsAppService } from "@/services/whatsapp-service";
 import { normalizePhone } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 interface SendBirthdayReminderRequest {
   dias_offset: -2 | -1 | 0; // -2 = 2 días antes, -1 = 1 día antes, 0 = hoy
@@ -167,6 +168,7 @@ async function logBirthdayConversationTemplate(
   perfilId: string,
   telefono: string,
   diasOffset: -2 | -1 | 0,
+  tenantId: string,
 ) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -178,6 +180,7 @@ async function logBirthdayConversationTemplate(
 
   const templateName = getTemplateName(diasOffset);
   await service.from("whatsapp_conversation_history").insert({
+    tenant_id: tenantId,
     telefono: normalizePhone(telefono),
     perfil_id: perfilId,
     rol: "agente",
@@ -192,6 +195,7 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<BirthdayReminderResponse>> {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     // 1. Validar autenticación
     if (!(await validateRequest(request))) {
       return NextResponse.json(
@@ -262,7 +266,31 @@ export async function POST(
       );
     }
 
-    if (!clientes || clientes.length === 0) {
+    const clienteRows = (clientes || []) as Array<{ perfil_id: string; telefono: string; nombre_completo: string }>;
+    const perfilIds = clienteRows.map((c) => c.perfil_id).filter(Boolean);
+
+    const { data: perfilesTenant, error: perfilesTenantError } = perfilIds.length
+      ? await supabase
+          .from("perfiles")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .in("id", perfilIds)
+      : { data: [], error: null };
+
+    if (perfilesTenantError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Error validando tenant de clientes: ${perfilesTenantError.message}`,
+        } as BirthdayReminderResponse,
+        { status: 500 }
+      );
+    }
+
+    const allowedIds = new Set((perfilesTenant || []).map((p: any) => String(p.id)));
+    const clientesFiltrados = clienteRows.filter((c) => allowedIds.has(String(c.perfil_id)));
+
+    if (clientesFiltrados.length === 0) {
       return NextResponse.json(
         {
           success: true,
@@ -279,7 +307,7 @@ export async function POST(
     let enviados = 0;
     let fallidos = 0;
 
-    for (const cliente of clientes) {
+    for (const cliente of clientesFiltrados) {
       try {
         if (!body.dry_run) {
           const result = await sendBirthdayReminder(
@@ -303,6 +331,7 @@ export async function POST(
                 cliente.perfil_id,
                 cliente.telefono,
                 body.dias_offset,
+                tenantId,
               );
             } catch (logError) {
               console.warn("[Birthday] No se pudo registrar historial de conversación", logError);

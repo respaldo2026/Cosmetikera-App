@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient, resolveTenantContext } from "../../_utils/tenant-resolver";
 
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { userId } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ success: false, error: "userId es requerido" }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ success: false, error: "Faltan llaves de Supabase" }, { status: 500 });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getAdminClient();
 
     // 1) Obtener matrículas para borrar en cascada
     const { data: matriculas, error: errMatriculas } = await supabaseAdmin
@@ -43,7 +35,7 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from("matriculas").delete().eq("estudiante_id", userId);
 
     // 4) Borrar perfil
-    await supabaseAdmin.from("perfiles").delete().eq("id", userId);
+    await supabaseAdmin.from("perfiles").delete().eq("tenant_id", tenantId).eq("id", userId);
 
     // 5) Borrar usuario auth
     const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(userId);

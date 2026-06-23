@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 type CheckStatus = "ok" | "warn" | "fail";
 
@@ -77,6 +78,7 @@ async function graphGet(path: string, accessToken: string) {
 
 export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     if (!(await validateRequest(request))) {
       return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
     }
@@ -229,6 +231,7 @@ export async function GET(request: NextRequest) {
       const { data: notifRows, error: notifError } = await admin
         .from("notificaciones_enviadas")
         .select("estado,created_at")
+        .eq("tenant_id", tenantId)
         .eq("tipo", "bienvenida_club")
         .order("created_at", { ascending: false })
         .limit(50);

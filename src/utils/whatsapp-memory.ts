@@ -101,12 +101,16 @@ function normalizeHistoryRows(
  */
 export async function getCustomerContext(
   supabase: any,
-  telefono: string
+  telefono: string,
+  tenantId?: string,
 ): Promise<CustomerContext | null> {
   const phone = normalizePhone(telefono);
 
   // 1) Camino principal: RPC
   try {
+    if (tenantId) {
+      throw new Error("skip-rpc-for-tenant");
+    }
     const { data, error } = await supabase.rpc("get_whatsapp_context", {
       p_telefono: phone,
       p_limit: 10,
@@ -141,19 +145,27 @@ export async function getCustomerContext(
 
   // 2) Fallback robusto: lectura directa de tablas
   try {
+    let memoryQuery = supabase
+      .from("whatsapp_customer_memory")
+      .select("nombre,nivel_confianza,preferencias,último_tema_tratado,total_mensajes")
+      .eq("telefono", phone)
+      .limit(1);
+
+    let historyQuery = supabase
+      .from("whatsapp_conversation_history")
+      .select("rol,mensaje,created_at")
+      .eq("telefono", phone)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (tenantId) {
+      memoryQuery = memoryQuery.eq("tenant_id", tenantId);
+      historyQuery = historyQuery.eq("tenant_id", tenantId);
+    }
+
     const [memoryRes, historyRes] = await Promise.all([
-      supabase
-        .from("whatsapp_customer_memory")
-        .select("nombre,nivel_confianza,preferencias,último_tema_tratado,total_mensajes")
-        .eq("telefono", phone)
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("whatsapp_conversation_history")
-        .select("rol,mensaje,created_at")
-        .eq("telefono", phone)
-        .order("created_at", { ascending: false })
-        .limit(10),
+      memoryQuery.maybeSingle(),
+      historyQuery,
     ]);
 
     const fallbackHistory = normalizeHistoryRows(
@@ -196,11 +208,15 @@ export async function updateCustomerMemory(
   telefono: string,
   perfilId?: string,
   nombre?: string,
-  temaTratado?: string
+  temaTratado?: string,
+  tenantId?: string,
 ): Promise<void> {
   const phone = normalizePhone(telefono);
 
   try {
+    if (tenantId) {
+      throw new Error("skip-rpc-for-tenant");
+    }
     const { error } = await supabase.rpc("update_whatsapp_memory", {
       p_telefono: phone,
       p_perfil_id: perfilId || null,
@@ -219,12 +235,17 @@ export async function updateCustomerMemory(
     try {
       const now = new Date().toISOString();
 
-      const { data: existing } = await supabase
+      let existingQuery = supabase
         .from("whatsapp_customer_memory")
         .select("id,total_mensajes,nivel_confianza,nombre")
         .eq("telefono", phone)
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+
+      if (tenantId) {
+        existingQuery = existingQuery.eq("tenant_id", tenantId);
+      }
+
+      const { data: existing } = await existingQuery.maybeSingle();
 
       if (existing?.id) {
         const totalMensajes = Number(existing.total_mensajes || 0) + 1;
@@ -250,6 +271,7 @@ export async function updateCustomerMemory(
         const { error: insertError } = await supabase
           .from("whatsapp_customer_memory")
           .insert({
+            tenant_id: tenantId || null,
             perfil_id: perfilId || null,
             telefono: phone,
             nombre: nombre || null,
@@ -278,17 +300,23 @@ export async function mergeCustomerPreferences(
   patch: Record<string, unknown>,
   perfilId?: string,
   nombre?: string,
+  tenantId?: string,
 ): Promise<void> {
   const phone = normalizePhone(telefono);
   if (!phone || !patch || Object.keys(patch).length === 0) return;
 
   try {
-    const { data: existing } = await supabase
+    let existingQuery = supabase
       .from("whatsapp_customer_memory")
       .select("id,nombre,preferencias")
       .eq("telefono", phone)
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    if (tenantId) {
+      existingQuery = existingQuery.eq("tenant_id", tenantId);
+    }
+
+    const { data: existing } = await existingQuery.maybeSingle();
 
     const currentPreferences = safeParseJsonb(existing?.preferencias, {}) as Record<string, unknown>;
     const mergedPreferences = mergePreferenceValues(currentPreferences, patch) as Record<string, unknown>;
@@ -315,6 +343,7 @@ export async function mergeCustomerPreferences(
     const { error } = await supabase
       .from("whatsapp_customer_memory")
       .insert({
+        tenant_id: tenantId || null,
         perfil_id: perfilId || null,
         telefono: phone,
         nombre: nombre || null,
@@ -344,7 +373,8 @@ export async function logConversationMessage(
   rol: "cliente" | "agente",
   mensaje: string,
   tipo: string = "text",
-  phoneNumberId?: string
+  phoneNumberId?: string,
+  tenantId?: string,
 ): Promise<void> {
   const phone = normalizePhone(telefono);
   const resolvedPhoneNumberId =
@@ -352,6 +382,7 @@ export async function logConversationMessage(
 
   try {
     const { error } = await supabase.from("whatsapp_conversation_history").insert({
+      tenant_id: tenantId || null,
       perfil_id: perfilId || null,
       telefono: phone,
       rol,

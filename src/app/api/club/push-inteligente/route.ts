@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import * as webpush from "web-push";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 // ─── Config ──────────────────────────────────────────────────────────────
 
@@ -164,6 +165,7 @@ ${recomendaciones.length > 0 ? `- Productos recomendados para ella: ${recomendac
 // ─── Handler principal ───────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const { tenantId } = await resolveTenantContext(request);
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
     return NextResponse.json(
       { error: "Faltan claves VAPID (NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)" },
@@ -212,6 +214,7 @@ export async function POST(request: NextRequest) {
   const { data: articulosData } = await supabase
     .from("articulos")
     .select("id,nombre,categoria,marca,precio_venta,stock,stock_minimo,descuento_porcentaje")
+    .eq("tenant_id", tenantId)
     .gt("stock", 0)
     .limit(600);
 
@@ -223,6 +226,7 @@ export async function POST(request: NextRequest) {
   const { data: perfilesData } = await supabase
     .from("perfiles")
     .select("id,nombre_completo,puntos_fidelidad")
+    .eq("tenant_id", tenantId)
     .in("id", perfilIds);
 
   const perfilMap = new Map<string, Perfil>(
@@ -245,6 +249,7 @@ export async function POST(request: NextRequest) {
     const { data: ventasData } = await supabase
       .from("ventas")
       .select("id,fecha,items")
+      .eq("tenant_id", tenantId)
       .eq("cliente_id", perfilId)
       .gte("fecha", fechaCorte)
       .order("fecha", { ascending: false })

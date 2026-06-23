@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizePhone } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 type RetryRequestBody = {
   limit?: number;
@@ -57,6 +58,7 @@ function normalizeCedula(value: unknown): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     if (!(await isAuthorized(request))) {
       return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
     }
@@ -77,6 +79,7 @@ export async function POST(request: NextRequest) {
     const { data: perfiles, error: perfilesError } = await supabase
       .from("perfiles")
       .select("id,nombre_completo,telefono,cedula,created_at")
+      .eq("tenant_id", tenantId)
       .eq("rol", "cliente")
       .order("created_at", { ascending: false })
       .limit(scanLimit);
@@ -96,6 +99,7 @@ export async function POST(request: NextRequest) {
       const { data: notifs, error: notifError } = await supabase
         .from("notificaciones_enviadas")
         .select("perfil_id,estado,created_at")
+        .eq("tenant_id", tenantId)
         .eq("tipo", "bienvenida_club")
         .in("perfil_id", perfilIds)
         .order("created_at", { ascending: false })

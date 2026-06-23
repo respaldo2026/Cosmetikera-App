@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizePhone } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 type ConversationMessage = {
   id: string;
@@ -144,6 +145,7 @@ function dedupeNearDuplicateMessages(messages: ConversationMessage[]): Conversat
 
 async function getTemplateMessagesByPhone(
   supabase: any,
+  tenantId: string,
   normalizedPhone: string,
   rawPhone: string,
 ): Promise<ConversationMessage[]> {
@@ -152,6 +154,7 @@ async function getTemplateMessagesByPhone(
     const { data, error } = await supabase
       .from("notificaciones_enviadas")
       .select("id, telefono, mensaje, created_at, perfil_id, estado, tipo")
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(3000);
 
@@ -203,12 +206,14 @@ async function getTemplateMessagesByPhone(
 
 async function getTemplateMessagesRecent(
   supabase: any,
+  tenantId: string,
 ): Promise<ConversationMessage[]> {
   try {
     // Recuperar notificaciones recientes y filtrar plantillas de bienvenida al club
     const { data, error } = await supabase
       .from("notificaciones_enviadas")
       .select("id, telefono, mensaje, created_at, perfil_id, estado, tipo")
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(3000);
 
@@ -257,6 +262,7 @@ function getSupabase() {
  * - ?phone=xxx: devuelve mensajes de ese número
  */
 export async function GET(request: NextRequest) {
+  const { tenantId } = await resolveTenantContext(request);
   const supabase = getSupabase();
   const phone = request.nextUrl.searchParams.get("phone");
   const search = request.nextUrl.searchParams.get("search") || "";
@@ -265,7 +271,7 @@ export async function GET(request: NextRequest) {
   // Aislamiento estricto por phone_number_id para evitar mezcla entre proyectos/bots.
   const ownPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || null;
   const includeNotificationTemplates = process.env.WHATSAPP_INCLUDE_NOTIFICATION_TEMPLATES === "true";
-  const allowLegacyAgentFallback = process.env.WHATSAPP_ALLOW_LEGACY_AGENT_CONVERSATIONS === "true";
+  const allowLegacyAgentFallback = false;
 
   /** Aplica el filtro de aislamiento a un query builder de Supabase */
   function applyPhoneNumberFilter(query: any) {
@@ -285,6 +291,7 @@ export async function GET(request: NextRequest) {
         .select(
           "id, telefono, rol, mensaje, tipo_mensaje, intento, created_at, perfil_id"
         )
+        .eq("tenant_id", tenantId)
         .eq("telefono", normalizedPhone)
         .order("created_at", { ascending: true })
         .limit(200)
@@ -298,6 +305,7 @@ export async function GET(request: NextRequest) {
           .select(
             "id, telefono, rol, mensaje, tipo_mensaje, intento, created_at, perfil_id"
           )
+          .eq("tenant_id", tenantId)
           .eq("telefono", phone)
           .order("created_at", { ascending: true })
           .limit(200)
@@ -307,7 +315,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (includeNotificationTemplates) {
-      const templateMessages = await getTemplateMessagesByPhone(supabase, normalizedPhone, phone);
+      const templateMessages = await getTemplateMessagesByPhone(supabase, tenantId, normalizedPhone, phone);
       // Solo mezclar notificaciones_enviadas si whatsapp_conversation_history
       // NO tiene ya registros de tipo template para este número. Evita mensajes dobles.
       const historyHasTemplate = (data || []).some(
@@ -371,16 +379,18 @@ export async function GET(request: NextRequest) {
       if (perfil_id) {
         const { data: perfil } = await supabase
           .from("perfiles")
-            .select("nombre_completo")
+          .select("nombre_completo")
+          .eq("tenant_id", tenantId)
           .eq("id", perfil_id)
           .single();
-          clientName = String((perfil as any)?.nombre_completo || "").trim();
+        clientName = String((perfil as any)?.nombre_completo || "").trim();
       }
       if (!clientName) {
         const phoneForLike = normalizedPhone.slice(-10);
         const { data: perfilByPhone } = await supabase
           .from("perfiles")
-            .select("nombre_completo, telefono")
+          .select("nombre_completo, telefono")
+          .eq("tenant_id", tenantId)
           .or(
             `telefono.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%`
           )
@@ -392,6 +402,7 @@ export async function GET(request: NextRequest) {
         const { data: memoryByPhone } = await supabase
           .from("whatsapp_customer_memory")
           .select("nombre, telefono")
+          .eq("tenant_id", tenantId)
           .or(
             `telefono.eq.${normalizedPhone},telefono.ilike.%${phoneForLike}%`
           )
@@ -416,12 +427,13 @@ export async function GET(request: NextRequest) {
     supabase
       .from("whatsapp_conversation_history")
       .select("id, telefono, rol, mensaje, tipo_mensaje, created_at, perfil_id")
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(2000)
   );
 
   if (includeNotificationTemplates) {
-    const templateRecent = await getTemplateMessagesRecent(supabase);
+    const templateRecent = await getTemplateMessagesRecent(supabase, tenantId);
     if (templateRecent.length > 0) {
       rawMessages = dedupeNearDuplicateMessages([
         ...((rawMessages || []) as ConversationMessage[]),
@@ -527,12 +539,14 @@ export async function GET(request: NextRequest) {
       ? supabase
           .from("perfiles")
           .select("id, nombre_completo, telefono")
+          .eq("tenant_id", tenantId)
           .in("id", perfilIds)
       : { data: [] },
     conversations.length > 0
       ? supabase
           .from("perfiles")
           .select("id, nombre_completo, telefono")
+          .eq("tenant_id", tenantId)
           .not("telefono", "is", null)
           .limit(10000)
       : { data: [] },
@@ -540,6 +554,7 @@ export async function GET(request: NextRequest) {
       ? supabase
           .from("whatsapp_customer_memory")
           .select("nombre, telefono")
+          .eq("tenant_id", tenantId)
           .not("telefono", "is", null)
           .limit(10000)
       : { data: [] },

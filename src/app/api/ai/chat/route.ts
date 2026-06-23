@@ -14,6 +14,7 @@ import {
   updateCustomerMemory,
   normalizePhone,
 } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 function normalize(value: unknown): string {
   return String(value || "")
@@ -1105,6 +1106,7 @@ function buildClubSummaryReply(context: CustomerBusinessContext): string {
 
 async function getCustomerBusinessContext(
   supabase: any,
+  tenantId: string,
   perfilIdRaw: string,
   telefonoRaw: string,
   cedulaRaw?: string,
@@ -1128,6 +1130,7 @@ async function getCustomerBusinessContext(
       const { data } = await supabase
         .from("perfiles")
         .select("id,nombre_completo,puntos_fidelidad,total_compras,telefono")
+        .eq("tenant_id", tenantId)
         .or(`cedula.eq.${cedula},identificacion.eq.${cedula}`)
         .limit(1)
         .maybeSingle();
@@ -1138,6 +1141,7 @@ async function getCustomerBusinessContext(
       const { data } = await supabase
         .from("perfiles")
         .select("id,nombre_completo,puntos_fidelidad,total_compras,telefono")
+        .eq("tenant_id", tenantId)
         .eq("id", perfilId)
         .maybeSingle();
       if (data) profile = data as ProfileCRM;
@@ -1148,6 +1152,7 @@ async function getCustomerBusinessContext(
       const { data } = await supabase
         .from("perfiles")
         .select("id,nombre_completo,puntos_fidelidad,total_compras,telefono")
+        .eq("tenant_id", tenantId)
         .or(`telefono.eq.${telefono},telefono.ilike.%${last10}%`)
         .limit(1)
         .maybeSingle();
@@ -1159,6 +1164,7 @@ async function getCustomerBusinessContext(
     const { data: ventas } = await supabase
       .from("ventas")
       .select("fecha,total,items")
+      .eq("tenant_id", tenantId)
       .eq("cliente_id", profile.id)
       .order("fecha", { ascending: false })
       .limit(8);
@@ -1210,7 +1216,7 @@ async function getCustomerBusinessContext(
   }
 }
 
-async function fetchCatalogArticles(supabase: any): Promise<CatalogArticle[]> {
+async function fetchCatalogArticles(supabase: any, tenantId: string): Promise<CatalogArticle[]> {
   const pageSize = 1000;
   const rows: CatalogArticle[] = [];
 
@@ -1221,6 +1227,7 @@ async function fetchCatalogArticles(supabase: any): Promise<CatalogArticle[]> {
     const { data, error } = await supabase
       .from("articulos")
       .select("id,nombre,categoria,marca,referencia,codigo_barras,descripcion,precio_venta,stock,descuento_porcentaje,promocion_texto,activo,created_at")
+      .eq("tenant_id", tenantId)
       .or("activo.is.null,activo.eq.true")
       .order("created_at", { ascending: false })
       .range(from, to);
@@ -1231,6 +1238,7 @@ async function fetchCatalogArticles(supabase: any): Promise<CatalogArticle[]> {
         const { data: fallbackData, error: fallbackError } = await supabase
           .from("articulos")
           .select("id,nombre,categoria,marca,descripcion,precio_venta,stock,activo,created_at")
+          .eq("tenant_id", tenantId)
           .or("activo.is.null,activo.eq.true")
           .order("created_at", { ascending: false })
           .range(0, pageSize - 1);
@@ -1761,6 +1769,7 @@ async function generateWithModelFallback(
 
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     if (!isAuthorized(request)) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -1832,6 +1841,7 @@ export async function POST(request: NextRequest) {
           let q = supabase
             .from("whatsapp_conversation_history")
             .select("rol, mensaje, created_at")
+            .eq("tenant_id", tenantId)
             .eq("telefono", telefono)
             .order("created_at", { ascending: false })
             .limit(20);
@@ -1843,7 +1853,7 @@ export async function POST(request: NextRequest) {
       : Promise.resolve({ data: [] });
 
     const [articulos, historyRes, perfilRes, customerContext] = await Promise.all([
-      fetchCatalogArticles(supabase),
+      fetchCatalogArticles(supabase, tenantId),
       // Historial real de conversación (últimos 20 mensajes, desc)
       historyQuery,
       // Nombre del cliente desde perfiles
@@ -1851,17 +1861,19 @@ export async function POST(request: NextRequest) {
         ? supabase
             .from("perfiles")
             .select("nombre_completo, nombre")
+            .eq("tenant_id", tenantId)
             .eq("id", perfil_id)
             .maybeSingle()
         : telefono
         ? supabase
             .from("perfiles")
             .select("nombre_completo, nombre")
+            .eq("tenant_id", tenantId)
           .or(`telefono.eq.${telefono}`)
             .limit(1)
             .maybeSingle()
         : Promise.resolve({ data: null }),
-      telefono ? getCustomerContext(supabase, telefono) : Promise.resolve(null),
+      telefono ? getCustomerContext(supabase, telefono, tenantId) : Promise.resolve(null),
     ]);
 
     // ── 2. Resolver nombre del cliente ────────────────────────────
@@ -1890,6 +1902,7 @@ export async function POST(request: NextRequest) {
 
     const customerBusinessContext = await getCustomerBusinessContext(
       supabase,
+      tenantId,
       String(perfil_id || ""),
       telefono,
       cedulaForLookup,
@@ -2228,6 +2241,7 @@ ${catalogoTexto}`;
             message,
             "text",
             activePhoneNumberId || undefined,
+            tenantId,
           ),
           logConversationMessage(
             supabase,
@@ -2237,27 +2251,25 @@ ${catalogoTexto}`;
             responseText,
             "text",
             activePhoneNumberId || undefined,
+            tenantId,
           ),
-          mergeCustomerPreferences(supabase, telefono, { beauty_profile: currentBeautyProfile }, perfil_id || undefined, customerName || undefined),
+          mergeCustomerPreferences(
+            supabase,
+            telefono,
+            { beauty_profile: currentBeautyProfile },
+            perfil_id || undefined,
+            customerName || undefined,
+            tenantId,
+          ),
           updateCustomerMemory(
             supabase,
             telefono,
             perfil_id || undefined,
             customerName || undefined,
-            detectedTheme || undefined
+            detectedTheme || undefined,
+            tenantId,
           ),
         ]);
-        await supabase
-          .from("agent_conversations")
-          .insert({
-            phone_number: telefono,
-            user_message: message,
-            agent_response: responseText,
-            created_at: new Date().toISOString(),
-          })
-          .then(({ error }: { error: any }) => {
-            if (error) console.warn("[ai/chat] Legacy insert:", error.message);
-          });
       } catch (logError) {
         console.warn("[ai/chat] Error registrando mensajes:", logError);
       }

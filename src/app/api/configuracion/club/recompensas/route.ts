@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
-}
+import { getAdminClient, resolveTenantContext } from "../../../_utils/tenant-resolver";
 
 /**
  * POST /api/configuracion/club/recompensas
@@ -15,6 +7,7 @@ function getAdminClient() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const body = await request.json();
     const { key, icon, title, description, category, points_cost, value_cop, level_min, birthday_only, featured, badge, activa, orden } = body;
 
@@ -25,7 +18,7 @@ export async function POST(request: NextRequest) {
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from("club_recompensas_config")
-      .insert({ key, icon: icon || "🎁", title, description: description || "", category, points_cost, value_cop: value_cop || 0, level_min: level_min || null, birthday_only: birthday_only || false, featured: featured || false, badge: badge || null, activa: activa !== false, orden: orden || 0 })
+      .insert({ tenant_id: tenantId, key, icon: icon || "🎁", title, description: description || "", category, points_cost, value_cop: value_cop || 0, level_min: level_min || null, birthday_only: birthday_only || false, featured: featured || false, badge: badge || null, activa: activa !== false, orden: orden || 0 })
       .select()
       .single();
 

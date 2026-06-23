@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
-}
+import { getAdminClient, resolveTenantContext } from "../../../../_utils/tenant-resolver";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,6 +9,7 @@ type Params = { params: Promise<{ id: string }> };
  */
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { id } = await params;
     const body = await request.json();
     const supabase = getAdminClient();
@@ -24,6 +17,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const { data, error } = await supabase
       .from("club_recompensas_config")
       .update(body)
+      .eq("tenant_id", tenantId)
       .eq("id", id)
       .select()
       .single();
@@ -41,12 +35,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
  */
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
+    const { tenantId } = await resolveTenantContext(_request);
     const { id } = await params;
     const supabase = getAdminClient();
 
     const { error } = await supabase
       .from("club_recompensas_config")
       .delete()
+      .eq("tenant_id", tenantId)
       .eq("id", id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });

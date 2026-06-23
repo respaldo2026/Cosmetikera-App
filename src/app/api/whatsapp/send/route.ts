@@ -14,6 +14,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { WhatsAppService } from "@/services/whatsapp-service";
 import { normalizePhone } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 import type { WhatsAppSendRequest, WhatsAppSendResponse } from "@/types/whatsapp";
 
 function getServiceSupabase() {
@@ -26,6 +27,7 @@ function getServiceSupabase() {
 async function logOutboundMessage(params: {
   phone: string;
   type: string;
+  tenantId: string;
   perfilId?: string | null;
   templateName?: string;
   text?: string;
@@ -45,6 +47,7 @@ async function logOutboundMessage(params: {
   }
 
   await supabase.from("whatsapp_conversation_history").insert({
+    tenant_id: params.tenantId,
     telefono: normalizedPhone,
     perfil_id: params.perfilId || null,
     rol: "agente",
@@ -95,6 +98,7 @@ async function validateRequest(request: NextRequest): Promise<boolean> {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     // 1. Validar autenticación
     if (!(await validateRequest(request))) {
       return NextResponse.json(
@@ -255,6 +259,7 @@ export async function POST(request: NextRequest) {
       await logOutboundMessage({
         phone: body.phone,
         type: body.type,
+        tenantId,
         perfilId,
         templateName: body.template,
         text: outgoingText,
