@@ -38,6 +38,11 @@ Estado actual:
 	- `src/app/api/articulos/route.ts`
 	- `src/app/api/perfiles/route.ts`
 	- `src/app/api/historial/route.ts`
+	- `src/app/api/club/puntos/route.ts`
+	- `src/app/api/club/canjes/route.ts`
+	- `src/app/api/club/referido/route.ts`
+	- `src/app/api/club/route.ts`
+	- `src/app/api/whatsapp/club-recipients/route.ts`
 
 Tablas candidatas iniciales:
 

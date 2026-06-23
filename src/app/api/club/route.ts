@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 function getAdminClient() {
   return createClient(
@@ -28,8 +29,9 @@ function normalizeDigits(value: unknown) {
  * Busca el perfil de un cliente por cédula.
  * Usa service role para evitar problemas de RLS.
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { searchParams } = new URL(request.url);
     const acceso = (searchParams.get("acceso") || searchParams.get("cedula") || "")
       .replace(/\D/g, "")
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
       .select(
         "id,nombre_completo,telefono,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento"
       )
+      .eq("tenant_id", tenantId)
       .eq("cedula", acceso)
       .eq("rol", "cliente")
       .or("activo.is.null,activo.eq.true")
@@ -83,8 +86,9 @@ export async function GET(request: Request) {
  * GET /api/club/historial?perfil_id=UUID
  * Devuelve el historial de puntos del cliente.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { perfil_id } = await request.json();
     if (!perfil_id) return NextResponse.json({ error: "perfil_id requerido" }, { status: 400 });
 
@@ -93,6 +97,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from("puntos_historial")
       .select("id,tipo,puntos,concepto,created_at")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", perfil_id)
       .order("created_at", { ascending: false })
       .limit(30);
@@ -105,8 +110,9 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const body = await request.json();
     const perfilId = String(body?.perfilId || "").trim();
     const acceso = normalizeDigits(body?.acceso);
@@ -134,6 +140,7 @@ export async function PATCH(request: Request) {
       .from("perfiles")
       .select("id,cedula,telefono,rol")
       .eq("id", perfilId)
+      .eq("tenant_id", tenantId)
       .eq("rol", "cliente")
       .maybeSingle();
 
@@ -148,6 +155,7 @@ export async function PATCH(request: Request) {
     const { data: existingPhone, error: existingPhoneError } = await supabase
       .from("perfiles")
       .select("id")
+      .eq("tenant_id", tenantId)
       .eq("telefono", telefono)
       .neq("id", perfilId)
       .limit(1)
@@ -169,6 +177,7 @@ export async function PATCH(request: Request) {
         telefono,
       })
       .eq("id", perfilId)
+      .eq("tenant_id", tenantId)
       .select("id,nombre_completo,telefono,cedula,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento")
       .single();
 
@@ -180,13 +189,15 @@ export async function PATCH(request: Request) {
       await supabase
         .from("whatsapp_customer_memory")
         .update({ nombre: nombreCompleto, telefono })
-        .eq("perfil_id", perfilId);
+        .eq("perfil_id", perfilId)
+        .eq("tenant_id", tenantId);
 
       if (oldPhone && oldPhone !== telefono) {
         await supabase
           .from("whatsapp_customer_memory")
           .update({ nombre: nombreCompleto, telefono })
-          .eq("telefono", oldPhone);
+          .eq("telefono", oldPhone)
+          .eq("tenant_id", tenantId);
       }
     } catch {
       // No bloquear actualización del portal si la sincronización secundaria falla.

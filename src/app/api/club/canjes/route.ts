@@ -9,6 +9,7 @@ import {
 import { isRewardEligibleDynamic, type DynamicClubReward } from "@/hooks/useClubConfig";
 import { DEFAULT_REGLAS, GAIN_TIPOS, getNivelDinamico, mergeClubRules, type ClubReglas } from "@/utils/club-rules";
 import { isBirthdayMonth } from "@/constants/clubRewards";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zgqrhzuhrwudckweslzr.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -41,6 +42,7 @@ function normalizeCanje(canje: any) {
 }
 
 async function applyExpiryIfNeeded(
+  tenantId: string,
   perfilId: string,
   reglas: ClubReglas,
   currentPoints: number,
@@ -54,6 +56,7 @@ async function applyExpiryIfNeeded(
     supabaseAdmin
       .from("puntos_historial")
       .select("puntos,tipo")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", perfilId)
       .lt("created_at", cutoffDate)
       .in("tipo", [...GAIN_TIPOS])
@@ -61,6 +64,7 @@ async function applyExpiryIfNeeded(
     supabaseAdmin
       .from("puntos_historial")
       .select("puntos,tipo")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", perfilId)
       .lt("created_at", cutoffDate)
       .not("tipo", "eq", "expiracion")
@@ -68,6 +72,7 @@ async function applyExpiryIfNeeded(
     supabaseAdmin
       .from("puntos_historial")
       .select("puntos")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", perfilId)
       .eq("tipo", "expiracion")
       .limit(5000),
@@ -94,6 +99,7 @@ async function applyExpiryIfNeeded(
   if (expiredNow <= 0) return { pointsAfterExpiry: currentPoints, expiredNow: 0 };
 
   await supabaseAdmin.from("puntos_historial").insert({
+    tenant_id: tenantId,
     perfil_id: perfilId,
     tipo: "expiracion",
     puntos: -expiredNow,
@@ -107,12 +113,14 @@ async function applyExpiryIfNeeded(
       puntos_fidelidad: pointsAfterExpiry,
       nivel_fidelidad: getNivelDinamico(pointsAfterExpiry, reglas),
     })
-    .eq("id", perfilId);
+    .eq("id", perfilId)
+    .eq("tenant_id", tenantId);
 
   return { pointsAfterExpiry, expiredNow };
 }
 
 export async function GET(request: NextRequest) {
+  const { tenantId } = await resolveTenantContext(request);
   const perfilId = request.nextUrl.searchParams.get("perfil_id");
   if (!perfilId) {
     return NextResponse.json({ error: "perfil_id es requerido" }, { status: 400 });
@@ -121,6 +129,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from("canjes")
     .select("id,perfil_id,puntos,valor_cop,descripcion,estado,created_at")
+    .eq("tenant_id", tenantId)
     .eq("perfil_id", perfilId)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -134,6 +143,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { perfilId, rewardKey, telefonoVerificacion } = await request.json();
     if (!perfilId || !rewardKey || !telefonoVerificacion) {
       return NextResponse.json({ error: "perfilId, rewardKey y telefonoVerificacion son requeridos" }, { status: 400 });
@@ -145,15 +155,17 @@ export async function POST(request: NextRequest) {
         .from("perfiles")
         .select("id,nombre_completo,telefono,puntos_fidelidad,puntos_canjeados,nivel_fidelidad,fecha_nacimiento")
         .eq("id", perfilId)
+        .eq("tenant_id", tenantId)
         .single(),
       supabaseAdmin
         .from("club_recompensas_config")
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("activa", true),
     ]);
 
     const [reglasDbRes] = await Promise.all([
-      supabaseAdmin.from("club_reglas_config").select("clave,valor"),
+      supabaseAdmin.from("club_reglas_config").select("clave,valor").eq("tenant_id", tenantId),
     ]);
 
     if (clientRes.error || !clientRes.data) {
@@ -184,7 +196,7 @@ export async function POST(request: NextRequest) {
     }
 
     const currentPoints = Number(client.puntos_fidelidad || 0);
-    const { pointsAfterExpiry } = await applyExpiryIfNeeded(client.id, reglas, currentPoints);
+    const { pointsAfterExpiry } = await applyExpiryIfNeeded(tenantId, client.id, reglas, currentPoints);
     const clientWithPolicy = {
       ...client,
       puntos_fidelidad: pointsAfterExpiry,
@@ -219,7 +231,8 @@ export async function POST(request: NextRequest) {
         puntos_canjeados: (client.puntos_canjeados || 0) + reward.points_cost,
         nivel_fidelidad: nextLevel,
       })
-      .eq("id", client.id);
+      .eq("id", client.id)
+      .eq("tenant_id", tenantId);
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
@@ -228,6 +241,7 @@ export async function POST(request: NextRequest) {
     const { data: insertedCanje, error: insertError } = await supabaseAdmin
       .from("canjes")
       .insert({
+        tenant_id: tenantId,
         perfil_id: client.id,
         puntos: reward.points_cost,
         valor_cop: reward.value_cop,
@@ -242,6 +256,7 @@ export async function POST(request: NextRequest) {
     }
 
     await supabaseAdmin.from("puntos_historial").insert({
+      tenant_id: tenantId,
       perfil_id: client.id,
       tipo: "canjeados",
       puntos: -reward.points_cost,

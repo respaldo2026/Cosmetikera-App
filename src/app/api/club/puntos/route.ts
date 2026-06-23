@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendClubPointsWhatsApp } from "@/utils/club-whatsapp";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 import {
   DEFAULT_REGLAS,
   GAIN_TIPOS,
@@ -23,14 +24,18 @@ type TipoPunto = (typeof TIPOS_VALIDOS)[number];
 
 const TIPOS_POSITIVOS_CON_REGLA = new Set<string>([...GAIN_TIPOS]);
 
-async function loadClubRules(supabase: ReturnType<typeof getAdminClient>): Promise<ClubReglas> {
-  const { data } = await supabase.from("club_reglas_config").select("clave,valor");
+async function loadClubRules(supabase: ReturnType<typeof getAdminClient>, tenantId: string): Promise<ClubReglas> {
+  const { data } = await supabase
+    .from("club_reglas_config")
+    .select("clave,valor")
+    .eq("tenant_id", tenantId);
   const raw = Object.fromEntries((data || []).map((row: any) => [row.clave, Number(row.valor)]));
   return mergeClubRules({ ...DEFAULT_REGLAS, ...raw });
 }
 
 async function applyExpiryIfNeeded(
   supabase: ReturnType<typeof getAdminClient>,
+  tenantId: string,
   perfilId: string,
   reglas: ClubReglas,
   currentPoints: number,
@@ -46,6 +51,7 @@ async function applyExpiryIfNeeded(
     supabase
       .from("puntos_historial")
       .select("puntos,tipo")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", perfilId)
       .lt("created_at", cutoffDate)
       .in("tipo", [...GAIN_TIPOS])
@@ -53,6 +59,7 @@ async function applyExpiryIfNeeded(
     supabase
       .from("puntos_historial")
       .select("puntos,tipo")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", perfilId)
       .lt("created_at", cutoffDate)
       .not("tipo", "eq", "expiracion")
@@ -60,6 +67,7 @@ async function applyExpiryIfNeeded(
     supabase
       .from("puntos_historial")
       .select("puntos")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", perfilId)
       .eq("tipo", "expiracion")
       .limit(5000),
@@ -88,6 +96,7 @@ async function applyExpiryIfNeeded(
   }
 
   await supabase.from("puntos_historial").insert({
+    tenant_id: tenantId,
     perfil_id: perfilId,
     tipo: "expiracion",
     puntos: -expiredNow,
@@ -101,7 +110,8 @@ async function applyExpiryIfNeeded(
       puntos_fidelidad: pointsAfterExpiry,
       nivel_fidelidad: getNivelDinamico(pointsAfterExpiry, reglas),
     })
-    .eq("id", perfilId);
+    .eq("id", perfilId)
+    .eq("tenant_id", tenantId);
 
   return { pointsAfterExpiry, expiredNow };
 }
@@ -113,6 +123,7 @@ async function applyExpiryIfNeeded(
  */
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const body = await request.json();
     const { perfil_id, tipo, puntos, concepto, referencia, actualizar_perfil } = body;
 
@@ -135,7 +146,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getAdminClient();
-    const reglas = await loadClubRules(supabase);
+    const reglas = await loadClubRules(supabase, tenantId);
 
     let puntosAplicados = Number(puntos);
 
@@ -143,17 +154,19 @@ export async function POST(request: NextRequest) {
       .from("perfiles")
       .select("id,nombre_completo,telefono,puntos_fidelidad,puntos_ganados")
       .eq("id", perfil_id)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     if (perfil && actualizar_perfil) {
       const currentPoints = Number(perfil.puntos_fidelidad || 0);
-      const { pointsAfterExpiry } = await applyExpiryIfNeeded(supabase, perfil_id, reglas, currentPoints);
+      const { pointsAfterExpiry } = await applyExpiryIfNeeded(supabase, tenantId, perfil_id, reglas, currentPoints);
 
       if (puntosAplicados > 0 && TIPOS_POSITIVOS_CON_REGLA.has(String(tipo))) {
         const { startIso, endIso } = getMonthRangeUtc(new Date());
         const { data: monthRows } = await supabase
           .from("puntos_historial")
           .select("puntos,tipo")
+          .eq("tenant_id", tenantId)
           .eq("perfil_id", perfil_id)
           .gte("created_at", startIso)
           .lte("created_at", endIso)
@@ -184,7 +197,11 @@ export async function POST(request: NextRequest) {
         payloadPerfil.puntos_ganados = Number(perfil.puntos_ganados || 0) + puntosAplicados;
       }
 
-      await supabase.from("perfiles").update(payloadPerfil).eq("id", perfil_id);
+      await supabase
+        .from("perfiles")
+        .update(payloadPerfil)
+        .eq("id", perfil_id)
+        .eq("tenant_id", tenantId);
     }
 
     if (puntosAplicados === 0) {
@@ -192,6 +209,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error } = await supabase.from("puntos_historial").insert({
+      tenant_id: tenantId,
       perfil_id,
       tipo,
       puntos: puntosAplicados,

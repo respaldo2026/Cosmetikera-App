@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_REGLAS, GAIN_TIPOS, getMonthRangeUtc, getNivelDinamico, mergeClubRules } from "@/utils/club-rules";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 function getAdminClient() {
   return createClient(
@@ -31,6 +32,7 @@ function resolveReferrerFromCode(code: string): string | null {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { codigo, nuevoClienteId } = await request.json();
 
     if (!codigo || !nuevoClienteId) {
@@ -51,10 +53,11 @@ export async function POST(request: NextRequest) {
     const supabase = getAdminClient();
 
     const [reglasRes, perfilesRes] = await Promise.all([
-      supabase.from("club_reglas_config").select("clave,valor"),
+      supabase.from("club_reglas_config").select("clave,valor").eq("tenant_id", tenantId),
       supabase
       .from("perfiles")
       .select("id, nombre_completo, puntos_fidelidad, nivel_fidelidad")
+      .eq("tenant_id", tenantId)
       .eq("activo", true)
       .eq("rol", "cliente")
       .ilike("id", `${prefix}%`),
@@ -99,6 +102,7 @@ export async function POST(request: NextRequest) {
       .from("perfiles")
       .select("id, referido_acreditado, referido_por")
       .eq("id", nuevoClienteId)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (clienteError || !nuevoCliente) {
@@ -120,6 +124,7 @@ export async function POST(request: NextRequest) {
     const { data: ganadosMesData } = await supabase
       .from("puntos_historial")
       .select("puntos,tipo")
+      .eq("tenant_id", tenantId)
       .eq("perfil_id", referidor.id)
       .gte("created_at", startIso)
       .lte("created_at", endIso)
@@ -153,7 +158,8 @@ export async function POST(request: NextRequest) {
         puntos_fidelidad: nuevosPuntos,
         nivel_fidelidad: getNivelDinamico(nuevosPuntos, reglas),
       })
-      .eq("id", referidor.id);
+      .eq("id", referidor.id)
+      .eq("tenant_id", tenantId);
 
     if (updateReferidorError) {
       return NextResponse.json({ error: updateReferidorError.message }, { status: 500 });
@@ -161,6 +167,7 @@ export async function POST(request: NextRequest) {
 
     // 5. Registrar en historial de puntos del referidor
     await supabase.from("puntos_historial").insert({
+      tenant_id: tenantId,
       perfil_id: referidor.id,
       tipo: "referido",
       puntos: puntosAcreditar,
@@ -174,7 +181,8 @@ export async function POST(request: NextRequest) {
         referido_por: referidor.id,
         referido_acreditado: true,
       })
-      .eq("id", nuevoClienteId);
+      .eq("id", nuevoClienteId)
+      .eq("tenant_id", tenantId);
 
     return NextResponse.json({
       ok: true,
@@ -197,6 +205,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const codigo = request.nextUrl.searchParams.get("codigo");
     if (!codigo) {
       return NextResponse.json({ error: "codigo requerido" }, { status: 400 });
@@ -212,6 +221,7 @@ export async function GET(request: NextRequest) {
     const { data: perfiles } = await supabase
       .from("perfiles")
       .select("id, nombre_completo")
+      .eq("tenant_id", tenantId)
       .eq("activo", true)
       .eq("rol", "cliente")
       .ilike("id", `${prefix}%`)

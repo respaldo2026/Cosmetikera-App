@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizePhone } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -13,13 +14,15 @@ function getSupabase() {
  * Devuelve la lista de clientes que recibieron la plantilla de bienvenida al club,
  * con sus nombres desde perfiles.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { tenantId } = await resolveTenantContext(request);
   const supabase = getSupabase();
 
   // Obtener todas las notificaciones de bienvenida al club
   const { data: notifs, error } = await supabase
     .from("notificaciones_enviadas")
     .select("id, perfil_id, telefono, mensaje, estado, created_at, tipo")
+    .eq("tenant_id", tenantId)
     .eq("tipo", "bienvenida_club")
     .order("created_at", { ascending: false })
     .limit(500);
@@ -50,6 +53,7 @@ export async function GET() {
     ? await supabase
         .from("perfiles")
         .select("id, nombre_completo, nombre, telefono")
+        .eq("tenant_id", tenantId)
         .in("id", perfilIds)
     : { data: [] };
 
@@ -82,6 +86,7 @@ export async function GET() {
       const { data: perfilesByPhone } = await supabase
         .from("perfiles")
         .select("id, nombre_completo, nombre, telefono")
+        .eq("tenant_id", tenantId)
         .or(phoneOrFilters)
         .limit(500);
 

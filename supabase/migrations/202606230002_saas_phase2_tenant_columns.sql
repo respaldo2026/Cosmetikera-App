@@ -29,6 +29,8 @@ begin
     'compras',
     'movimientos_financieros',
     'configuracion',
+    'club_reglas_config',
+    'club_recompensas_config',
     'proveedores',
     'puntos_historial',
     'canjes',
