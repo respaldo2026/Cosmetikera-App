@@ -1,13 +1,5 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-}
+import { NextRequest, NextResponse } from "next/server";
+import { getAdminClient, resolveTenantContext } from "../../_utils/tenant-resolver";
 
 function normalizeWhatsAppTarget(value: string | null | undefined): string {
   const raw = String(value || "").trim();
@@ -26,13 +18,15 @@ function normalizeWhatsAppTarget(value: string | null | undefined): string {
  * GET /api/configuracion/contacto-publico
  * Devuelve el número de WhatsApp de atención para enlazar el portal Club con el bot.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const supabase = getAdminClient();
 
     const { data, error } = await supabase
       .from("configuracion")
       .select("whatsapp,telefono")
+      .eq("tenant_id", tenantId)
       .limit(1)
       .maybeSingle();
 

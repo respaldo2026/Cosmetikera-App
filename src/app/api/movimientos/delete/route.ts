@@ -1,28 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient, resolveTenantContext } from "../../_utils/tenant-resolver";
 
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { movimientoId } = await request.json();
 
     if (!movimientoId) {
       return NextResponse.json({ success: false, error: "movimientoId es requerido" }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ success: false, error: "Faltan llaves de Supabase" }, { status: 500 });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = getAdminClient();
 
     const { error, count } = await supabaseAdmin
       .from("movimientos_financieros")
       .delete({ count: "exact" })
+      .eq("tenant_id", tenantId)
       .eq("id", movimientoId);
 
     if (error) throw error;
