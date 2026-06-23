@@ -1,11 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { extractTenantFromPathname, getDefaultTenantSlug, normalizeTenantSlug } from '@/utils/tenant/tenant-context'
+import { extractTenantFromPathname, normalizeTenantSlug } from '@/utils/tenant/tenant-context'
 
 export async function middleware(request: NextRequest) {
   const tenantFromPath = extractTenantFromPathname(request.nextUrl.pathname)
-  const tenantFromCookie = request.cookies.get('lc_tenant')?.value
-  const tenant = normalizeTenantSlug(tenantFromPath ?? tenantFromCookie ?? getDefaultTenantSlug())
+  const tenantFromCookie = request.cookies.get('lc_tenant')?.value?.trim()
+  // Hardcodear fallback a "principal" en middleware (las env vars no siempre están disponibles en edge)
+  const tenant = normalizeTenantSlug(tenantFromPath || tenantFromCookie || 'principal')
 
   // 1. Crear una respuesta inicial que permite continuar
   let response = NextResponse.next({

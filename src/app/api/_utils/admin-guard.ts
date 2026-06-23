@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { extractTenantFromPathname, getDefaultTenantSlug, normalizeTenantSlug } from "@/utils/tenant/tenant-context";
+import { extractTenantFromPathname, normalizeTenantSlug } from "@/utils/tenant/tenant-context";
 
 function normalizeRole(rawRole: unknown): string {
   let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
@@ -18,13 +18,12 @@ function normalizeRole(rawRole: unknown): string {
 }
 
 function resolveTenantFromRequest(request: NextRequest): string {
-  const tenantFromHeader = request.headers.get("x-tenant");
-  const tenantFromCookie = request.cookies.get("lc_tenant")?.value;
+  const tenantFromHeader = request.headers.get("x-tenant")?.trim();
+  const tenantFromCookie = request.cookies.get("lc_tenant")?.value?.trim();
   const tenantFromPath = extractTenantFromPathname(request.nextUrl.pathname);
-  return normalizeTenantSlug(tenantFromHeader ?? tenantFromCookie ?? tenantFromPath ?? getDefaultTenantSlug());
-}
-
-function getAdminClient(tenantSlug: string) {
+  // Hardcodear fallback a "principal"
+  return normalizeTenantSlug(tenantFromHeader || tenantFromCookie || tenantFromPath || 'principal');
+}\n\nfunction getAdminClient(tenantSlug: string) {
   const _tenant = tenantSlug;
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

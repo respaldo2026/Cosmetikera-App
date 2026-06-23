@@ -13,7 +13,19 @@ function getAdminClient() {
 
 export async function GET(request: NextRequest) {
   try {
-    const { tenantId } = await resolveTenantContext(request);
+    let tenantContext;
+    try {
+      tenantContext = await resolveTenantContext(request);
+    } catch (tenantErr) {
+      console.warn("[GET /api/dashboard] Fallo resolución de tenant:", tenantErr);
+      return NextResponse.json({ error: "No se pudo determinar el tenant" }, { status: 400 });
+    }
+
+    if (!tenantContext?.tenantId) {
+      return NextResponse.json({ error: "Tenant ID vacío" }, { status: 400 });
+    }
+
+    const { tenantId } = tenantContext;
     const supabase = getAdminClient();
 
     const hoy = dayjs();
@@ -45,7 +57,7 @@ export async function GET(request: NextRequest) {
       ventasRec: ventasRecData || [],
     });
   } catch (err) {
-    console.error("[GET /api/dashboard]", err);
+    console.error("[GET /api/dashboard] Unexpected error:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

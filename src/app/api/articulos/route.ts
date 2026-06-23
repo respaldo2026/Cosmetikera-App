@@ -98,7 +98,19 @@ function getAdminClient() {
 // GET /api/articulos — lista todos los artículos
 export async function GET(request: NextRequest) {
   try {
-    const { tenantId } = await resolveTenantContext(request);
+    let tenantContext;
+    try {
+      tenantContext = await resolveTenantContext(request);
+    } catch (tenantErr) {
+      console.warn("[GET /api/articulos] Fallo resolución de tenant:", tenantErr);
+      return NextResponse.json({ error: "No se pudo determinar el tenant" }, { status: 400 });
+    }
+
+    if (!tenantContext?.tenantId) {
+      return NextResponse.json({ error: "Tenant ID vacío" }, { status: 400 });
+    }
+
+    const { tenantId } = tenantContext;
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from("articulos")
@@ -106,10 +118,14 @@ export async function GET(request: NextRequest) {
       .eq("tenant_id", tenantId)
       .order("nombre");
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) {
+      console.error("[GET /api/articulos] Query error:", error);
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json({ data });
   } catch (err) {
-    console.error("[GET /api/articulos]", err);
+    console.error("[GET /api/articulos] Unexpected error:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

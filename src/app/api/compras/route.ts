@@ -12,7 +12,19 @@ function getAdminClient() {
 
 export async function GET(request: NextRequest) {
   try {
-    const { tenantId } = await resolveTenantContext(request);
+    let tenantContext;
+    try {
+      tenantContext = await resolveTenantContext(request);
+    } catch (tenantErr) {
+      console.warn("[GET /api/compras] Fallo resolución de tenant:", tenantErr);
+      return NextResponse.json({ error: "No se pudo determinar el tenant" }, { status: 400 });
+    }
+
+    if (!tenantContext?.tenantId) {
+      return NextResponse.json({ error: "Tenant ID vacío" }, { status: 400 });
+    }
+
+    const { tenantId } = tenantContext;
     const supabase = getAdminClient();
 
     const [
@@ -34,7 +46,7 @@ export async function GET(request: NextRequest) {
       config: configData,
     });
   } catch (err) {
-    console.error("[GET /api/compras]", err);
+    console.error("[GET /api/compras] Unexpected error:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

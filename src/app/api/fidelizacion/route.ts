@@ -13,7 +13,19 @@ function getAdminClient() {
 // GET /api/fidelizacion/clientes - cargar lista de clientes con datos de fidelización
 export async function GET(request: NextRequest) {
   try {
-    const { tenantId } = await resolveTenantContext(request);
+    let tenantContext;
+    try {
+      tenantContext = await resolveTenantContext(request);
+    } catch (tenantErr) {
+      console.warn("[GET /api/fidelizacion] Fallo resolución de tenant:", tenantErr);
+      return NextResponse.json({ error: "No se pudo determinar el tenant" }, { status: 400 });
+    }
+
+    if (!tenantContext?.tenantId) {
+      return NextResponse.json({ error: "Tenant ID vacío" }, { status: 400 });
+    }
+
+    const { tenantId } = tenantContext;
     const supabase = getAdminClient();
     const { searchParams } = new URL(request.url);
     const clienteId = searchParams.get("clienteId");
@@ -29,6 +41,7 @@ export async function GET(request: NextRequest) {
         .limit(10);
 
       if (canjesError) {
+        console.error("[GET /api/fidelizacion] Canjes query error:", canjesError);
         return NextResponse.json({ error: canjesError.message }, { status: 400 });
       }
 
@@ -46,12 +59,13 @@ export async function GET(request: NextRequest) {
       .order("puntos_fidelidad", { ascending: false });
 
     if (error) {
+      console.error("[GET /api/fidelizacion] Clientes query error:", error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ data });
   } catch (err) {
-    console.error("[GET /api/fidelizacion]", err);
+    console.error("[GET /api/fidelizacion] Unexpected error:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

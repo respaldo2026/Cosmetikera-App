@@ -12,7 +12,7 @@ export function toTenantEnvSuffix(tenantSlug?: string | null): string {
 
 export function getDefaultTenantSlug(): string {
   return normalizeTenantSlug(
-    process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? process.env.DEFAULT_TENANT_SLUG ?? "default",
+    process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? process.env.DEFAULT_TENANT_SLUG ?? "principal",
   );
 }
 

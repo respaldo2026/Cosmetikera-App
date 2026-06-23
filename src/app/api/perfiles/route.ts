@@ -171,7 +171,19 @@ async function ensureMonitorEntryForClubWelcome(args: {
 
 export async function GET(request: NextRequest) {
   try {
-    const { tenantId } = await resolveTenantContext(request);
+    let tenantContext;
+    try {
+      tenantContext = await resolveTenantContext(request);
+    } catch (tenantErr) {
+      console.warn("[GET /api/perfiles] Fallo resolución de tenant, usando fallback:", tenantErr);
+      return NextResponse.json({ error: "No se pudo determinar el tenant" }, { status: 400 });
+    }
+
+    if (!tenantContext?.tenantId) {
+      return NextResponse.json({ error: "Tenant ID vacío" }, { status: 400 });
+    }
+
+    const { tenantId } = tenantContext;
     const { searchParams } = new URL(request.url);
     const rol = searchParams.get("rol") || "cliente";
 
@@ -184,12 +196,13 @@ export async function GET(request: NextRequest) {
       .order("nombre_completo");
 
     if (error) {
+      console.error("[GET /api/perfiles] Query error:", error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ data });
   } catch (err) {
-    console.error("[GET /api/perfiles]", err);
+    console.error("[GET /api/perfiles] Unexpected error:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
