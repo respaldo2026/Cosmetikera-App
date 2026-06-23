@@ -64,6 +64,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { RolesPermissionsProvider, useRolesPermissions } from "@/contexts/roles-permissions-context";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
+import { extractTenantFromPathname } from "@/utils/tenant/tenant-context";
 
 const isDebugLogging = process.env.NODE_ENV !== "production";
 const debugLog = (...args: unknown[]) => {
@@ -695,6 +696,25 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
   const shouldUseLayout = !isAuthRoute && Boolean(user);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const syncTenantFromPath = async () => {
+      if (userLoading || !user || !pathname) return;
+
+      const tenantSlug = extractTenantFromPathname(pathname);
+      if (!tenantSlug) return;
+
+      const { error } = await supabaseBrowserClient.rpc("set_default_tenant", {
+        p_tenant_slug: tenantSlug,
+      });
+
+      if (error) {
+        console.warn("[AppShell] No se pudo sincronizar tenant por defecto:", error.message);
+      }
+    };
+
+    syncTenantFromPath();
+  }, [pathname, user, userLoading]);
 
   useEffect(() => {
     const cargarBranding = async () => {
