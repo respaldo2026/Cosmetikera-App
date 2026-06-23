@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { normalizePhone } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 interface SendPuntosRequest {
   perfil_id: string;
@@ -67,7 +68,7 @@ async function validateRequest(request: NextRequest): Promise<boolean> {
 }
 
 // ── Obtener nombre del cliente ──────────────────────────────────────────────
-async function getNombreCliente(perfilId: string): Promise<string> {
+async function getNombreCliente(perfilId: string, tenantId: string): Promise<string> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceRoleKey) return "Cliente";
@@ -80,6 +81,7 @@ async function getNombreCliente(perfilId: string): Promise<string> {
     .from("perfiles")
     .select("nombre_completo")
     .eq("id", perfilId)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
 
   const nombre = String(data?.nombre_completo || "").split(" ")[0] || "Cliente";
@@ -152,6 +154,7 @@ async function sendReciboWhatsApp(
 
 // ── Auditoría en whatsapp_conversation_history ─────────────────────────────
 async function logConversation(
+  tenantId: string,
   perfilId: string,
   phone: string,
   totalCompra: number,
@@ -167,6 +170,7 @@ async function logConversation(
   });
 
   await supabase.from("whatsapp_conversation_history").insert({
+    tenant_id: tenantId,
     telefono: normalizePhone(phone),
     perfil_id: perfilId,
     rol: "agente",
@@ -180,6 +184,7 @@ async function logConversation(
 // ── Handler principal ──────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     if (!(await validateRequest(request))) {
       return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
     }
@@ -200,11 +205,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const nombre = await getNombreCliente(perfil_id);
+    const nombre = await getNombreCliente(perfil_id, tenantId);
     const result = await sendReciboWhatsApp(telefono, nombre, total_compra, numero_venta);
 
     // Auditoría (no-throw)
-    logConversation(perfil_id, telefono, total_compra, numero_venta, result.success).catch(() => {});
+    logConversation(tenantId, perfil_id, telefono, total_compra, numero_venta, result.success).catch(() => {});
 
     if (result.success) {
       return NextResponse.json({ success: true, message: "Mensaje de puntos enviado" });

@@ -42,7 +42,12 @@ Estado actual:
 	- `src/app/api/club/canjes/route.ts`
 	- `src/app/api/club/referido/route.ts`
 	- `src/app/api/club/route.ts`
+	- `src/app/api/club/voucher/route.ts`
+	- `src/app/api/club/verificar/route.ts`
+	- `src/app/api/club/recomendaciones/route.ts`
 	- `src/app/api/whatsapp/club-recipients/route.ts`
+	- `src/app/api/whatsapp/send-puntos-compra/route.ts`
+	- `src/app/api/whatsapp/send-club-welcome/route.ts`
 
 Tablas candidatas iniciales:
 

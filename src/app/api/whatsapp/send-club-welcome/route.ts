@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { normalizePhone } from "@/utils/whatsapp-memory";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 interface SendClubWelcomeRequest {
   perfil_id: string;
@@ -55,10 +56,11 @@ type WelcomeLockResult = {
 /**
  * Verifica si ya existe una bienvenida enviada para evitar duplicados.
  */
-async function wasWelcomeAlreadySent(supabase: any, perfilId: string): Promise<boolean> {
+async function wasWelcomeAlreadySent(supabase: any, perfilId: string, tenantId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from("notificaciones_enviadas")
     .select("id, estado")
+    .eq("tenant_id", tenantId)
     .eq("perfil_id", perfilId)
     .eq("tipo", "bienvenida_club")
     .order("created_at", { ascending: false })
@@ -76,19 +78,20 @@ async function wasWelcomeAlreadySent(supabase: any, perfilId: string): Promise<b
 
 async function wasWelcomeAlreadySentBroad(
   supabase: any,
-  args: { perfilId: string; phone: string; cedula: string },
+  args: { perfilId: string; phone: string; cedula: string; tenantId: string },
 ): Promise<boolean> {
   const normalizedPhone = normalizePhone(args.phone);
   const cedulaNeedle = String(args.cedula || "").trim();
 
   // 1) Revisión directa por perfil + tipo (idempotencia primaria)
-  if (await wasWelcomeAlreadySent(supabase, args.perfilId)) return true;
+  if (await wasWelcomeAlreadySent(supabase, args.perfilId, args.tenantId)) return true;
 
   // 2) Respaldo por teléfono + cédula en auditoría, para escenarios con llamadas repetidas
   //    desde múltiples orígenes o migraciones incompletas en constraints.
   const { data: notifRows } = await supabase
     .from("notificaciones_enviadas")
     .select("estado,mensaje,telefono")
+    .eq("tenant_id", args.tenantId)
     .eq("tipo", "bienvenida_club")
     .order("created_at", { ascending: false })
     .limit(200);
@@ -108,6 +111,7 @@ async function wasWelcomeAlreadySentBroad(
   const { data: templateRows } = await supabase
     .from("whatsapp_conversation_history")
     .select("mensaje,telefono")
+    .eq("tenant_id", args.tenantId)
     .eq("tipo_mensaje", "template")
     .order("created_at", { ascending: false })
     .limit(200);
@@ -141,8 +145,10 @@ async function acquireWelcomeSendLock(
   perfilId: string,
   phone: string,
   cedula: string,
+  tenantId: string,
 ): Promise<WelcomeLockResult> {
   const pendingPayload = {
+    tenant_id: tenantId,
     perfil_id: perfilId,
     tipo: "bienvenida_club",
     telefono: phone,
@@ -166,6 +172,7 @@ async function acquireWelcomeSendLock(
   const { data: existing, error: fetchError } = await supabase
     .from("notificaciones_enviadas")
     .select("id, estado")
+    .eq("tenant_id", tenantId)
     .eq("perfil_id", perfilId)
     .eq("tipo", "bienvenida_club")
     .maybeSingle();
@@ -187,6 +194,7 @@ async function acquireWelcomeSendLock(
   const { error: retryError } = await supabase
     .from("notificaciones_enviadas")
     .update({ estado: "procesando", telefono: phone, mensaje: pendingPayload.mensaje })
+    .eq("tenant_id", tenantId)
     .eq("perfil_id", perfilId)
     .eq("tipo", "bienvenida_club");
 
@@ -250,12 +258,14 @@ async function validateRequest(request: NextRequest): Promise<boolean> {
  */
 async function getProfilePhone(
   supabase: any,
-  perfilId: string
+  perfilId: string,
+  tenantId: string,
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("perfiles")
     .select("telefono")
     .eq("id", perfilId)
+    .eq("tenant_id", tenantId)
     .single();
 
   if (error) {
@@ -368,6 +378,7 @@ async function sendWhatsAppMessage(
  */
 async function logNotification(
   supabase: any,
+  tenantId: string,
   perfilId: string,
   phone: string,
   mensaje: string,
@@ -378,6 +389,7 @@ async function logNotification(
     .from("notificaciones_enviadas")
     .upsert(
       {
+        tenant_id: tenantId,
         perfil_id: perfilId,
         tipo: "bienvenida_club",
         telefono: phone,
@@ -398,6 +410,7 @@ async function logNotification(
  */
 async function logClubInscription(
   supabase: any,
+  tenantId: string,
   perfilId: string,
   notificationSent: boolean
 ) {
@@ -405,6 +418,7 @@ async function logClubInscription(
     .from("club_inscripciones")
     .upsert(
       {
+        tenant_id: tenantId,
         perfil_id: perfilId,
         notificacion_enviada: notificationSent,
       },
@@ -416,7 +430,7 @@ async function logClubInscription(
   }
 }
 
-async function logConversationTemplate(perfilId: string, phone: string, cedula: string) {
+async function logConversationTemplate(perfilId: string, phone: string, cedula: string, tenantId: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceRoleKey) return;
@@ -431,6 +445,7 @@ async function logConversationTemplate(perfilId: string, phone: string, cedula: 
   const { data: existing } = await service
     .from("whatsapp_conversation_history")
     .select("id,mensaje")
+    .eq("tenant_id", tenantId)
     .eq("perfil_id", perfilId)
     .eq("tipo_mensaje", "template")
     .order("created_at", { ascending: false })
@@ -451,6 +466,7 @@ async function logConversationTemplate(perfilId: string, phone: string, cedula: 
   }
 
   await service.from("whatsapp_conversation_history").insert({
+    tenant_id: tenantId,
     telefono: normalizedPhone,
     perfil_id: perfilId,
     rol: "agente",
@@ -472,6 +488,8 @@ export async function POST(
         { status: 401 }
       );
     }
+
+    const { tenantId } = await resolveTenantContext(request);
 
     // 2. Parsear payload
     const body: SendClubWelcomeRequest = await request.json();
@@ -506,7 +524,7 @@ export async function POST(
 
     // 4. Obtener teléfono
     const phone =
-      body.telefono || (await getProfilePhone(supabase, body.perfil_id));
+      body.telefono || (await getProfilePhone(supabase, body.perfil_id, tenantId));
 
     if (!phone) {
       return NextResponse.json(
@@ -523,6 +541,7 @@ export async function POST(
       perfilId: body.perfil_id,
       phone,
       cedula: body.cedula,
+      tenantId,
     });
     if (alreadySent) {
       return NextResponse.json(
@@ -536,7 +555,7 @@ export async function POST(
     }
 
     // 5. Candado anti-concurrencia: evita doble envío simultáneo de plantilla
-    const lock = await acquireWelcomeSendLock(supabase, body.perfil_id, phone, body.cedula);
+    const lock = await acquireWelcomeSendLock(supabase, body.perfil_id, phone, body.cedula, tenantId);
     if (!lock.acquired) {
       if (lock.alreadySent) {
         return NextResponse.json(
@@ -580,6 +599,7 @@ export async function POST(
     // 8. Registrar notificación
     await logNotification(
       supabase,
+      tenantId,
       body.perfil_id,
       phone,
       mensajeAuditoria,
@@ -588,11 +608,11 @@ export async function POST(
     );
 
     // 9. Registrar inscripción al club
-    await logClubInscription(supabase, body.perfil_id, whatsappResult.success);
+    await logClubInscription(supabase, tenantId, body.perfil_id, whatsappResult.success);
 
     if (whatsappResult.success) {
       try {
-        await logConversationTemplate(body.perfil_id, phone, body.cedula);
+        await logConversationTemplate(body.perfil_id, phone, body.cedula, tenantId);
       } catch (logError) {
         console.warn("[Club Welcome] No se pudo registrar historial de conversación", logError);
       }

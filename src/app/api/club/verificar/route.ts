@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 function getAdminClient() {
   return createClient(
@@ -14,8 +15,9 @@ function normalizePhone(value: unknown) {
   return value.replace(/\D/g, "").trim();
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { perfilId, telefono } = await request.json();
 
     if (!perfilId || !telefono) {
@@ -32,6 +34,7 @@ export async function POST(request: Request) {
       .from("perfiles")
       .select("id,telefono")
       .eq("id", perfilId)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (error || !perfil) {

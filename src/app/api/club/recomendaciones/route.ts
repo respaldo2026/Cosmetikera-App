@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 type VentaItem = {
   id?: string;
@@ -52,6 +53,7 @@ function promoBoost(articulo: Articulo) {
 
 export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const perfilId = request.nextUrl.searchParams.get("perfil_id")?.trim();
     if (!perfilId) {
       return NextResponse.json({ error: "perfil_id requerido" }, { status: 400 });
@@ -63,12 +65,14 @@ export async function GET(request: NextRequest) {
       supabase
         .from("ventas")
         .select("id,fecha,items")
+        .eq("tenant_id", tenantId)
         .eq("cliente_id", perfilId)
         .order("fecha", { ascending: false })
         .limit(120),
       supabase
         .from("articulos")
         .select("*")
+        .eq("tenant_id", tenantId)
         .gt("stock", 0)
         .order("nombre", { ascending: true })
         .limit(500),

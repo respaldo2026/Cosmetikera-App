@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getRewardByKey, parseRewardCanjeDescription } from "@/constants/clubRewards";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zgqrhzuhrwudckweslzr.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -9,11 +10,12 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-async function findVoucherByCode(code: string) {
+async function findVoucherByCode(code: string, tenantId: string) {
   const normalizedCode = code.trim().toUpperCase();
   const { data, error } = await supabaseAdmin
     .from("canjes")
     .select("id,perfil_id,puntos,valor_cop,descripcion,estado,created_at")
+    .eq("tenant_id", tenantId)
     .ilike("descripcion", `%${normalizedCode}%`)
     .limit(10);
 
@@ -40,12 +42,13 @@ async function findVoucherByCode(code: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { action, code, clienteId, ventaId } = await request.json();
     if (!action || !code) {
       return NextResponse.json({ error: "action y code son requeridos" }, { status: 400 });
     }
 
-    const voucher = await findVoucherByCode(code);
+    const voucher = await findVoucherByCode(code, tenantId);
     if (!voucher) {
       return NextResponse.json({ error: "Voucher no encontrado" }, { status: 404 });
     }
@@ -90,6 +93,7 @@ export async function POST(request: NextRequest) {
       const { error } = await supabaseAdmin
         .from("canjes")
         .update({ estado: "redimido", descripcion: nextDescription })
+        .eq("tenant_id", tenantId)
         .eq("id", voucher.id)
         .eq("perfil_id", clienteId);
 
