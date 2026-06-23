@@ -1,27 +1,21 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
-import { resolveTenantFromBrowserLocation } from "@/utils/tenant/tenant-context";
-import { getTenantSupabaseConfig } from "./tenant-config";
+import { SUPABASE_KEY, SUPABASE_URL } from "./constants";
 
 type BrowserSupabaseClient = ReturnType<typeof createBrowserClient>;
 
-const clientsByTenant = new Map<string, BrowserSupabaseClient>();
+let browserClient: BrowserSupabaseClient | null = null;
 
-export function getSupabaseBrowserClient(tenantSlug?: string): BrowserSupabaseClient {
-  const tenant = tenantSlug || resolveTenantFromBrowserLocation();
+export function getSupabaseBrowserClient(): BrowserSupabaseClient {
+  if (browserClient) return browserClient;
 
-  const cached = clientsByTenant.get(tenant);
-  if (cached) return cached;
-
-  const config = getTenantSupabaseConfig(tenant);
-  if (!config.url || !config.anonKey) {
-    throw new Error(`Supabase no configurado para tenant '${tenant}'`);
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error("Supabase no configurado en variables públicas");
   }
 
-  const client = createBrowserClient(config.url, config.anonKey);
-  clientsByTenant.set(tenant, client);
-  return client;
+  browserClient = createBrowserClient(SUPABASE_URL, SUPABASE_KEY);
+  return browserClient;
 }
 
 export const supabaseBrowserClient: BrowserSupabaseClient = new Proxy({} as BrowserSupabaseClient, {

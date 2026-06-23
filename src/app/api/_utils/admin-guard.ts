@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { extractTenantFromPathname, getDefaultTenantSlug, normalizeTenantSlug } from "@/utils/tenant/tenant-context";
-import { getTenantSupabaseConfig } from "@/utils/supabase/tenant-config";
 
 function normalizeRole(rawRole: unknown): string {
   let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
@@ -26,10 +25,10 @@ function resolveTenantFromRequest(request: NextRequest): string {
 }
 
 function getAdminClient(tenantSlug: string) {
-  const cfg = getTenantSupabaseConfig(tenantSlug);
+  const _tenant = tenantSlug;
   return createClient(
-    cfg.url,
-    cfg.serviceRoleKey,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
@@ -38,11 +37,11 @@ export async function requireAdmin(
   request: NextRequest
 ): Promise<{ ok: true; userId: string } | { ok: false; response: NextResponse }> {
   const tenant = resolveTenantFromRequest(request);
-  const tenantCfg = getTenantSupabaseConfig(tenant);
-  const supabaseUrl = tenantCfg.url;
-  const supabaseAnonKey = tenantCfg.anonKey;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey || !tenantCfg.serviceRoleKey) {
+  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return {
       ok: false,
       response: NextResponse.json({ error: `Configuración de Supabase incompleta para tenant '${tenant}'` }, { status: 500 }),

@@ -1,15 +1,23 @@
-import { resolveTenantFromBrowserLocation } from "@/utils/tenant/tenant-context";
-import { getTenantSupabaseConfig } from "./tenant-config";
+// En cliente solo deben usarse env públicas estáticas (NEXT_PUBLIC_*).
+// Evita leer process.env dinámicamente para no romper en runtime browser/edge.
+const normalizeSupabaseUrl = (url: string) => {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
 
-export function getSupabasePublicConfigForTenant(tenantSlug?: string) {
-  return getTenantSupabaseConfig(tenantSlug);
+export function getSupabasePublicConfigForTenant() {
+  return {
+    tenant: "default",
+    url: SUPABASE_URL,
+    anonKey: SUPABASE_KEY,
+    serviceRoleKey: "",
+  };
 }
 
-const browserTenant = resolveTenantFromBrowserLocation();
-const browserConfig = getSupabasePublicConfigForTenant(browserTenant);
-
-export const SUPABASE_URL = browserConfig.url;
-export const SUPABASE_KEY = browserConfig.anonKey;
+export const SUPABASE_URL = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+export const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "";
 
 if (!SUPABASE_URL) {
   console.error("Supabase URL env var missing at runtime");

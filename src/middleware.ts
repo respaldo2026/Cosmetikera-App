@@ -1,13 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { extractTenantFromPathname, getDefaultTenantSlug, normalizeTenantSlug } from '@/utils/tenant/tenant-context'
-import { getTenantSupabaseConfig } from '@/utils/supabase/tenant-config'
 
 export async function middleware(request: NextRequest) {
   const tenantFromPath = extractTenantFromPathname(request.nextUrl.pathname)
   const tenantFromCookie = request.cookies.get('lc_tenant')?.value
   const tenant = normalizeTenantSlug(tenantFromPath ?? tenantFromCookie ?? getDefaultTenantSlug())
-  const tenantConfig = getTenantSupabaseConfig(tenant)
 
   // 1. Crear una respuesta inicial que permite continuar
   let response = NextResponse.next({
@@ -17,15 +15,18 @@ export async function middleware(request: NextRequest) {
   })
   response.cookies.set('lc_tenant', tenant, { path: '/', sameSite: 'lax' })
 
-  if (!tenantConfig.url || !tenantConfig.anonKey) {
-    console.error(`[middleware] Supabase no configurado para tenant '${tenant}'`)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('[middleware] Supabase no configurado en variables públicas')
     return response
   }
 
   // 2. Cliente Supabase (Lógica integrada para manejar cookies)
   const supabase = createServerClient(
-    tenantConfig.url,
-    tenantConfig.anonKey,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
