@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Tabs, Card, Spin, Form, Input, Button, message, Table, Switch, Select, Modal, Tag, Divider, Upload, Space, Row, Col, Grid, Alert, Badge, Radio, InputNumber } from "antd";
-import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined, CopyOutlined, TagsOutlined, ShopOutlined } from "@ant-design/icons";
+import { SettingOutlined, TeamOutlined, SaveOutlined, PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, CreditCardOutlined, WhatsAppOutlined, UploadOutlined, InstagramOutlined, FacebookOutlined, YoutubeOutlined, EnvironmentOutlined, PrinterOutlined, WifiOutlined, ReloadOutlined, CopyOutlined, TagsOutlined, ShopOutlined, DownloadOutlined } from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd/es/_util/responsiveObserver";
@@ -224,6 +224,14 @@ export default function ConfiguracionPage() {
   const usaQZ = posPrintMode === "qz";
   const usaAgenteLocal = posPrintMode === "agent" || posPrintMode === "auto";
   const permiteCajon = usaQZ || usaAgenteLocal;
+  const posAgentDownloadUrl =
+    process.env.NEXT_PUBLIC_POS_AGENT_DOWNLOAD_URL ??
+    "https://github.com/newsocialmedia20-create/Cosmetikera_App/archive/refs/heads/main.zip";
+  const posAgentInstallerBatUrl =
+    process.env.NEXT_PUBLIC_POS_AGENT_INSTALLER_BAT_URL ??
+    "https://raw.githubusercontent.com/newsocialmedia20-create/Cosmetikera_App/main/pos-agent/instalar-caja.bat";
+  const posAgentRepoUrl = "https://github.com/newsocialmedia20-create/Cosmetikera_App/tree/main/pos-agent";
+  const nodeDownloadUrl = "https://nodejs.org/en/download";
   const currentSiteOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   const modulos: ModuleDefinition[] = MODULES;
@@ -1680,13 +1688,54 @@ export default function ConfiguracionPage() {
           />
         </>
       ) : usaAgenteLocal ? (
-        <Alert
-          type="success"
-          showIcon
-          style={{ marginBottom: 24 }}
-          message="Modo agente local activo"
-          description="La impresión se envía al servicio local (http://127.0.0.1:17891)."
-        />
+        <Space direction="vertical" size={12} style={{ width: "100%", marginBottom: 24 }}>
+          <Alert
+            type="success"
+            showIcon
+            message="Modo agente local activo"
+            description="La impresión se envía al servicio local (http://127.0.0.1:17891)."
+          />
+
+          <Alert
+            type="info"
+            showIcon
+            message="Instalación rápida del agente en otro PC"
+            description={
+              <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                <Space wrap>
+                  <a href={posAgentInstallerBatUrl} target="_blank" rel="noopener noreferrer">
+                    <Button type="primary" icon={<DownloadOutlined />}>Descargar instalador 1 clic (.bat)</Button>
+                  </a>
+                  <a href={posAgentDownloadUrl} target="_blank" rel="noopener noreferrer">
+                    <Button icon={<DownloadOutlined />}>Descargar paquete completo (ZIP)</Button>
+                  </a>
+                  <a href={posAgentRepoUrl} target="_blank" rel="noopener noreferrer">
+                    <Button icon={<ShopOutlined />}>Ver carpeta pos-agent</Button>
+                  </a>
+                </Space>
+
+                <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
+                  <li>Descarga y extrae el paquete completo en el PC de caja.</li>
+                  <li>Entra a la carpeta pos-agent.</li>
+                  <li>
+                    Si no tienes Node.js LTS, instálalo desde
+                    <a href={nodeDownloadUrl} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4 }}>
+                      nodejs.org
+                    </a>
+                    .
+                  </li>
+                  <li>Ejecuta instalar-caja.bat como Administrador (instala y deja el agente iniciado).</li>
+                  <li>Valida en el navegador del mismo PC: http://127.0.0.1:17891/health.</li>
+                  <li>En esta app, configura impresora POS y etiquetas y ejecuta las pruebas.</li>
+                </ol>
+
+                <div style={{ fontSize: 12, color: "#555" }}>
+                  Recomendado para tiendas: NEXT_PUBLIC_POS_PRINT_MODE=agent.
+                </div>
+              </Space>
+            }
+          />
+        </Space>
       ) : (
         <Alert
           type="info"
