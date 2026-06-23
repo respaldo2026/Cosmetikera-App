@@ -988,7 +988,11 @@ export default function ConfiguracionPage() {
       okType: "danger",
       onOk: async () => {
         try {
-          await supabaseBrowserClient.from("perfiles").delete().eq("id", admin.id);
+          const response = await fetch(`/api/admin?id=${admin.id}`, { method: "DELETE" });
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || "Error al eliminar");
+          }
           messageApi.success("Eliminado");
           cargarAdministradores();
         } catch (e: any) {

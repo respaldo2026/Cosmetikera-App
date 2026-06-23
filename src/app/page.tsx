@@ -33,30 +33,17 @@ export default function VistaRapidaPage() {
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
+      const response = await fetch("/api/dashboard");
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}`);
+      }
+      const dashData = await response.json();
+
       const hoy = dayjs();
-      const inicioHoy = hoy.startOf("day").toISOString();
-      const inicioMes = hoy.startOf("month").toISOString();
-
-      const [
-        { data: ventasHoyData },
-        { data: ventasMesData },
-        { data: clientesData },
-        { data: articulosData },
-        { data: comprasData },
-        { data: ventasRecData },
-      ] = await Promise.all([
-        supabaseBrowserClient.from("ventas").select("total").gte("fecha", inicioHoy),
-        supabaseBrowserClient.from("ventas").select("total").gte("fecha", inicioMes),
-        supabaseBrowserClient.from("perfiles").select("id,nombre_completo,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,created_at"),
-        supabaseBrowserClient.from("articulos").select("id,nombre,stock,stock_minimo,precio_venta"),
-        supabaseBrowserClient.from("compras").select("id,estado,total,proveedor_nombre").eq("estado", "pendiente"),
-        supabaseBrowserClient.from("ventas").select("id,total,fecha,items,cliente:perfiles(nombre_completo)").order("fecha", { ascending: false }).limit(5),
-      ]);
-
-      const ventasH = ventasHoyData || [];
-      const ventasM = ventasMesData || [];
-      const clientes = clientesData || [];
-      const articulos = articulosData || [];
+      const ventasH = dashData.ventasHoy || [];
+      const ventasM = dashData.ventasMes || [];
+      const clientes = dashData.clientes || [];
+      const articulos = dashData.articulos || [];
 
       const stockBajoItems = articulos.filter((a: any) => a.stock <= (a.stock_minimo ?? 3));
       const clientesNuevosMes = clientes.filter((c: any) => dayjs(c.created_at).isAfter(hoy.startOf("month")));
@@ -72,8 +59,8 @@ export default function VistaRapidaPage() {
         clientesNuevosMes: clientesNuevosMes.length,
         totalArticulos: articulos.length,
         stockBajo: stockBajoItems.length,
-        comprasPendientes: (comprasData || []).length,
-        ventasRecientes: ventasRecData || [],
+        comprasPendientes: (dashData.compras || []).length,
+        ventasRecientes: dashData.ventasRec || [],
         clientesTop,
         cumpleanierosMes: cumpleMes,
       });

@@ -426,32 +426,18 @@ export default function VentasPage() {
           return r.json();
         });
 
-      const pageSize = 1000;
-      let from = 0;
-      let allArts: Articulo[] = [];
-      let keepFetching = true;
-
-      while (keepFetching) {
-        const { data: arts, error: artsError } = await supabaseBrowserClient
-          .from("articulos")
-          .select("id,nombre,precio_venta,stock,categoria,marca,imagen_url,referencia,codigo_barras,codigo_secundario,activo")
-          .eq("activo", true)
-          .order("nombre")
-          .range(from, from + pageSize - 1);
-
-        if (artsError) {
-          throw artsError;
-        }
-
-        const batch = (arts as Articulo[]) || [];
-        allArts = allArts.concat(batch);
-        keepFetching = batch.length === pageSize;
-        from += pageSize;
-      }
+      const articulosPromise = fetch("/api/articulos").then(async (r) => {
+          if (!r.ok) {
+            const body = await r.text();
+            throw new Error(body || `Error HTTP ${r.status} cargando artículos`);
+          }
+          return r.json();
+        });
 
       const clientesRes = await clientesPromise;
+      const articulosRes = await articulosPromise;
 
-      setArticulos(allArts);
+      setArticulos((articulosRes.data as Articulo[]) || []);
       setClientes(((clientesRes.data as Cliente[]) || []).filter((c: Cliente) => c.activo !== false));
     } catch (error) {
       console.error("[Ventas] Error cargando datos iniciales:", error);

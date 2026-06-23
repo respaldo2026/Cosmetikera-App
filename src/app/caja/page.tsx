@@ -218,15 +218,12 @@ export default function CajaPage() {
 
   const cargarClientes = useCallback(async () => {
     try {
-      const { data, error } = await supabaseBrowserClient
-        .from("perfiles")
-        .select("id, nombre_completo, telefono, email, notif_whatsapp")
-        .eq("rol", "cliente")
-        .eq("activo", true)
-        .order("nombre_completo");
-
-      if (error) throw error;
-      setClientes(data || []);
+      const response = await fetch("/api/perfiles?rol=cliente");
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status} cargando clientes`);
+      }
+      const json = await response.json();
+      setClientes(json.data || []);
     } catch (error) {
       console.error("Error cargando clientes:", error);
       messageApi.error("No se pudieron cargar los clientes");

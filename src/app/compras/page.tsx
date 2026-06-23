@@ -158,19 +158,21 @@ export default function ComprasPage() {
   // ── Carga inicial ─────────────────────────────────────────────────────────────
   const cargar = useCallback(async () => {
     setLoading(true);
-    const [{ data: c }, { data: p }, { data: a }, { data: cfg }] = await Promise.all([
-      supabaseBrowserClient.from("compras").select("*").order("fecha", { ascending: false }),
-      supabaseBrowserClient.from("proveedores").select("id,nombre").order("nombre"),
-      supabaseBrowserClient.from("articulos")
-        .select("id,nombre,referencia,codigo_secundario,codigo_barras,precio_costo,precio_venta,stock,categoria,marca")
-        .order("nombre"),
-      supabaseBrowserClient.from("configuracion").select("nombre_academia").limit(1).maybeSingle(),
-    ]);
-    setCompras(c || []);
-    setProveedores(p || []);
-    setArticulos(a || []);
-    if (cfg?.nombre_academia) setNombreTienda(String(cfg.nombre_academia).trim() || "La Cosmetikera");
-    setLoading(false);
+    try {
+      const response = await fetch("/api/compras");
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}`);
+      }
+      const json = await response.json();
+      setCompras(json.compras || []);
+      setProveedores(json.proveedores || []);
+      setArticulos(json.articulos || []);
+      if (json.config?.nombre_academia) setNombreTienda(String(json.config.nombre_academia).trim() || "La Cosmetikera");
+    } catch (error) {
+      console.error("Error cargando compras:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);

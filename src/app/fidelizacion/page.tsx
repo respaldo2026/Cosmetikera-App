@@ -439,24 +439,42 @@ function TabCanje({ clientes, onRecargar }: { clientes: Cliente[]; onRecargar: (
 
   useEffect(() => {
     if (!clienteId) return;
-    supabaseBrowserClient.from("canjes").select("id,puntos,valor_cop,descripcion,created_at").eq("perfil_id", clienteId).order("created_at", { ascending: false }).limit(10).then(({ data }) => setCanjes(data || []));
+    fetch(`/api/fidelizacion?clienteId=${clienteId}`).then(async (r) => {
+      if (r.ok) {
+        const json = await r.json();
+        setCanjes(json.data || []);
+      }
+    });
   }, [clienteId]);
 
   const canjear = async () => {
     if (!cliente || puntosACanjear < 100 || puntosACanjear > disponibles) return;
     setCanjeando(true);
     try {
-      const nuevos = disponibles - puntosACanjear;
-      const nivel = getNivel(nuevos);
-      const { error } = await supabaseBrowserClient.from("perfiles").update({ puntos_fidelidad: nuevos, nivel_fidelidad: nivel.key, puntos_canjeados: (cliente.puntos_canjeados || 0) + puntosACanjear }).eq("id", cliente.id);
-      if (error) throw error;
-      await supabaseBrowserClient.from("canjes").insert({ perfil_id: cliente.id, puntos: puntosACanjear, valor_cop: valorDescuento, descripcion: `Canje ${puntosACanjear} pts = $${valorDescuento.toLocaleString()}`, estado: "aplicado" });
-      await supabaseBrowserClient.from("puntos_historial").insert({ perfil_id: cliente.id, tipo: "canjeados", puntos: -puntosACanjear, concepto: `Canje por $${valorDescuento.toLocaleString()} de descuento` });
+      const response = await fetch("/api/fidelizacion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clienteId: cliente.id,
+          puntosACanjear,
+          valorDescuento,
+          nivelKey: getNivel(disponibles - puntosACanjear).key,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Error al canjear");
+      }
+
       message.success(`🎁 Canje exitoso: -${puntosACanjear} pts = $${valorDescuento.toLocaleString()}`);
       setPuntosACanjear(100);
       onRecargar();
-    } catch { message.error("Error al canjear"); }
-    finally { setCanjeando(false); }
+    } catch (error) {
+      message.error(`Error al canjear: ${error instanceof Error ? error.message : "Error desconocido"}`);
+    } finally {
+      setCanjeando(false);
+    }
   };
 
   return (
@@ -508,11 +526,17 @@ export default function FidelizacionPage() {
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabaseBrowserClient.from("perfiles")
-      .select("id,nombre_completo,telefono,email,cedula,puntos_fidelidad,puntos_canjeados,puntos_ganados,nivel_fidelidad,fecha_nacimiento,total_compras,logros,racha_visitas,fecha_ultima_visita")
-      .eq("rol", "cliente").order("puntos_fidelidad", { ascending: false });
-    setClientes(data || []);
-    setLoading(false);
+    try {
+      const response = await fetch("/api/fidelizacion");
+      if (response.ok) {
+        const json = await response.json();
+        setClientes(json.data || []);
+      }
+    } catch (error) {
+      console.error("Error cargando clientes:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
