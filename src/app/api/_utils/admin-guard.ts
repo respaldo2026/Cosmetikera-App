@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { extractTenantFromPathname, getDefaultTenantSlug, normalizeTenantSlug } from "@/utils/tenant/tenant-context";
+import { getTenantSupabaseConfig } from "@/utils/supabase/tenant-config";
 
 function normalizeRole(rawRole: unknown): string {
   let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
@@ -16,10 +18,18 @@ function normalizeRole(rawRole: unknown): string {
   return normalized;
 }
 
-function getAdminClient() {
+function resolveTenantFromRequest(request: NextRequest): string {
+  const tenantFromHeader = request.headers.get("x-tenant");
+  const tenantFromCookie = request.cookies.get("lc_tenant")?.value;
+  const tenantFromPath = extractTenantFromPathname(request.nextUrl.pathname);
+  return normalizeTenantSlug(tenantFromHeader ?? tenantFromCookie ?? tenantFromPath ?? getDefaultTenantSlug());
+}
+
+function getAdminClient(tenantSlug: string) {
+  const cfg = getTenantSupabaseConfig(tenantSlug);
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    cfg.url,
+    cfg.serviceRoleKey,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
@@ -27,17 +37,19 @@ function getAdminClient() {
 export async function requireAdmin(
   request: NextRequest
 ): Promise<{ ok: true; userId: string } | { ok: false; response: NextResponse }> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const tenant = resolveTenantFromRequest(request);
+  const tenantCfg = getTenantSupabaseConfig(tenant);
+  const supabaseUrl = tenantCfg.url;
+  const supabaseAnonKey = tenantCfg.anonKey;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseUrl || !supabaseAnonKey || !tenantCfg.serviceRoleKey) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Configuración de Supabase incompleta" }, { status: 500 }),
+      response: NextResponse.json({ error: `Configuración de Supabase incompleta para tenant '${tenant}'` }, { status: 500 }),
     };
   }
 
-  const admin = getAdminClient();
+  const admin = getAdminClient(tenant);
   let userId: string | null = null;
 
   // 1. Intentar verificar por Bearer token (Authorization header)

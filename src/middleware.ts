@@ -1,18 +1,31 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { extractTenantFromPathname, getDefaultTenantSlug, normalizeTenantSlug } from '@/utils/tenant/tenant-context'
+import { getTenantSupabaseConfig } from '@/utils/supabase/tenant-config'
 
 export async function middleware(request: NextRequest) {
+  const tenantFromPath = extractTenantFromPathname(request.nextUrl.pathname)
+  const tenantFromCookie = request.cookies.get('lc_tenant')?.value
+  const tenant = normalizeTenantSlug(tenantFromPath ?? tenantFromCookie ?? getDefaultTenantSlug())
+  const tenantConfig = getTenantSupabaseConfig(tenant)
+
   // 1. Crear una respuesta inicial que permite continuar
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
+  response.cookies.set('lc_tenant', tenant, { path: '/', sameSite: 'lax' })
+
+  if (!tenantConfig.url || !tenantConfig.anonKey) {
+    console.error(`[middleware] Supabase no configurado para tenant '${tenant}'`)
+    return response
+  }
 
   // 2. Cliente Supabase (Lógica integrada para manejar cookies)
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    tenantConfig.url,
+    tenantConfig.anonKey,
     {
       cookies: {
         getAll() {
@@ -25,6 +38,7 @@ export async function middleware(request: NextRequest) {
               headers: request.headers,
             },
           })
+          response.cookies.set('lc_tenant', tenant, { path: '/', sameSite: 'lax' })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
