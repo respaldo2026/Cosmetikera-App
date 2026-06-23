@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendClubWelcomeWhatsApp } from "@/utils/club-whatsapp";
 import { requireAdmin } from "../_utils/admin-guard";
 import { isMissingSupabaseRelationError } from "@/utils/supabase/optional";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 const ENABLE_LEGACY_TEXT_WELCOME = process.env.WHATSAPP_PERFILES_TEXT_WELCOME === "true";
 
@@ -168,8 +169,9 @@ async function ensureMonitorEntryForClubWelcome(args: {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { searchParams } = new URL(request.url);
     const rol = searchParams.get("rol") || "cliente";
 
@@ -177,6 +179,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("perfiles")
       .select("id,nombre_completo,telefono,email,cedula,puntos_fidelidad,nivel_fidelidad,fecha_nacimiento,activo,created_at")
+      .eq("tenant_id", tenantId)
       .eq("rol", rol)
       .order("nombre_completo");
 
@@ -191,8 +194,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
@@ -204,6 +208,7 @@ export async function PATCH(request: Request) {
       .from("perfiles")
       .update(body)
       .eq("id", id)
+      .eq("tenant_id", tenantId)
       .select("id")
       .single();
 
@@ -215,8 +220,9 @@ export async function PATCH(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const body = await request.json();
 
     const {
@@ -283,6 +289,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from("perfiles")
       .insert({
+        tenant_id: tenantId,
         nombre_completo: nombre_completo.trim(),
         telefono: telefonoNormalizado,
         email: email || null,
@@ -384,6 +391,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const adminCheck = await requireAdmin(request);
     if (!adminCheck.ok) return adminCheck.response;
+    const { tenantId } = await resolveTenantContext(request);
 
     const { searchParams } = new URL(request.url);
     const id = String(searchParams.get("id") || "").trim();
@@ -397,6 +405,7 @@ export async function DELETE(request: NextRequest) {
       .from("perfiles")
       .select("id,telefono,rol")
       .eq("id", id)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     if (perfilError) {
@@ -410,21 +419,21 @@ export async function DELETE(request: NextRequest) {
     const telefono = String((perfil as any).telefono || "").replace(/\D/g, "");
 
     const cascadeDeletes: any[] = [
-      supabase.from("ventas").delete().eq("cliente_id", id),
-      supabase.from("movimientos_financieros").delete().eq("estudiante_id", id),
-      supabase.from("movimientos_financieros").delete().eq("proveedor_id", id),
-      supabase.from("puntos_historial").delete().eq("perfil_id", id),
-      supabase.from("canjes").delete().eq("perfil_id", id),
-      supabase.from("club_inscripciones").delete().eq("perfil_id", id),
-      supabase.from("notificaciones_enviadas").delete().eq("perfil_id", id),
-      supabase.from("whatsapp_conversation_history").delete().eq("perfil_id", id),
-      supabase.from("whatsapp_customer_memory").delete().eq("perfil_id", id),
+      supabase.from("ventas").delete().eq("cliente_id", id).eq("tenant_id", tenantId),
+      supabase.from("movimientos_financieros").delete().eq("estudiante_id", id).eq("tenant_id", tenantId),
+      supabase.from("movimientos_financieros").delete().eq("proveedor_id", id).eq("tenant_id", tenantId),
+      supabase.from("puntos_historial").delete().eq("perfil_id", id).eq("tenant_id", tenantId),
+      supabase.from("canjes").delete().eq("perfil_id", id).eq("tenant_id", tenantId),
+      supabase.from("club_inscripciones").delete().eq("perfil_id", id).eq("tenant_id", tenantId),
+      supabase.from("notificaciones_enviadas").delete().eq("perfil_id", id).eq("tenant_id", tenantId),
+      supabase.from("whatsapp_conversation_history").delete().eq("perfil_id", id).eq("tenant_id", tenantId),
+      supabase.from("whatsapp_customer_memory").delete().eq("perfil_id", id).eq("tenant_id", tenantId),
     ];
 
     if (telefono) {
       cascadeDeletes.push(
-        supabase.from("whatsapp_conversation_history").delete().ilike("telefono", `%${telefono.slice(-10)}%`),
-        supabase.from("whatsapp_customer_memory").delete().ilike("telefono", `%${telefono.slice(-10)}%`),
+        supabase.from("whatsapp_conversation_history").delete().eq("tenant_id", tenantId).ilike("telefono", `%${telefono.slice(-10)}%`),
+        supabase.from("whatsapp_customer_memory").delete().eq("tenant_id", tenantId).ilike("telefono", `%${telefono.slice(-10)}%`),
         supabase.from("agent_conversations").delete().ilike("phone_number", `%${telefono.slice(-10)}%`),
       );
     }
@@ -441,7 +450,11 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { error: deletePerfilError } = await supabase.from("perfiles").delete().eq("id", id);
+    const { error: deletePerfilError } = await supabase
+      .from("perfiles")
+      .delete()
+      .eq("id", id)
+      .eq("tenant_id", tenantId);
     if (deletePerfilError) {
       return NextResponse.json({ error: deletePerfilError.message }, { status: 400 });
     }

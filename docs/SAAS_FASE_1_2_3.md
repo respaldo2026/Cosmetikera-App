@@ -31,6 +31,14 @@ Archivos:
 
 Objetivo: añadir tenant_id a tablas de negocio sin romper.
 
+Estado actual:
+
+- Migración creada: `supabase/migrations/202606230002_saas_phase2_tenant_columns.sql`
+- Endpoints críticos ya adaptados con filtro por tenant:
+	- `src/app/api/articulos/route.ts`
+	- `src/app/api/perfiles/route.ts`
+	- `src/app/api/historial/route.ts`
+
 Tablas candidatas iniciales:
 
 - perfiles

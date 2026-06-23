@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "../_utils/admin-guard";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 function getAdminClient() {
   return createClient(
@@ -10,8 +11,9 @@ function getAdminClient() {
   );
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const supabase = getAdminClient();
     const { searchParams } = new URL(request.url);
 
@@ -28,27 +30,32 @@ export async function GET(request: Request) {
       supabase
         .from("ventas")
         .select("id,numero_ticket,fecha,total,subtotal,descuento,metodo_pago,cliente_id,items,cliente:perfiles(nombre_completo,cedula)")
+        .eq("tenant_id", tenantId)
         .order("fecha", { ascending: false })
         .range(from, to),
       supabase
         .from("compras")
         .select("id,proveedor_id,proveedor_nombre,fecha,total,estado,notas,items")
+        .eq("tenant_id", tenantId)
         .order("fecha", { ascending: false })
         .range(from, to),
       supabase
         .from("movimientos_financieros")
         .select("id,fecha,tipo,monto,concepto,categoria,metodo_pago,referencia,descripcion,estudiante_id,proveedor_id,conciliado,created_at, perfiles:perfiles!movimientos_financieros_estudiante_id_fkey(nombre_completo, telefono), proveedores:perfiles!movimientos_financieros_proveedor_id_fkey(nombre_completo)")
+        .eq("tenant_id", tenantId)
         .order("fecha", { ascending: false })
         .order("created_at", { ascending: false })
         .range(from, to),
       supabase
         .from("puntos_historial")
         .select("id,perfil_id,tipo,puntos,concepto,referencia,created_at")
+        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false })
         .range(from, to),
       supabase
         .from("canjes")
         .select("id,perfil_id,puntos,valor_cop,descripcion,estado,created_at")
+        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false })
         .range(from, to),
     ]);
@@ -105,6 +112,7 @@ export async function GET(request: Request) {
       ? await supabase
           .from("perfiles")
           .select("id,nombre_completo,cedula")
+          .eq("tenant_id", tenantId)
           .in("id", perfilIdList)
       : { data: [], error: null };
 
@@ -112,6 +120,7 @@ export async function GET(request: Request) {
       ? await supabase
           .from("articulos")
           .select("id,nombre,categoria,marca,precio_costo,precio_venta")
+          .eq("tenant_id", tenantId)
           .in("id", articuloIdList)
       : { data: [], error: null };
 
@@ -162,6 +171,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const adminCheck = await requireAdmin(request);
     if (!adminCheck.ok) return adminCheck.response;
+    const { tenantId } = await resolveTenantContext(request);
 
     const body = (await request.json()) as DeleteHistorialBody;
     const id = String(body.id || "").trim();
@@ -178,6 +188,7 @@ export async function DELETE(request: NextRequest) {
         .from("ventas")
         .select("id,numero_ticket")
         .eq("id", id)
+        .eq("tenant_id", tenantId)
         .maybeSingle();
 
       if (ventaError) {
@@ -193,7 +204,8 @@ export async function DELETE(request: NextRequest) {
       const { error: deleteVentaError } = await supabase
         .from("ventas")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
 
       if (deleteVentaError) {
         return NextResponse.json({ error: deleteVentaError.message }, { status: 400 });
@@ -205,11 +217,13 @@ export async function DELETE(request: NextRequest) {
         await supabase
           .from("movimientos_financieros")
           .delete()
+          .eq("tenant_id", tenantId)
           .or(`concepto.ilike.%${tag}%,descripcion.ilike.%${tag}%,referencia.ilike.%${ticket}%`);
 
         await supabase
           .from("puntos_historial")
           .delete()
+          .eq("tenant_id", tenantId)
           .or(`concepto.ilike.%${tag}%,referencia.ilike.%${ticket}%`);
       }
 
@@ -228,7 +242,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Tipo de transacción inválido" }, { status: 400 });
     }
 
-    const { error } = await supabase.from(table).delete().eq("id", id);
+    const { error } = await supabase.from(table).delete().eq("id", id).eq("tenant_id", tenantId);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

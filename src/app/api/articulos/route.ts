@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 type ArticuloIdentityRow = {
   id: string;
@@ -17,8 +18,11 @@ const fieldLabels: Record<keyof Pick<ArticuloIdentityRow, "referencia">, string>
   referencia: "código principal",
 };
 
-async function getArticuloIdentityRows(supabase: ReturnType<typeof getAdminClient>) {
-  return supabase.from("articulos").select("id,nombre,referencia,codigo_secundario");
+async function getArticuloIdentityRows(supabase: ReturnType<typeof getAdminClient>, tenantId: string) {
+  return supabase
+    .from("articulos")
+    .select("id,nombre,referencia,codigo_secundario")
+    .eq("tenant_id", tenantId);
 }
 
 function buildDuplicateError(field: keyof typeof fieldLabels, value: string, scope: "db" | "payload") {
@@ -92,12 +96,14 @@ function getAdminClient() {
 }
 
 // GET /api/articulos — lista todos los artículos
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from("articulos")
       .select("*")
+      .eq("tenant_id", tenantId)
       .order("nombre");
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -110,8 +116,9 @@ export async function GET() {
 
 // POST /api/articulos — crear uno o varios artículos
 // body: { articulo: {...} }  o  { articulos: [{...}, ...] }
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const body = await request.json();
     const supabase = getAdminClient();
 
@@ -136,7 +143,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: existingRows, error: existingError } = await getArticuloIdentityRows(supabase);
+    const { data: existingRows, error: existingError } = await getArticuloIdentityRows(supabase, tenantId);
     if (existingError) {
       return NextResponse.json({ error: existingError.message }, { status: 400 });
     }
@@ -149,7 +156,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await supabase.from("articulos").insert(rows).select("*");
+    const rowsWithTenant = rows.map((row) => ({ ...row, tenant_id: tenantId }));
+
+    const { data, error } = await supabase.from("articulos").insert(rowsWithTenant).select("*");
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
     return NextResponse.json({ data }, { status: 201 });
@@ -161,8 +170,9 @@ export async function POST(request: Request) {
 
 // PATCH /api/articulos?id=xxx  — editar un artículo
 // PATCH /api/articulos          — actualización masiva de precios { updates: [...] }
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const body = await request.json();
@@ -174,6 +184,7 @@ export async function PATCH(request: Request) {
         .from("articulos")
         .select("id,nombre,referencia,codigo_secundario")
         .eq("id", id)
+        .eq("tenant_id", tenantId)
         .single();
 
       if (currentError || !currentRow) {
@@ -198,7 +209,7 @@ export async function PATCH(request: Request) {
       );
 
       if (fieldsToCheck.length > 0) {
-        const { data: existingRows, error: existingError } = await getArticuloIdentityRows(supabase);
+        const { data: existingRows, error: existingError } = await getArticuloIdentityRows(supabase, tenantId);
         if (existingError) {
           return NextResponse.json({ error: existingError.message }, { status: 400 });
         }
@@ -221,6 +232,7 @@ export async function PATCH(request: Request) {
         .from("articulos")
         .update(body)
         .eq("id", id)
+        .eq("tenant_id", tenantId)
         .select("id")
         .single();
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -242,7 +254,8 @@ export async function PATCH(request: Request) {
       const { error } = await supabase
         .from("articulos")
         .update(update)
-        .eq("id", item.id);
+        .eq("id", item.id)
+        .eq("tenant_id", tenantId);
 
       if (error) errores++;
     }
@@ -258,14 +271,19 @@ export async function PATCH(request: Request) {
 }
 
 // DELETE /api/articulos?id=xxx
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
+    const { tenantId } = await resolveTenantContext(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
 
     const supabase = getAdminClient();
-    const { error } = await supabase.from("articulos").delete().eq("id", id);
+    const { error } = await supabase
+      .from("articulos")
+      .delete()
+      .eq("id", id)
+      .eq("tenant_id", tenantId);
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
     return NextResponse.json({ ok: true });
