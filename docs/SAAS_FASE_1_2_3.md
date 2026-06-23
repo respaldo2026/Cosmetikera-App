@@ -55,6 +55,35 @@ Estrategia:
 3. Actualizar endpoints para escribir siempre tenant_id nuevo.
 4. En lecturas, empezar a filtrar por tenant_id.
 
+### Verificación de Fase 2 (obligatoria)
+
+1. Confirmar columnas tenant_id en tablas:
+- perfiles
+- articulos
+- ventas
+- compras
+- movimientos_financieros
+- configuracion
+- puntos_historial
+- canjes
+
+2. Confirmar backfill:
+- `select count(*) from public.perfiles where tenant_id is null;` debe ser 0
+- Repetir para tablas críticas
+
+3. Confirmar endpoints ya aislados:
+- `src/app/api/articulos/route.ts`
+- `src/app/api/perfiles/route.ts`
+- `src/app/api/historial/route.ts`
+
+4. Probar manualmente con dos tenants:
+- Crear artículo en tenant A y validar que no aparece en tenant B
+- Crear cliente en tenant A y validar que historial de tenant B no lo devuelve
+
+5. Si la migración muestra notice de duplicados en referencia de artículos:
+- Limpiar duplicados por tenant
+- Luego crear índice único `uq_articulos_tenant_referencia`
+
 ## Fase 3 (siguiente)
 
 Objetivo: aislamiento total.

@@ -20,6 +20,7 @@ do $$
 declare
   table_name text;
   fk_name text;
+  qualified_name text;
 begin
   foreach table_name in array array[
     'perfiles',
@@ -37,12 +38,18 @@ begin
     'whatsapp_customer_memory'
   ]
   loop
-    execute format('alter table if exists public.%I add column if not exists tenant_id uuid', table_name);
-    execute format('alter table if exists public.%I alter column tenant_id set default public.get_default_tenant_id()', table_name);
+    qualified_name := format('public.%I', table_name);
+    if to_regclass(qualified_name) is null then
+      raise notice 'Tabla % no existe. Se omite en Fase 2.', qualified_name;
+      continue;
+    end if;
 
-    execute format('update public.%I set tenant_id = public.get_default_tenant_id() where tenant_id is null', table_name);
+    execute format('alter table %s add column if not exists tenant_id uuid', qualified_name);
+    execute format('alter table %s alter column tenant_id set default public.get_default_tenant_id()', qualified_name);
 
-    execute format('create index if not exists idx_%I_tenant_id on public.%I (tenant_id)', table_name, table_name);
+    execute format('update %s set tenant_id = public.get_default_tenant_id() where tenant_id is null', qualified_name);
+
+    execute format('create index if not exists idx_%I_tenant_id on %s (tenant_id)', table_name, qualified_name);
 
     fk_name := table_name || '_tenant_id_fkey';
     if not exists (
@@ -55,8 +62,8 @@ begin
         and t.relname = table_name
     ) then
       execute format(
-        'alter table public.%I add constraint %I foreign key (tenant_id) references public.tenants(id) on delete restrict',
-        table_name,
+        'alter table %s add constraint %I foreign key (tenant_id) references public.tenants(id) on delete restrict',
+        qualified_name,
         fk_name
       );
     end if;
@@ -65,6 +72,8 @@ end $$;
 
 -- Ajuste de unicidad por tenant para referencia de artículos.
 do $$
+declare
+  has_duplicates boolean;
 begin
   if exists (
     select 1
@@ -73,9 +82,25 @@ begin
       and table_name = 'articulos'
       and column_name = 'referencia'
   ) then
-    create unique index if not exists uq_articulos_tenant_referencia
+    create index if not exists idx_articulos_tenant_referencia
       on public.articulos (tenant_id, lower(referencia))
       where referencia is not null and btrim(referencia) <> '';
+
+    select exists (
+      select 1
+      from public.articulos
+      where referencia is not null and btrim(referencia) <> ''
+      group by tenant_id, lower(referencia)
+      having count(*) > 1
+    ) into has_duplicates;
+
+    if not has_duplicates then
+      create unique index if not exists uq_articulos_tenant_referencia
+        on public.articulos (tenant_id, lower(referencia))
+        where referencia is not null and btrim(referencia) <> '';
+    else
+      raise notice 'Se omite uq_articulos_tenant_referencia por duplicados existentes. Resolver en limpieza de datos.';
+    end if;
   end if;
 end $$;
 
