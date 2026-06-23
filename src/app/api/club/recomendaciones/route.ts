@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { resolveTenantContext } from "../_utils/tenant-resolver";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 type VentaItem = {
   id?: string;

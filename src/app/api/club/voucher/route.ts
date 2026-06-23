@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getRewardByKey, parseRewardCanjeDescription } from "@/constants/clubRewards";
-import { resolveTenantContext } from "../_utils/tenant-resolver";
+import { resolveTenantContext } from "../../_utils/tenant-resolver";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zgqrhzuhrwudckweslzr.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
