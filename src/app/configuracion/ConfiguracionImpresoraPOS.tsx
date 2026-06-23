@@ -50,6 +50,8 @@ export default function ConfiguracionImpresoraPOS({
       const { data } = await supabaseBrowserClient
         .from("configuracion")
         .select("pos_printer_name, pos_printer_width")
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
       if (data) {
@@ -114,6 +116,8 @@ export default function ConfiguracionImpresoraPOS({
       const { data: configs } = await supabaseBrowserClient
         .from("configuracion")
         .select("id")
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
         .limit(1);
       const id = configs?.[0]?.id;
       if (!id) {

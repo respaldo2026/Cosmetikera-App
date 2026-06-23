@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getAdminClient, resolveTenantContext } from "../_utils/tenant-resolver";
 
 export const dynamic = "force-dynamic";
 
@@ -8,28 +9,21 @@ const isHttpUrl = (value?: string | null): boolean => {
 };
 
 async function getConfiguredLogoUrl(request: NextRequest): Promise<string | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const apiKey = serviceRoleKey || anonKey;
-
-  if (!supabaseUrl || !apiKey) return null;
-
-  const endpoint = `${supabaseUrl}/rest/v1/configuracion?select=logo_url&order=updated_at.desc.nullslast,created_at.desc.nullslast&limit=1`;
+  const { tenantId } = await resolveTenantContext(request);
+  const supabase = getAdminClient();
 
   try {
-    const response = await fetch(endpoint, {
-      headers: {
-        apikey: apiKey,
-        Authorization: `Bearer ${apiKey}`,
-      },
-      cache: "no-store",
-    });
+    const { data, error } = await supabase
+      .from("configuracion")
+      .select("logo_url")
+      .eq("tenant_id", tenantId)
+      .order("updated_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (!response.ok) return null;
-
-    const rows = (await response.json()) as Array<{ logo_url?: string | null }>;
-    const logoUrl = rows?.[0]?.logo_url || null;
+    if (error) return null;
+    const logoUrl = data?.logo_url || null;
 
     return isHttpUrl(logoUrl) ? logoUrl : null;
   } catch {

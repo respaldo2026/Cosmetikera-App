@@ -133,6 +133,15 @@ export default function ConfiguracionPage() {
   const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
   const [ticketPromoConfig, setTicketPromoConfig] = useState<TicketPromoConfig>(DEFAULT_TICKET_PROMO_CONFIG);
 
+  const resolveTenantId = useCallback(async (): Promise<string | null> => {
+    const { data, error } = await supabaseBrowserClient.rpc("effective_tenant_id");
+    if (error) {
+      console.error("No se pudo resolver tenant efectivo:", error);
+      return null;
+    }
+    return typeof data === "string" ? data : null;
+  }, []);
+
   const previewNombreAcademia = Form.useWatch("nombre_academia", formAcademia) as string | undefined;
   const previewRuc = Form.useWatch("ruc", formAcademia) as string | undefined;
   const previewDireccion = Form.useWatch("direccion", formAcademia) as string | undefined;
@@ -384,10 +393,14 @@ export default function ConfiguracionPage() {
 
         if (updateError) throw updateError;
       } else {
+        const tenantId = await resolveTenantId();
+        if (!tenantId) {
+          throw new Error("No se pudo resolver el tenant activo para guardar catálogos");
+        }
         const newId = generateUUID();
         const { error: insertError } = await supabaseBrowserClient
           .from("configuracion")
-          .insert({ id: newId, ticket_campos: payloadTicketCampos });
+          .insert({ id: newId, tenant_id: tenantId, ticket_campos: payloadTicketCampos });
 
         if (insertError) throw insertError;
         setConfiguracionId(newId);
@@ -396,7 +409,7 @@ export default function ConfiguracionPage() {
       console.error("Error guardando catálogos en Supabase:", error);
       messageApi.error("No se pudieron sincronizar los catálogos en Supabase");
     }
-  }, [messageApi, ticketFields, ticketPromoConfig]);
+  }, [messageApi, resolveTenantId, ticketFields, ticketPromoConfig]);
 
   // ==================== FUNCIONES POS / IMPRESORA ====================
   const conectarQZ = async () => {
@@ -701,10 +714,14 @@ export default function ConfiguracionPage() {
         }
       } else {
         // Si no hay registro, crear uno base para evitar pantalla vacía
+        const tenantId = await resolveTenantId();
+        if (!tenantId) {
+          throw new Error("No se pudo resolver el tenant activo para inicializar configuración");
+        }
         const nuevoId = generateUUID();
         const { error: insertError } = await supabaseBrowserClient
           .from("configuracion")
-          .insert({ id: nuevoId });
+          .insert({ id: nuevoId, tenant_id: tenantId });
 
         if (!insertError) {
           setConfiguracionId(nuevoId);
@@ -716,7 +733,7 @@ export default function ConfiguracionPage() {
     } finally {
       setLoadingAcademia(false);
     }
-  }, [formAcademia]);
+  }, [formAcademia, resolveTenantId]);
 
   useEffect(() => {
     if (!initialized) {
@@ -810,9 +827,15 @@ export default function ConfiguracionPage() {
         ...valuesSinId,
         ticket_campos: buildTicketCamposPayload(ticketFields, catalogosArticulos, ticketPromoConfig),
       });
+
+      const tenantId = await resolveTenantId();
+      if (!tenantId) {
+        throw new Error("No se pudo resolver el tenant activo para guardar configuración");
+      }
+
       const { error } = await supabaseBrowserClient
         .from("configuracion")
-        .upsert({ ...datosNormalizados, id: idParaGuardar });
+        .upsert({ ...datosNormalizados, id: idParaGuardar, tenant_id: tenantId });
 
       if (error) throw error;
 

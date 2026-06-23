@@ -96,6 +96,8 @@ export default function ConfiguracionImprsoraEtiquetas({
         const { data } = await supabaseBrowserClient
           .from("configuracion")
           .select("pos_printer_name")
+          .order("updated_at", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false, nullsFirst: false })
           .limit(1)
           .maybeSingle();
         if (data?.pos_printer_name) {
