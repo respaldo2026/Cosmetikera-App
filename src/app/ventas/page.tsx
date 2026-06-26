@@ -590,7 +590,6 @@ export default function VentasPage() {
     win.print();
   }, [billetesContados, formCierre, message, monedasContadas, turnoCaja]);
 
-  const abrirModalCierreCaja = useCallback(() => {
   const abrirModalCierreCaja = useCallback(async () => {
     if (!turnoCaja) {
       message.warning("No hay una caja abierta para cerrar");
@@ -602,8 +601,7 @@ export default function VentasPage() {
     setMonedasContadas(crearMapaDenominaciones(MONEDAS_CAJA));
     formCierre.setFieldsValue({ notas_cierre: "" });
     setCierreVisible(true);
-    }, [cargarTurnoCaja, formCierre, message, turnoCaja]);
-  }, [formCierre, message, turnoCaja]);
+  }, [cargarTurnoCaja, formCierre, message, turnoCaja]);
 
   const confirmarCierreCaja = useCallback(async () => {
     if (!turnoCaja) {
