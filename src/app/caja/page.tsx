@@ -23,6 +23,7 @@ import {
   Switch,
   List,
   Popconfirm,
+  Modal,
 } from "antd";
 import {
   DollarOutlined,
@@ -37,6 +38,8 @@ import {
 import dayjs from "dayjs";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { abrirCajon, imprimirTicketTermico } from "@utils/pos-hardware";
+import { useCurrentUser } from "@hooks/useCurrentUser";
+import { useRolePermissions } from "@hooks/useRolePermissions";
 
 let ticketUtilsPromise: Promise<typeof import("@utils/pago-ticket")> | null = null;
 let ticketStoragePromise: Promise<typeof import("@utils/ticket-storage")> | null = null;
@@ -66,6 +69,47 @@ const loadMovimientosService = () => {
 };
 
 const { Title, Text } = Typography;
+
+const BILLETES_CAJA = [100000, 50000, 20000, 10000, 5000, 2000] as const;
+const MONEDAS_CAJA = [1000, 500, 200, 100, 50] as const;
+
+type Denominacion = (typeof BILLETES_CAJA)[number] | (typeof MONEDAS_CAJA)[number];
+
+interface TurnoCaja {
+  id: string;
+  estado: "abierto" | "cerrado";
+  opened_at: string;
+  closed_at?: string | null;
+  base_apertura: number;
+  producido_efectivo: number;
+  efectivo_esperado: number;
+  efectivo_contado: number;
+  descuadre: number;
+  billetes?: Record<string, number>;
+  monedas?: Record<string, number>;
+  notas_apertura?: string | null;
+  notas_cierre?: string | null;
+}
+
+interface ResumenCaja {
+  base_apertura: number;
+  produccion_efectivo: number;
+  efectivo_esperado: number;
+  efectivo_contado?: number;
+  descuadre?: number;
+}
+
+const crearMapaDenominaciones = (denominaciones: readonly Denominacion[]) =>
+  denominaciones.reduce<Record<string, number>>((acc, denominacion) => {
+    acc[String(denominacion)] = 0;
+    return acc;
+  }, {});
+
+const sumarMapaDenominaciones = (counts: Record<string, number>) =>
+  Object.entries(counts).reduce((acc, [denominacion, cantidad]) => {
+    const value = Number(denominacion);
+    return acc + (Number.isFinite(value) ? value * Number(cantidad || 0) : 0);
+  }, 0);
 
 type MetodoPago = "efectivo" | "transferencia" | "tarjeta" | "nequi" | "sistecredito" | "qr";
 
@@ -176,7 +220,11 @@ export default function CajaPage() {
   const permiteCajon = usaAgenteLocal;
   const permiteImpresionSilenciosa = usaAgenteLocal;
   const { message: messageApi } = App.useApp();
+  const { user } = useCurrentUser();
+  const { tienePermiso } = useRolePermissions();
   const [form] = Form.useForm();
+  const [formApertura] = Form.useForm();
+  const [formCierre] = Form.useForm();
 
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useState<ClientePerfil[]>([]);
@@ -191,6 +239,17 @@ export default function CajaPage() {
   const [ventasAparcadas, setVentasAparcadas] = useState<VentaAparcada[]>([]);
   const [restaurandoVentaId, setRestaurandoVentaId] = useState<string | null>(null);
   const [filtroVentasAparcadas, setFiltroVentasAparcadas] = useState("");
+  const [turnoCaja, setTurnoCaja] = useState<TurnoCaja | null>(null);
+  const [resumenCaja, setResumenCaja] = useState<ResumenCaja | null>(null);
+  const [cargandoCaja, setCargandoCaja] = useState(false);
+  const [guardandoCaja, setGuardandoCaja] = useState(false);
+  const [aperturaVisible, setAperturaVisible] = useState(false);
+  const [cierreVisible, setCierreVisible] = useState(false);
+  const [billetesContados, setBilletesContados] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
+  const [monedasContadas, setMonedasContadas] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
+
+  const puedeAbrirCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_abrir");
+  const puedeCerrarCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_cerrar");
 
   const totalAPagar = useMemo(
     () =>
@@ -299,6 +358,123 @@ export default function CajaPage() {
       console.error("Error leyendo ventas aparcadas:", error);
     }
   }, []);
+
+  const cargarTurnoCaja = useCallback(async () => {
+    try {
+      setCargandoCaja(true);
+      const response = await fetch("/api/caja/turnos");
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "No se pudo cargar la caja");
+      }
+
+      setTurnoCaja(payload.currentTurno || null);
+      setResumenCaja(payload.resumen || null);
+    } catch (error: any) {
+      console.error("Error cargando turno de caja:", error);
+      setTurnoCaja(null);
+      setResumenCaja(null);
+    } finally {
+      setCargandoCaja(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void cargarTurnoCaja();
+  }, [cargarTurnoCaja, user?.id]);
+
+  const totalBilletesContados = useMemo(() => sumarMapaDenominaciones(billetesContados), [billetesContados]);
+  const totalMonedasContadas = useMemo(() => sumarMapaDenominaciones(monedasContadas), [monedasContadas]);
+  const totalContadoCaja = totalBilletesContados + totalMonedasContadas;
+  const efectivoEsperadoCaja = Number(resumenCaja?.efectivo_esperado ?? turnoCaja?.efectivo_esperado ?? 0);
+  const produccionCaja = Number(resumenCaja?.produccion_efectivo ?? turnoCaja?.producido_efectivo ?? 0);
+  const baseCaja = Number(resumenCaja?.base_apertura ?? turnoCaja?.base_apertura ?? 0);
+  const descuadreCaja = totalContadoCaja - efectivoEsperadoCaja;
+
+  const abrirModalApertura = () => {
+    formApertura.setFieldsValue({
+      base_apertura: 0,
+      notas_apertura: "",
+    });
+    setAperturaVisible(true);
+  };
+
+  const abrirModalCierre = async () => {
+    if (permiteCajon) {
+      await abrirCajon().catch((error) => console.warn("[Caja] No se pudo abrir cajón antes del cierre:", error));
+    }
+
+    await cargarTurnoCaja();
+    setBilletesContados(crearMapaDenominaciones(BILLETES_CAJA));
+    setMonedasContadas(crearMapaDenominaciones(MONEDAS_CAJA));
+    formCierre.setFieldsValue({ notas_cierre: "" });
+    setCierreVisible(true);
+  };
+
+  const confirmarAperturaCaja = async () => {
+    try {
+      setGuardandoCaja(true);
+      const values = await formApertura.validateFields();
+      const response = await fetch("/api/caja/turnos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "open",
+          base_apertura: values.base_apertura,
+          notas_apertura: values.notas_apertura,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "No se pudo abrir la caja");
+      }
+
+      setTurnoCaja(payload.currentTurno || null);
+      setResumenCaja(payload.resumen || null);
+      setAperturaVisible(false);
+      messageApi.success("Caja abierta correctamente");
+
+      if (permiteCajon) {
+        await abrirCajon();
+      }
+    } catch (error: any) {
+      messageApi.error(error?.message || "No se pudo abrir la caja");
+    } finally {
+      setGuardandoCaja(false);
+    }
+  };
+
+  const confirmarCierreCaja = async () => {
+    try {
+      setGuardandoCaja(true);
+      const values = await formCierre.validateFields();
+      const response = await fetch("/api/caja/turnos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "close",
+          billetes: billetesContados,
+          monedas: monedasContadas,
+          notas_cierre: values.notas_cierre,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "No se pudo cerrar la caja");
+      }
+
+      setTurnoCaja(payload.turnoCerrado || null);
+      setResumenCaja(payload.resumen || null);
+      setCierreVisible(false);
+      messageApi.success(
+        `Cierre realizado. Cuadre: ${formatCurrency(payload?.resumen?.descuadre || 0)}`
+      );
+    } catch (error: any) {
+      messageApi.error(error?.message || "No se pudo cerrar la caja");
+    } finally {
+      setGuardandoCaja(false);
+    }
+  };
 
   // Generar número de factura cuando se selecciona una cuota
   useEffect(() => {
@@ -971,6 +1147,8 @@ export default function CajaPage() {
       messageApi.success(
         `Pago registrado exitosamente. Total: ${formatCurrency(totalAPagar)}${imprimirTicket ? "" : " (sin impresión)"}`
       );
+
+      void cargarTurnoCaja();
       
       // Limpiar formulario y recargar datos
       limpiarVentaActual();
@@ -993,6 +1171,7 @@ export default function CajaPage() {
     cambio,
     limpiarVentaActual,
     permiteImpresionSilenciosa,
+    cargarTurnoCaja,
   ]);
 
   const abrirCajonRegistrador = () => {
@@ -1079,6 +1258,68 @@ export default function CajaPage() {
             </Text>
           </div>
         </Space>
+      </Card>
+
+      <Card style={{ marginBottom: 24 }}>
+        <Row gutter={[16, 16]} align="middle">
+          <Col xs={24} lg={16}>
+            <Space direction="vertical" size={4} style={{ width: "100%" }}>
+              <Title level={4} style={{ margin: 0 }}>
+                Apertura y cierre de caja
+              </Title>
+              <Text type="secondary">
+                Controla la base, el efectivo producido y el cuadre final antes de cerrar la jornada.
+              </Text>
+
+              {turnoCaja ? (
+                <Space wrap>
+                  <Tag color="green">Caja abierta</Tag>
+                  <Tag>Base: {formatCurrency(baseCaja)}</Tag>
+                  <Tag>Producido: {formatCurrency(produccionCaja)}</Tag>
+                  <Tag>Esperado: {formatCurrency(efectivoEsperadoCaja)}</Tag>
+                </Space>
+              ) : (
+                <Tag color="red">Caja cerrada</Tag>
+              )}
+
+              {!puedeAbrirCaja && !puedeCerrarCaja && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="No tienes permisos para abrir o cerrar caja"
+                  description="Pide a un administrador que active caja_abrir y caja_cerrar en Permisos por Rol."
+                />
+              )}
+            </Space>
+          </Col>
+
+          <Col xs={24} lg={8}>
+            {turnoCaja ? (
+              <Button
+                type="primary"
+                danger
+                size="large"
+                block
+                icon={<CheckCircleOutlined />}
+                onClick={abrirModalCierre}
+                disabled={!puedeCerrarCaja}
+              >
+                Realizar cierre de caja
+              </Button>
+            ) : (
+              <Button
+                type="primary"
+                size="large"
+                block
+                icon={<DollarOutlined />}
+                onClick={abrirModalApertura}
+                disabled={!puedeAbrirCaja}
+              >
+                Abrir caja
+              </Button>
+            )}
+          </Col>
+        </Row>
       </Card>
 
       <Row gutter={24}>
@@ -1410,6 +1651,165 @@ export default function CajaPage() {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title="Apertura de caja"
+        open={aperturaVisible}
+        onCancel={() => setAperturaVisible(false)}
+        onOk={confirmarAperturaCaja}
+        confirmLoading={guardandoCaja}
+        okText="Abrir caja"
+        cancelText="Cancelar"
+        width={640}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Define la base inicial antes de empezar a vender"
+          description="Al confirmar, se guardará el turno y se abrirá el cajón si el dispositivo lo permite."
+        />
+
+        <Form form={formApertura} layout="vertical">
+          <Form.Item
+            label="Base inicial"
+            name="base_apertura"
+            rules={[{ required: true, message: "Ingresa la base inicial" }]}
+          >
+            <InputNumber
+              min={0}
+              style={{ width: "100%" }}
+              formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
+              placeholder="$0"
+            />
+          </Form.Item>
+
+          <Form.Item label="Observaciones" name="notas_apertura">
+            <Input.TextArea rows={3} placeholder="Ej: cambio inicial, observaciones del turno" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Cierre de caja"
+        open={cierreVisible}
+        onCancel={() => setCierreVisible(false)}
+        onOk={confirmarCierreCaja}
+        confirmLoading={guardandoCaja}
+        okText="Cerrar caja"
+        cancelText="Cancelar"
+        width={980}
+      >
+        <Alert
+          type={descuadreCaja === 0 ? "success" : "warning"}
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={
+            descuadreCaja === 0
+              ? "Cuadre exacto"
+              : `${descuadreCaja > 0 ? "Sobra" : "Falta"} ${formatCurrency(Math.abs(descuadreCaja))}`
+          }
+          description={
+            <span>
+              Base: {formatCurrency(baseCaja)} · Producido: {formatCurrency(produccionCaja)} · Esperado: {formatCurrency(efectivoEsperadoCaja)}
+            </span>
+          }
+        />
+
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col xs={12} md={6}>
+            <Statistic title="Base" value={baseCaja} precision={0} prefix="$" />
+          </Col>
+          <Col xs={12} md={6}>
+            <Statistic title="Producido" value={produccionCaja} precision={0} prefix="$" />
+          </Col>
+          <Col xs={12} md={6}>
+            <Statistic title="Esperado" value={efectivoEsperadoCaja} precision={0} prefix="$" />
+          </Col>
+          <Col xs={12} md={6}>
+            <Statistic title="Contado" value={totalContadoCaja} precision={0} prefix="$" />
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Card size="small" title="Billetes" bordered={false} style={{ background: "#fafafa" }}>
+              <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                {BILLETES_CAJA.map((denominacion) => {
+                  const valor = billetesContados[String(denominacion)] || 0;
+                  const subtotal = valor * denominacion;
+                  return (
+                    <Row key={denominacion} align="middle" gutter={8}>
+                      <Col flex="auto">
+                        <Text strong>${denominacion.toLocaleString("es-CO")}</Text>
+                        <div style={{ fontSize: 12, color: "#666" }}>
+                          {valor} x {formatCurrency(denominacion)} = {formatCurrency(subtotal)}
+                        </div>
+                      </Col>
+                      <Col>
+                        <InputNumber
+                          min={0}
+                          value={valor}
+                          onChange={(nextValue) =>
+                            setBilletesContados((prev) => ({
+                              ...prev,
+                              [String(denominacion)]: Number(nextValue || 0),
+                            }))
+                          }
+                          style={{ width: 120 }}
+                        />
+                      </Col>
+                    </Row>
+                  );
+                })}
+              </Space>
+            </Card>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Card size="small" title="Monedas" bordered={false} style={{ background: "#fafafa" }}>
+              <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                {MONEDAS_CAJA.map((denominacion) => {
+                  const valor = monedasContadas[String(denominacion)] || 0;
+                  const subtotal = valor * denominacion;
+                  return (
+                    <Row key={denominacion} align="middle" gutter={8}>
+                      <Col flex="auto">
+                        <Text strong>${denominacion.toLocaleString("es-CO")}</Text>
+                        <div style={{ fontSize: 12, color: "#666" }}>
+                          {valor} x {formatCurrency(denominacion)} = {formatCurrency(subtotal)}
+                        </div>
+                      </Col>
+                      <Col>
+                        <InputNumber
+                          min={0}
+                          value={valor}
+                          onChange={(nextValue) =>
+                            setMonedasContadas((prev) => ({
+                              ...prev,
+                              [String(denominacion)]: Number(nextValue || 0),
+                            }))
+                          }
+                          style={{ width: 120 }}
+                        />
+                      </Col>
+                    </Row>
+                  );
+                })}
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+
+        <Divider />
+
+        <Form form={formCierre} layout="vertical">
+          <Form.Item label="Observaciones del cierre" name="notas_cierre">
+            <Input.TextArea rows={3} placeholder="Ej: sobrante, faltante, incidencias del turno" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

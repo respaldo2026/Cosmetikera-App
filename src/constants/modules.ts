@@ -20,6 +20,8 @@ export const MODULES: ModuleDefinition[] = [
 ];
 
 export const OPERATION_PERMISSIONS: ModuleDefinition[] = [
+  { key: "caja_abrir", label: "Operación: Abrir caja" },
+  { key: "caja_cerrar", label: "Operación: Cerrar caja" },
   { key: "usuarios_crear", label: "Operación: Crear usuarios" },
   { key: "usuarios_eliminar", label: "Operación: Eliminar usuarios" },
   { key: "historial_eliminar", label: "Operación: Eliminar historial" },
