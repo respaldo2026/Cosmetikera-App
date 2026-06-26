@@ -314,8 +314,6 @@ const CustomSider: React.FC<CustomSiderProps> = ({
           ) : (
             <a
               href={route}
-              target="_blank"
-              rel="noopener noreferrer"
               style={{
                 display: "block",
                 width: "100%",
