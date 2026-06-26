@@ -517,11 +517,6 @@ export default function VentasPage() {
     }
 
     const fecha = dayjs().format("DD/MM/YYYY HH:mm");
-    const baseCaja = Number(turnoCaja.base_apertura || 0);
-    const produccionCaja = Number(turnoCaja.producido_efectivo || 0);
-    const efectivoEsperadoCaja = Number(turnoCaja.efectivo_esperado || 0);
-    const totalContadoCaja = sumarMapaDenominaciones(billetesContados) + sumarMapaDenominaciones(monedasContadas);
-    const descuadreCaja = totalContadoCaja - efectivoEsperadoCaja;
     const win = window.open("", "_blank", "width=420,height=700");
     if (!win) {
       message.warning("No se pudo abrir la vista de impresión");
@@ -588,7 +583,7 @@ export default function VentasPage() {
     win.document.close();
     win.focus();
     win.print();
-  }, [billetesContados, formCierre, message, monedasContadas, turnoCaja]);
+  }, [baseCaja, billetesContados, descuadreCaja, efectivoEsperadoCaja, formCierre, message, monedasContadas, produccionCaja, resumenCaja, totalContadoCaja, turnoCaja]);
 
   const abrirModalCierreCaja = useCallback(async () => {
     if (!turnoCaja) {
@@ -2066,16 +2061,16 @@ export default function VentasPage() {
         <Card size="small" style={{ marginTop: 12 }} styles={{ body: { padding: 12 } }}>
           <Row justify="space-between">
             <Text type="secondary">Contado</Text>
-            <Text strong>${(sumarMapaDenominaciones(billetesContados) + sumarMapaDenominaciones(monedasContadas)).toLocaleString()}</Text>
+            <Text strong>{formatCurrency(totalContadoCaja)}</Text>
           </Row>
           <Row justify="space-between">
             <Text type="secondary">Esperado</Text>
-            <Text strong>${Number(turnoCaja?.efectivo_esperado || 0).toLocaleString()}</Text>
+            <Text strong>{formatCurrency(efectivoEsperadoCaja)}</Text>
           </Row>
           <Row justify="space-between">
             <Text type="secondary">Descuadre</Text>
-            <Text strong style={{ color: (sumarMapaDenominaciones(billetesContados) + sumarMapaDenominaciones(monedasContadas)) - Number(turnoCaja?.efectivo_esperado || 0) >= 0 ? "#389e0d" : "#cf1322" }}>
-              ${((sumarMapaDenominaciones(billetesContados) + sumarMapaDenominaciones(monedasContadas)) - Number(turnoCaja?.efectivo_esperado || 0)).toLocaleString()}
+            <Text strong style={{ color: descuadreCaja >= 0 ? "#389e0d" : "#cf1322" }}>
+              {formatCurrency(descuadreCaja)}
             </Text>
           </Row>
         </Card>
