@@ -10,7 +10,7 @@ import {
   ShoppingCartOutlined, UserOutlined, PlusOutlined,
   MinusOutlined, DeleteOutlined, CheckOutlined, DollarOutlined,
   CreditCardOutlined, MobileOutlined, BarChartOutlined, TagsOutlined,
-  GiftOutlined, CrownOutlined, ReloadOutlined, ExclamationCircleOutlined,
+  GiftOutlined, CrownOutlined, ReloadOutlined, ExclamationCircleOutlined, PrinterOutlined,
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
