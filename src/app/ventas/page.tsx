@@ -306,6 +306,9 @@ export default function VentasPage() {
       tareas.push(
         abrirCajon().then((result) => {
           if (!result.ok) {
+            if (String(result.error || "").includes("no habilitado")) {
+              return;
+            }
             console.warn("[POS] Venta registrada, pero el cajón no respondió:", result.error ?? "sin detalle");
           }
         }).catch(() => {})

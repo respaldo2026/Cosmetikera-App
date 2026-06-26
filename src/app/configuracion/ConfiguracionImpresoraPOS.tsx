@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Row, Col, Space, Button, Select, Input, Radio, Card, Divider, message } from "antd";
 import { ReloadOutlined, PrinterOutlined } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
-import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon } from "@utils/pos-hardware";
+import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS, imprimirTicketTermico, abrirCajon, marcarAgentePOSLocalHabilitado } from "@utils/pos-hardware";
 import { crearTemplateTicketPOS, crearTicketPruebaPOS, invalidarConfigTicketPOS } from "@utils/pos-ticket-template";
 import type { TicketPromoConfig } from "@utils/pos-ticket-template";
 
@@ -161,6 +161,7 @@ export default function ConfiguracionImpresoraPOS({
       );
       if (!result.ok) {
         if (usaAgenteLocal) {
+          marcarAgentePOSLocalHabilitado(false);
           messageApi.error(`El agente no pudo imprimir: ${result.error ?? "sin detalle"}`);
         } else {
           messageApi.warning(`No se pudo imprimir: ${result.error ?? "sin detalle"}`);
@@ -168,6 +169,9 @@ export default function ConfiguracionImpresoraPOS({
           imprimirTicketNavegador(ticket);
         }
       } else {
+        if (usaAgenteLocal) {
+          marcarAgentePOSLocalHabilitado(true);
+        }
         messageApi.success("Ticket de prueba enviado");
       }
     } catch (e: any) {
@@ -186,8 +190,14 @@ export default function ConfiguracionImpresoraPOS({
     try {
       const result = await abrirCajon(posPrinterName || null);
       if (!result.ok) {
+        if (usaAgenteLocal) {
+          marcarAgentePOSLocalHabilitado(false);
+        }
         messageApi.error("No se pudo abrir el cajón: " + (result.error ?? "desconocido"));
       } else {
+        if (usaAgenteLocal) {
+          marcarAgentePOSLocalHabilitado(true);
+        }
         messageApi.success("¡Señal enviada al cajón!");
       }
     } finally {

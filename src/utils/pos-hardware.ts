@@ -26,6 +26,7 @@ const POS_AGENT_TIMEOUT_MS = 12000;
 const POS_AGENT_TOKEN = process.env.NEXT_PUBLIC_POS_AGENT_TOKEN ?? "";
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.cosmetikera.com";
 const APP_CLUB_URL = process.env.NEXT_PUBLIC_APP_CLUB_URL ?? `${APP_BASE_URL.replace(/\/$/, "")}/club`;
+const POS_AGENT_ENABLED_STORAGE_KEY = "lc_pos_agent_enabled_v1";
 
 function usarQZTray(): boolean {
   return POS_PRINT_MODE === "qz";
@@ -35,7 +36,29 @@ function usarAgentePOS(): boolean {
   return POS_PRINT_MODE === "agent" || POS_PRINT_MODE === "auto";
 }
 
+function isLocalDevHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+export function agentePOSLocalHabilitado(): boolean {
+  if (!usarAgentePOS()) return false;
+  if (typeof window === "undefined") return false;
+  if (isLocalDevHost()) return true;
+  return window.localStorage.getItem(POS_AGENT_ENABLED_STORAGE_KEY) === "true";
+}
+
+export function marcarAgentePOSLocalHabilitado(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(POS_AGENT_ENABLED_STORAGE_KEY, enabled ? "true" : "false");
+}
+
 async function llamarAgentePOS<T = any>(ruta: string, payload: Record<string, any>): Promise<T> {
+  if (!agentePOSLocalHabilitado()) {
+    throw new Error("Agente POS local no habilitado en este navegador/PC");
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), POS_AGENT_TIMEOUT_MS);
 
@@ -59,6 +82,8 @@ async function llamarAgentePOS<T = any>(ruta: string, payload: Record<string, an
     if (!response.ok) {
       throw new Error(typeof data?.error === "string" ? data.error : "Agente POS no disponible");
     }
+
+    marcarAgentePOSLocalHabilitado(true);
 
     return data as T;
   } finally {
