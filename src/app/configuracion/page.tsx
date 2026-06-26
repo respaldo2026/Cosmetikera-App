@@ -1032,7 +1032,7 @@ export default function ConfiguracionPage() {
 
       const vistos = new Set<string>();
       const sinDuplicados = normalizados.filter((medio) => {
-        const clave = String(medio.codigo || medio.tipo || medio.nombre || "").trim().toLowerCase();
+        const clave = String((medio as any).codigo || medio.tipo || medio.nombre || "").trim().toLowerCase();
         if (!clave) return true;
         if (vistos.has(clave)) return false;
         vistos.add(clave);
@@ -1068,7 +1068,7 @@ export default function ConfiguracionPage() {
       const values = await formMedioPago.validateFields();
       const payload = {
         nombre: values.nombre,
-        codigo: values.tipo,
+        codigo: String(values.tipo || "").trim().toLowerCase(),
         descripcion: buildDescripcion(values.descripcion, values.informacion),
         activo: values.activo ?? true,
       };
