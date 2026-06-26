@@ -150,6 +150,25 @@ const sumarMapaDenominaciones = (counts: Record<string, number>) =>
     return acc + (Number.isFinite(value) ? value * Number(cantidad || 0) : 0);
   }, 0);
 
+async function buildCajaAuthHeaders(contentType = false): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  if (contentType) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const { data, error } = await supabaseBrowserClient.auth.getSession();
+  if (error) {
+    throw error;
+  }
+
+  const accessToken = data.session?.access_token;
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return headers;
+}
+
 function getVentaNumero(venta?: { numero_ticket?: number | null; id?: string | null } | null): string {
   const numero = Number(venta?.numero_ticket ?? 0);
   if (Number.isFinite(numero) && numero >= 1000) {
@@ -331,7 +350,7 @@ export default function VentasPage() {
         .from("perfiles")
         .select("id,nombre_completo,rol,email")
         .eq("activo", true)
-        .in("rol", ["administrador", "admin", "director", "administrativo", "vendedor", "marketing"])
+        .in("rol", ["administrador", "admin", "director", "administrativo", "vendedor", "secretaria", "asesor", "marketing"])
         .order("nombre_completo");
 
       if (error) throw error;
@@ -355,7 +374,9 @@ export default function VentasPage() {
   const cargarTurnoCaja = useCallback(async () => {
     setCargandoCaja(true);
     try {
-      const response = await fetch("/api/caja/turnos");
+      const response = await fetch("/api/caja/turnos", {
+        headers: await buildCajaAuthHeaders(false),
+      });
       const payload = (await response.json()) as EstadoCajaResponse;
       if (!response.ok) throw new Error(payload.error || "No se pudo consultar la caja");
       setTurnoCaja(payload.currentTurno || null);
@@ -412,7 +433,7 @@ export default function VentasPage() {
       const values = await formApertura.validateFields();
       const response = await fetch("/api/caja/turnos", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildCajaAuthHeaders(true),
         body: JSON.stringify({
           action: "open",
           base_apertura: values.base_apertura,
@@ -534,7 +555,7 @@ export default function VentasPage() {
       const values = await formCierre.validateFields();
       const response = await fetch("/api/caja/turnos", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildCajaAuthHeaders(true),
         body: JSON.stringify({
           action: "close",
           billetes: billetesContados,
@@ -1804,17 +1825,17 @@ export default function VentasPage() {
 
           <Form.Item
             label="Base inicial"
-            name="base_apertura"
-            rules={[{ required: true, message: "Ingresa la base inicial" }]}
           >
             <Space.Compact style={{ width: "100%" }}>
-              <InputNumber
-                min={0}
-                style={{ width: "100%" }}
-                formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
-                placeholder="$0"
-              />
+              <Form.Item name="base_apertura" noStyle rules={[{ required: true, message: "Ingresa la base inicial" }]}>
+                <InputNumber
+                  min={0}
+                  style={{ width: "100%" }}
+                  formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                  parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
+                  placeholder="$0"
+                />
+              </Form.Item>
               <Button icon={<CalculatorOutlined />} onClick={() => setContadorAperturaVisible(true)}>
                 Contador
               </Button>
