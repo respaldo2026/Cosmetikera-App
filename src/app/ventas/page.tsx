@@ -464,7 +464,7 @@ export default function VentasPage() {
     win.document.close();
     win.focus();
     win.print();
-  }, [baseCaja, billetesContados, descuadreCaja, efectivoEsperadoCaja, formCierre, message, monedasContadas, produccionCaja, totalContadoCaja, turnoCaja]);
+  }, [billetesContados, formCierre, message, monedasContadas, turnoCaja]);
 
   const abrirModalCierreCaja = useCallback(() => {
     if (!turnoCaja) {
