@@ -7,6 +7,7 @@ declare namespace NodeJS {
     NEXT_PUBLIC_APP_URL?: string;
     NEXT_PUBLIC_DEFAULT_TENANT_SLUG?: string;
     DEFAULT_TENANT_SLUG?: string;
+    SAAS_ONBOARDING_ENABLED?: string;
   }
 }
 
