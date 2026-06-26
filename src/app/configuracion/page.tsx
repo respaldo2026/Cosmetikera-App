@@ -1017,7 +1017,9 @@ export default function ConfiguracionPage() {
       const { data } = await supabaseBrowserClient
         .from("medios_pago")
         .select("*")
+        .order("orden", { ascending: true })
         .order("nombre", { ascending: true });
+
       const normalizados = (data || []).map((medio: any) => {
         const parsed = splitDescripcion(medio?.descripcion);
         return {
@@ -1027,7 +1029,17 @@ export default function ConfiguracionPage() {
           informacion: parsed.informacion,
         } as MedioPago;
       });
-      setMediosPago(normalizados);
+
+      const vistos = new Set<string>();
+      const sinDuplicados = normalizados.filter((medio) => {
+        const clave = String(medio.codigo || medio.tipo || medio.nombre || "").trim().toLowerCase();
+        if (!clave) return true;
+        if (vistos.has(clave)) return false;
+        vistos.add(clave);
+        return true;
+      });
+
+      setMediosPago(sinDuplicados);
     } catch (error) {
       console.error(error);
     } finally {
@@ -1071,7 +1083,7 @@ export default function ConfiguracionPage() {
       } else {
         const { error } = await supabaseBrowserClient
           .from("medios_pago")
-          .insert(payload);
+          .upsert(payload, { onConflict: "codigo" });
         if (error) throw error;
         messageApi.success("Medio de pago creado");
       }
@@ -1093,11 +1105,12 @@ export default function ConfiguracionPage() {
       okType: "danger",
       onOk: async () => {
         try {
-          await supabaseBrowserClient.from("medios_pago").delete().eq("id", medio.id);
+          const { error } = await supabaseBrowserClient.from("medios_pago").delete().eq("id", medio.id);
+          if (error) throw error;
           messageApi.success("Eliminado");
           cargarMediosPago();
         } catch (e: any) {
-          messageApi.error(e.message);
+          messageApi.error(e?.message || "No se pudo eliminar el medio de pago");
         }
       }
     });
