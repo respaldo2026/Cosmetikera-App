@@ -49,6 +49,7 @@ import { buildComparisonMetric, buildHistorialStats, getCurrentAndPreviousRanges
 import { descargarInformeHistorialPDF } from "@/utils/historial-report";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { authHeaders } from "@/utils/auth-fetch";
+import { supabaseBrowserClient } from "@utils/supabase/client";
 
 const HistorialCharts = dynamic(() => import("./HistorialCharts"), {
   ssr: false,
@@ -149,6 +150,22 @@ type ArticuloCatalogo = {
   marca?: string | null;
   precio_costo?: number | null;
   precio_venta?: number | null;
+};
+
+type CajaTurno = {
+  id: string;
+  estado: "abierto" | "cerrado";
+  opened_at: string;
+  closed_at?: string | null;
+  base_apertura: number;
+  producido_efectivo: number;
+  efectivo_esperado: number;
+  efectivo_contado: number;
+  descuadre: number;
+  notas_apertura?: string | null;
+  notas_cierre?: string | null;
+  opened_by?: string | null;
+  closed_by?: string | null;
 };
 
 type HistorialPayload = {
@@ -447,6 +464,8 @@ export default function HistorialPage() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedOperacionKeys, setSelectedOperacionKeys] = useState<string[]>([]);
+  const [cierresCaja, setCierresCaja] = useState<CajaTurno[]>([]);
+  const [loadingCierresCaja, setLoadingCierresCaja] = useState(false);
 
   const PAGE_SIZE = 300;
 
@@ -491,6 +510,30 @@ export default function HistorialPage() {
     }));
   }, [mergeUniqueById]);
 
+  const cargarCierresCaja = useCallback(async () => {
+    setLoadingCierresCaja(true);
+    try {
+      const { data, error } = await supabaseBrowserClient
+        .from("caja_turnos")
+        .select("id,estado,opened_at,closed_at,base_apertura,producido_efectivo,efectivo_esperado,efectivo_contado,descuadre,notas_apertura,notas_cierre,opened_by,closed_by")
+        .eq("estado", "cerrado")
+        .order("closed_at", { ascending: false, nullsFirst: false })
+        .order("opened_at", { ascending: false, nullsFirst: false })
+        .limit(8);
+
+      if (error) {
+        throw error;
+      }
+
+      setCierresCaja((data || []) as CajaTurno[]);
+    } catch (error) {
+      console.error("No se pudieron cargar los cierres de caja:", error);
+      setCierresCaja([]);
+    } finally {
+      setLoadingCierresCaja(false);
+    }
+  }, []);
+
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
@@ -515,8 +558,9 @@ export default function HistorialPage() {
   }, [hasMore, loadPage, loadingMore, message, page]);
 
   useEffect(() => {
-    cargar();
-  }, [cargar]);
+    void cargar();
+    void cargarCierresCaja();
+  }, [cargar, cargarCierresCaja]);
 
   const operaciones = useMemo(() => {
     const perfilesMap = new Map(data.perfiles.map((perfil) => [perfil.id, perfil]));
@@ -825,6 +869,18 @@ export default function HistorialPage() {
     () => buildHistorialStats(ventasFiltradas, data.articulos),
     [data.articulos, ventasFiltradas]
   );
+
+  const resumenCierresCaja = useMemo(() => {
+    const total = cierresCaja.length;
+    const totalDescuadre = cierresCaja.reduce((acc, turno) => acc + Number(turno.descuadre || 0), 0);
+    const ultimoTurno = cierresCaja[0] || null;
+
+    return {
+      total,
+      totalDescuadre,
+      ultimoTurno,
+    };
+  }, [cierresCaja]);
 
   const previousSalesStats = useMemo(
     () => buildHistorialStats(ventasPeriodoAnterior, data.articulos),
@@ -1321,6 +1377,94 @@ export default function HistorialPage() {
           </Card>
         </Col>
       </Row>
+
+      <Card style={{ marginBottom: 16, borderRadius: 12 }} styles={{ body: { padding: 16 } }}>
+        <Row gutter={[12, 12]} align="middle">
+          <Col xs={24} lg={10}>
+            <Space direction="vertical" size={4}>
+              <Title level={5} style={{ margin: 0 }}>Cierres de caja</Title>
+              <Text type="secondary">Últimos cierres con base, efectivo esperado, contado y descuadre.</Text>
+            </Space>
+          </Col>
+          <Col xs={12} lg={4}>
+            <Statistic title="Cierres" value={resumenCierresCaja.total} />
+          </Col>
+          <Col xs={12} lg={5}>
+            <Statistic
+              title="Descuadre acumulado"
+              value={resumenCierresCaja.totalDescuadre}
+              formatter={(value) => formatMoney(Number(value || 0))}
+              valueStyle={{ color: resumenCierresCaja.totalDescuadre >= 0 ? "#1677ff" : "#cf1322" }}
+            />
+          </Col>
+          <Col xs={24} lg={5}>
+            {resumenCierresCaja.ultimoTurno ? (
+              <Space direction="vertical" size={0} style={{ width: "100%" }}>
+                <Text type="secondary">Último cierre</Text>
+                <Text strong>{formatDateTime(resumenCierresCaja.ultimoTurno.closed_at || resumenCierresCaja.ultimoTurno.opened_at)}</Text>
+                <Text style={{ color: resumenCierresCaja.ultimoTurno.descuadre >= 0 ? "#1677ff" : "#cf1322" }}>
+                  {resumenCierresCaja.ultimoTurno.descuadre >= 0 ? "Sobrante" : "Faltante"} {formatMoney(Math.abs(resumenCierresCaja.ultimoTurno.descuadre || 0))}
+                </Text>
+              </Space>
+            ) : (
+              <Text type="secondary">Sin cierres registrados aún</Text>
+            )}
+          </Col>
+        </Row>
+
+        <div style={{ marginTop: 16 }}>
+          <Table
+            size="small"
+            loading={loadingCierresCaja}
+            pagination={false}
+            rowKey="id"
+            dataSource={cierresCaja}
+            columns={[
+              {
+                title: "Fecha cierre",
+                dataIndex: "closed_at",
+                key: "closed_at",
+                render: (value: string | null, record: CajaTurno) => formatDateTime(value || record.opened_at),
+              },
+              {
+                title: "Base",
+                dataIndex: "base_apertura",
+                key: "base_apertura",
+                render: (value: number) => formatMoney(value),
+              },
+              {
+                title: "Esperado",
+                dataIndex: "efectivo_esperado",
+                key: "efectivo_esperado",
+                render: (value: number) => formatMoney(value),
+              },
+              {
+                title: "Contado",
+                dataIndex: "efectivo_contado",
+                key: "efectivo_contado",
+                render: (value: number) => formatMoney(value),
+              },
+              {
+                title: "Descuadre",
+                dataIndex: "descuadre",
+                key: "descuadre",
+                render: (value: number) => (
+                  <Text style={{ color: value >= 0 ? "#1677ff" : "#cf1322" }}>
+                    {value >= 0 ? "Sobra" : "Falta"} {formatMoney(Math.abs(value || 0))}
+                  </Text>
+                ),
+              },
+              {
+                title: "Observación",
+                dataIndex: "notas_cierre",
+                key: "notas_cierre",
+                render: (value: string | null) => value || "-",
+              },
+            ]}
+            locale={{ emptyText: "No hay cierres de caja para mostrar" }}
+          />
+        </div>
+      </Card>
 
       {periodComparison ? (
         <Card style={{ marginBottom: 16, borderRadius: 12 }} styles={{ body: { padding: "14px 16px" } }}>
