@@ -126,6 +126,11 @@ const getDetallePagoMixto = (pagoMixto: PagoMixto) =>
     .map(([clave, monto]) => `${METODO_PAGO_LABELS[clave as keyof typeof METODO_PAGO_LABELS]} $${Number(monto).toLocaleString()}`)
     .join(" · ");
 
+const formatCurrency = (value?: number | null) => {
+  if (!value) return "$0";
+  return `$${Number(value).toLocaleString("es-CO")}`;
+};
+
 const crearMapaDenominaciones = (denominaciones: readonly Denominacion[]) =>
   denominaciones.reduce<Record<string, number>>((acc, denominacion) => {
     acc[String(denominacion)] = 0;
