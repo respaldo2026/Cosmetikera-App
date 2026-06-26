@@ -21,6 +21,7 @@ import { aplicarPlantillaTicketPOS, cargarConfigTicketPOS } from "@utils/pos-tic
 import { BarcodeOutlined } from "@ant-design/icons";
 import { crearMovimiento } from "@/modules/finanzas/movimientos.service";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 import { isBirthdayMonth } from "@/constants/clubRewards";
 import { useClubConfig, getNivelDinamico, getMultiplicadorCumple, calcularPuntosVenta } from "@/hooks/useClubConfig";
 import { useRouter } from "next/navigation";
@@ -83,6 +84,13 @@ type TurnoCaja = {
   descuadre: number;
   billetes?: Record<string, number>;
   monedas?: Record<string, number>;
+};
+
+type ResponsableCaja = {
+  id: string;
+  nombre_completo: string;
+  rol?: string | null;
+  email?: string | null;
 };
 
 const NIVEL_COLORS: Record<string, string> = {
@@ -192,6 +200,9 @@ export default function VentasPage() {
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
   const { user } = useCurrentUser();
+  const { tienePermiso } = useRolePermissions();
+  const [formApertura] = Form.useForm();
+  const [formCierre] = Form.useForm();
 
   const [articulos, setArticulos] = useState<Articulo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -215,10 +226,13 @@ export default function VentasPage() {
   const [productoAgregadoReciente, setProductoAgregadoReciente] = useState<string | null>(null);
   const [turnoCaja, setTurnoCaja] = useState<TurnoCaja | null>(null);
   const [cargandoCaja, setCargandoCaja] = useState(false);
+  const [aperturaVisible, setAperturaVisible] = useState(false);
   const [cierreVisible, setCierreVisible] = useState(false);
   const [guardandoCierreCaja, setGuardandoCierreCaja] = useState(false);
+  const [guardandoAperturaCaja, setGuardandoAperturaCaja] = useState(false);
   const [billetesContados, setBilletesContados] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
   const [monedasContadas, setMonedasContadas] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
+  const [responsablesCaja, setResponsablesCaja] = useState<ResponsableCaja[]>([]);
 
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
   const [nuevoClienteForm] = Form.useForm();
@@ -226,6 +240,8 @@ export default function VentasPage() {
   const [cumpleDiaPickerOpen, setCumpleDiaPickerOpen] = useState(false);
   const [clientesFiltrados, setClientesFiltrados] = useState<Cliente[]>([]);
   const { reglas: reglasClub } = useClubConfig();
+  const puedeAbrirCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_abrir");
+  const puedeCerrarCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_cerrar");
 
   const subtotalCarrito = carrito.reduce((s, i) => s + i.subtotal, 0);
   const descuentoVal = Math.round(subtotalCarrito * (descuento / 100));
@@ -286,11 +302,32 @@ export default function VentasPage() {
     setModalPagoOpen(true);
   }, [metodoPago, totalFinal]);
 
+  const cargarResponsablesCaja = useCallback(async () => {
+    try {
+      const { data, error } = await supabaseBrowserClient
+        .from("perfiles")
+        .select("id,nombre_completo,rol,email")
+        .eq("activo", true)
+        .in("rol", ["administrador", "admin", "director", "administrativo", "vendedor", "marketing"])
+        .order("nombre_completo");
+
+      if (error) throw error;
+      setResponsablesCaja((data || []) as ResponsableCaja[]);
+    } catch (error) {
+      console.error("[Ventas] Error cargando responsables de caja:", error);
+      setResponsablesCaja([]);
+    }
+  }, []);
+
   useEffect(() => {
     // Precarga para evitar latencia en la primera impresión/cajón.
     void cargarConfigPOS().catch(() => {});
     void cargarConfigTicketPOS().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    void cargarResponsablesCaja();
+  }, [cargarResponsablesCaja]);
 
   const cargarTurnoCaja = useCallback(async () => {
     setCargandoCaja(true);
@@ -311,6 +348,114 @@ export default function VentasPage() {
     void cargarTurnoCaja();
   }, [cargarTurnoCaja]);
 
+  const abrirModalApertura = useCallback(() => {
+    formApertura.setFieldsValue({
+      base_apertura: 0,
+      notas_apertura: "",
+      opened_by: user?.id || undefined,
+    });
+    setAperturaVisible(true);
+  }, [formApertura, user?.id]);
+
+  const confirmarAperturaCaja = useCallback(async () => {
+    try {
+      setGuardandoAperturaCaja(true);
+      const values = await formApertura.validateFields();
+      const response = await fetch("/api/caja/turnos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "open",
+          base_apertura: values.base_apertura,
+          notas_apertura: values.notas_apertura,
+          opened_by: values.opened_by,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "No se pudo abrir la caja");
+
+      setTurnoCaja(payload.currentTurno || null);
+      setAperturaVisible(false);
+      message.success("Caja abierta correctamente");
+
+      if (permiteCajon) {
+        await abrirCajon();
+      }
+    } catch (error: any) {
+      message.error(error?.message || "No se pudo abrir la caja");
+    } finally {
+      setGuardandoAperturaCaja(false);
+    }
+  }, [formApertura, message, permiteCajon]);
+
+  const imprimirCuadreCaja = useCallback(() => {
+    if (!turnoCaja) {
+      message.warning("No hay un turno de caja para imprimir");
+      return;
+    }
+
+    const fecha = dayjs().format("DD/MM/YYYY HH:mm");
+    const win = window.open("", "_blank", "width=420,height=700");
+    if (!win) {
+      message.warning("No se pudo abrir la vista de impresión");
+      return;
+    }
+
+    const filasBilletes = BILLETES_CAJA.map((denominacion) => {
+      const valor = billetesContados[String(denominacion)] || 0;
+      return `<tr><td>${formatCurrency(denominacion)}</td><td style="text-align:right">${valor}</td><td style="text-align:right">${formatCurrency(valor * denominacion)}</td></tr>`;
+    }).join("");
+    const filasMonedas = MONEDAS_CAJA.map((denominacion) => {
+      const valor = monedasContadas[String(denominacion)] || 0;
+      return `<tr><td>${formatCurrency(denominacion)}</td><td style="text-align:right">${valor}</td><td style="text-align:right">${formatCurrency(valor * denominacion)}</td></tr>`;
+    }).join("");
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Cuadre de caja</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
+            h1 { margin: 0 0 8px; font-size: 20px; }
+            .meta { color: #555; font-size: 12px; margin-bottom: 16px; }
+            .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 16px; }
+            .summary div { padding: 8px 0; border-bottom: 1px solid #eee; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+            th, td { border-bottom: 1px solid #eee; padding: 6px 4px; font-size: 12px; }
+            th { text-align: left; background: #fafafa; }
+            .footer { margin-top: 18px; font-size: 12px; color: #444; }
+          </style>
+        </head>
+        <body>
+          <h1>Cuadre de caja</h1>
+          <div class="meta">Fecha de impresión: ${fecha} · Turno: ${turnoCaja.id}</div>
+          <div class="summary">
+            <div><strong>Base:</strong> ${formatCurrency(baseCaja)}</div>
+            <div><strong>Producido:</strong> ${formatCurrency(produccionCaja)}</div>
+            <div><strong>Esperado:</strong> ${formatCurrency(efectivoEsperadoCaja)}</div>
+            <div><strong>Contado:</strong> ${formatCurrency(totalContadoCaja)}</div>
+            <div><strong>Cuadre/Descuadre:</strong> ${formatCurrency(descuadreCaja)}</div>
+            <div><strong>Estado:</strong> ${descuadreCaja === 0 ? "Cuadre exacto" : descuadreCaja > 0 ? "Sobra" : "Falta"}</div>
+          </div>
+          <h2 style="font-size: 15px; margin: 0 0 8px;">Billetes</h2>
+          <table>
+            <thead><tr><th>Denominación</th><th style="text-align:right">Cant.</th><th style="text-align:right">Total</th></tr></thead>
+            <tbody>${filasBilletes}</tbody>
+          </table>
+          <h2 style="font-size: 15px; margin: 0 0 8px;">Monedas</h2>
+          <table>
+            <thead><tr><th>Denominación</th><th style="text-align:right">Cant.</th><th style="text-align:right">Total</th></tr></thead>
+            <tbody>${filasMonedas}</tbody>
+          </table>
+          ${formCierre.getFieldValue("notas_cierre") ? `<div class="footer"><strong>Observaciones:</strong> ${String(formCierre.getFieldValue("notas_cierre"))}</div>` : ""}
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+  }, [baseCaja, billetesContados, descuadreCaja, efectivoEsperadoCaja, formCierre, message, monedasContadas, produccionCaja, totalContadoCaja, turnoCaja]);
+
   const abrirModalCierreCaja = useCallback(() => {
     if (!turnoCaja) {
       message.warning("No hay una caja abierta para cerrar");
@@ -319,8 +464,9 @@ export default function VentasPage() {
 
     setBilletesContados(crearMapaDenominaciones(BILLETES_CAJA));
     setMonedasContadas(crearMapaDenominaciones(MONEDAS_CAJA));
+    formCierre.setFieldsValue({ notas_cierre: "" });
     setCierreVisible(true);
-  }, [message, turnoCaja]);
+  }, [formCierre, message, turnoCaja]);
 
   const confirmarCierreCaja = useCallback(async () => {
     if (!turnoCaja) {
@@ -330,6 +476,7 @@ export default function VentasPage() {
 
     setGuardandoCierreCaja(true);
     try {
+      const values = await formCierre.validateFields();
       const response = await fetch("/api/caja/turnos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -337,6 +484,7 @@ export default function VentasPage() {
           action: "close",
           billetes: billetesContados,
           monedas: monedasContadas,
+          notas_cierre: values.notas_cierre,
         }),
       });
       const payload = await response.json();
@@ -350,7 +498,7 @@ export default function VentasPage() {
     } finally {
       setGuardandoCierreCaja(false);
     }
-  }, [billetesContados, message, monedasContadas, turnoCaja]);
+  }, [billetesContados, formCierre, message, monedasContadas, turnoCaja]);
 
   useEffect(() => {
     if (!modalPagoOpen) return;
@@ -1522,14 +1670,23 @@ export default function VentasPage() {
             </Space>
           </Col>
           <Col>
-            <Button
-              type={turnoCaja ? "primary" : "default"}
-              danger={Boolean(turnoCaja)}
-              disabled={!turnoCaja}
-              onClick={abrirModalCierreCaja}
-            >
-              Cerrar caja
-            </Button>
+            <Space>
+              <Button
+                type="primary"
+                onClick={abrirModalApertura}
+                disabled={Boolean(turnoCaja) || !puedeAbrirCaja}
+              >
+                Abrir caja
+              </Button>
+              <Button
+                danger
+                type="primary"
+                onClick={abrirModalCierreCaja}
+                disabled={!turnoCaja || !puedeCerrarCaja}
+              >
+                Cerrar caja
+              </Button>
+            </Space>
           </Col>
         </Row>
       </Card>
@@ -1545,10 +1702,77 @@ export default function VentasPage() {
       </Row>
 
       <Modal
+        title="Apertura de caja"
+        open={aperturaVisible}
+        onCancel={() => setAperturaVisible(false)}
+        onOk={confirmarAperturaCaja}
+        confirmLoading={guardandoAperturaCaja}
+        okText="Abrir caja"
+        cancelText="Cancelar"
+        width={640}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Selecciona el responsable y la base inicial"
+          description="Al confirmar se registrará el turno y se abrirá el cajón si el dispositivo lo permite."
+        />
+
+        <Form form={formApertura} layout="vertical">
+          <Form.Item
+            label="Responsable de apertura"
+            name="opened_by"
+            rules={[{ required: true, message: "Selecciona quién abre la caja" }]}
+          >
+            <Select
+              showSearch
+              placeholder="Selecciona responsable"
+              optionFilterProp="children"
+              filterOption={(input, option) => String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+              options={responsablesCaja.map((resp) => ({
+                value: resp.id,
+                label: `${resp.nombre_completo}${resp.rol ? ` · ${resp.rol}` : ""}`,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Base inicial"
+            name="base_apertura"
+            rules={[{ required: true, message: "Ingresa la base inicial" }]}
+          >
+            <InputNumber
+              min={0}
+              style={{ width: "100%" }}
+              formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
+              placeholder="$0"
+            />
+          </Form.Item>
+
+          <Form.Item label="Observaciones" name="notas_apertura">
+            <Input.TextArea rows={3} placeholder="Ej: cambio inicial, observaciones del turno" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
         title="Cierre de caja"
         open={cierreVisible}
         onCancel={() => setCierreVisible(false)}
         onOk={confirmarCierreCaja}
+        footer={[
+          <Button key="print" icon={<PrinterOutlined />} onClick={imprimirCuadreCaja}>
+            Imprimir cuadre
+          </Button>,
+          <Button key="cancel" onClick={() => setCierreVisible(false)}>
+            Cancelar
+          </Button>,
+          <Button key="ok" type="primary" danger onClick={confirmarCierreCaja} loading={guardandoCierreCaja}>
+            Cerrar caja
+          </Button>,
+        ]}
         okText="Cerrar caja"
         cancelText="Cancelar"
         confirmLoading={guardandoCierreCaja}
