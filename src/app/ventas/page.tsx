@@ -156,12 +156,21 @@ async function buildCajaAuthHeaders(contentType = false): Promise<Record<string,
     headers["Content-Type"] = "application/json";
   }
 
-  const { data, error } = await supabaseBrowserClient.auth.getSession();
+  let { data, error } = await supabaseBrowserClient.auth.getSession();
   if (error) {
     throw error;
   }
 
-  const accessToken = data.session?.access_token;
+  let accessToken = data.session?.access_token ?? null;
+  if (!accessToken) {
+    const refreshed = await supabaseBrowserClient.auth.refreshSession();
+    if (refreshed.error) {
+      throw refreshed.error;
+    }
+    data = refreshed.data as typeof data;
+    accessToken = data.session?.access_token ?? null;
+  }
+
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -230,7 +239,7 @@ export default function VentasPage() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const { message, modal } = App.useApp();
-  const { user } = useCurrentUser();
+  const { user, loading: loadingUser } = useCurrentUser();
   const { tienePermiso } = useRolePermissions();
   const [formApertura] = Form.useForm();
   const [formCierre] = Form.useForm();
@@ -350,11 +359,14 @@ export default function VentasPage() {
         .from("perfiles")
         .select("id,nombre_completo,rol,email")
         .eq("activo", true)
-        .in("rol", ["administrador", "admin", "director", "administrativo", "vendedor", "secretaria", "asesor", "marketing"])
         .order("nombre_completo");
 
       if (error) throw error;
-      setResponsablesCaja((data || []) as ResponsableCaja[]);
+      const responsables = ((data || []) as ResponsableCaja[]).filter((perfil) => {
+        const role = String(perfil.rol || "").toLowerCase();
+        return !["cliente", "estudiante", "egresado"].includes(role);
+      });
+      setResponsablesCaja(responsables);
     } catch (error) {
       console.error("[Ventas] Error cargando responsables de caja:", error);
       setResponsablesCaja([]);
@@ -372,6 +384,14 @@ export default function VentasPage() {
   }, [cargarResponsablesCaja]);
 
   const cargarTurnoCaja = useCallback(async () => {
+    if (loadingUser) return;
+    if (!user?.id) {
+      setTurnoCaja(null);
+      setUltimoCierreCaja(null);
+      setBaseSugeridaApertura(0);
+      return;
+    }
+
     setCargandoCaja(true);
     try {
       const response = await fetch("/api/caja/turnos", {
@@ -390,14 +410,14 @@ export default function VentasPage() {
     } finally {
       setCargandoCaja(false);
     }
-  }, []);
+  }, [loadingUser, user?.id]);
 
   useEffect(() => {
     void cargarTurnoCaja();
   }, [cargarTurnoCaja]);
 
   useEffect(() => {
-    if (cargandoCaja || turnoCaja || aperturaVisible || !puedeAbrirCaja || !esRolVendedor || aperturaAutoMostrada) return;
+    if (loadingUser || cargandoCaja || turnoCaja || aperturaVisible || !puedeAbrirCaja || !esRolVendedor || aperturaAutoMostrada || !user?.id) return;
     setAperturaAutoMostrada(true);
     formApertura.setFieldsValue({
       base_apertura: baseSugeridaApertura,
@@ -407,7 +427,7 @@ export default function VentasPage() {
       opened_by: user?.id || undefined,
     });
     setAperturaVisible(true);
-  }, [aperturaAutoMostrada, aperturaVisible, baseSugeridaApertura, cargandoCaja, esRolVendedor, formApertura, puedeAbrirCaja, turnoCaja, ultimoCierreCaja?.closed_at, user?.id]);
+  }, [aperturaAutoMostrada, aperturaVisible, baseSugeridaApertura, cargandoCaja, esRolVendedor, formApertura, loadingUser, puedeAbrirCaja, turnoCaja, ultimoCierreCaja?.closed_at, user?.id]);
 
   const abrirModalApertura = useCallback(() => {
     setBilletesApertura(crearMapaDenominaciones(BILLETES_CAJA));
