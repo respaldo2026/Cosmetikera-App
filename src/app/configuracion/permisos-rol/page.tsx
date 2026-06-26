@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Table, Switch, message, Spin, Button } from "antd";
 import { SaveOutlined } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+import { MODULES, OPERATION_PERMISSIONS } from "@/constants/modules";
 
 interface PermisosPorRol {
   [rol: string]: {
@@ -18,19 +19,10 @@ export default function PermisosRolPage() {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Memoizar la lista de módulos
-  const modulos = useMemo(() => [
-    { key: "dashboard", label: "Vista rápida" },
-    { key: "ventas", label: "Ventas" },
-    { key: "historial", label: "Historial" },
-    { key: "caja", label: "Caja / POS" },
-    { key: "articulos", label: "Artículos" },
-    { key: "compras", label: "Compras" },
-    { key: "proveedores", label: "Proveedores" },
-    { key: "fidelizacion", label: "Fidelización" },
-    { key: "marketing-center", label: "Marketing" },
-    { key: "nomina", label: "Nómina" },
-    { key: "configuracion", label: "Configuración" },
-  ], []);
+  const modulos = useMemo(
+    () => [...MODULES, ...OPERATION_PERMISSIONS],
+    [],
+  );
 
   // Memoizar la lista de roles
   const roles = useMemo(() => [

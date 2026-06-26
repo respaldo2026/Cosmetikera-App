@@ -18,3 +18,9 @@ export const MODULES: ModuleDefinition[] = [
   { key: "marketing-center", label: "Marketing" },
   { key: "configuracion", label: "Configuración" },
 ];
+
+export const OPERATION_PERMISSIONS: ModuleDefinition[] = [
+  { key: "usuarios_crear", label: "Operación: Crear usuarios" },
+  { key: "usuarios_eliminar", label: "Operación: Eliminar usuarios" },
+  { key: "historial_eliminar", label: "Operación: Eliminar historial" },
+];

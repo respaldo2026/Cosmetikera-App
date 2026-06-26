@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveTenantContext } from "../_utils/tenant-resolver";
+import { requireOperationPermission } from "../_utils/admin-guard";
 
 function getAdminClient() {
   return createClient(
@@ -12,6 +13,9 @@ function getAdminClient() {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const permissionCheck = await requireOperationPermission(request, "usuarios_eliminar");
+    if (!permissionCheck.ok) return permissionCheck.response;
+
     let tenantContext;
     try {
       tenantContext = await resolveTenantContext(request);

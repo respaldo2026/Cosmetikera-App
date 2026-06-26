@@ -1,12 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { NextRequest } from "next/server";
+import { requireOperationPermission } from "../_utils/admin-guard";
+import { resolveTenantContext } from "../_utils/tenant-resolver";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const permissionCheck = await requireOperationPermission(request, "usuarios_crear");
+    if (!permissionCheck.ok) return permissionCheck.response;
+
+    const { tenantId, tenantSlug } = await resolveTenantContext(request);
     const body = await request.json();
     const { email, password, rol, user_metadata } = body;
 
-    console.log("[CREATE-USER] Request received:", { email, rol });
+    console.log("[CREATE-USER] Request received:", { email, rol, tenantSlug });
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email y contraseña son obligatorios' }, { status: 400 });
@@ -55,6 +62,7 @@ export async function POST(request: Request) {
         ...user_metadata,
         rol,
         email,
+        tenant_id: tenantId,
       }, { onConflict: 'id' });
 
     if (profileError) {
@@ -64,6 +72,29 @@ export async function POST(request: Request) {
     }
 
     console.log("[CREATE-USER] Profile created successfully");
+
+    const membershipRole = rol === "administrador" ? "admin" : "staff";
+    const { error: membershipError } = await supabaseAdmin
+      .from("tenant_memberships")
+      .upsert(
+        {
+          tenant_id: tenantId,
+          user_id: userId,
+          role: membershipRole,
+          is_default: true,
+        },
+        { onConflict: "tenant_id,user_id" },
+      );
+
+    if (membershipError) {
+      console.error("[CREATE-USER] Membership error:", membershipError);
+      return NextResponse.json(
+        { user: authData.user, warning: "Usuario creado, pero falló la asociación al tenant." },
+        { status: 207 },
+      );
+    }
+
+    console.log("[CREATE-USER] Membership created successfully");
 
     const { data: perfil } = await supabaseAdmin
       .from('perfiles')

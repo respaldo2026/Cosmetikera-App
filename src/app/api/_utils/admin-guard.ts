@@ -3,6 +3,9 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { extractTenantFromPathname, normalizeTenantSlug } from "@/utils/tenant/tenant-context";
 
+type GuardSuccess = { ok: true; userId: string; role: string };
+type GuardFailure = { ok: false; response: NextResponse };
+
 function normalizeRole(rawRole: unknown): string {
   let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
   if (["admin", "director", "administrativo"].includes(normalized)) {
@@ -34,9 +37,10 @@ function getAdminClient(tenantSlug: string) {
   );
 }
 
-export async function requireAdmin(
-  request: NextRequest
-): Promise<{ ok: true; userId: string } | { ok: false; response: NextResponse }> {
+async function resolveAuthContext(request: NextRequest): Promise<
+  | { ok: true; userId: string; role: string; admin: any }
+  | GuardFailure
+> {
   const tenant = resolveTenantFromRequest(request);
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -52,7 +56,6 @@ export async function requireAdmin(
   const admin = getAdminClient(tenant);
   let userId: string | null = null;
 
-  // 1. Intentar verificar por Bearer token (Authorization header)
   const authHeader = request.headers.get("authorization") ?? request.headers.get("Authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
 
@@ -63,7 +66,6 @@ export async function requireAdmin(
     }
   }
 
-  // 2. Fallback: verificar por cookies de sesión
   if (!userId) {
     const supabaseAuth = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
@@ -102,13 +104,61 @@ export async function requireAdmin(
     };
   }
 
-  const role = normalizeRole((perfil as any)?.rol);
-  if (role !== "administrador") {
+  return {
+    ok: true,
+    userId,
+    role: normalizeRole((perfil as any)?.rol),
+    admin,
+  };
+}
+
+export async function requireAdmin(
+  request: NextRequest
+): Promise<GuardSuccess | GuardFailure> {
+  const context = await resolveAuthContext(request);
+  if (!context.ok) return context;
+
+  if (context.role !== "administrador") {
     return {
       ok: false,
       response: NextResponse.json({ error: "Permisos insuficientes" }, { status: 403 }),
     };
   }
 
-  return { ok: true, userId };
+  return { ok: true, userId: context.userId, role: context.role };
+}
+
+export async function requireOperationPermission(
+  request: NextRequest,
+  permissionKey: string,
+): Promise<GuardSuccess | GuardFailure> {
+  const context = await resolveAuthContext(request);
+  if (!context.ok) return context;
+
+  if (context.role === "administrador") {
+    return { ok: true, userId: context.userId, role: context.role };
+  }
+
+  const { data: rolePermission, error } = await context.admin
+    .from("role_permissions")
+    .select("permisos")
+    .eq("rol", context.role)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "No se pudo validar permisos del rol" }, { status: 500 }),
+    };
+  }
+
+  const permissions = (rolePermission as any)?.permisos as Record<string, boolean> | undefined;
+  if (permissions?.[permissionKey] === true) {
+    return { ok: true, userId: context.userId, role: context.role };
+  }
+
+  return {
+    ok: false,
+    response: NextResponse.json({ error: "Permisos insuficientes para esta operación" }, { status: 403 }),
+  };
 }

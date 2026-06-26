@@ -784,9 +784,13 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
     const userPermisos = permisos[normalizedRole] || {};
     const knownRoles = ["administrador", "marketing", "vendedor", "cliente", "administrativo"];
 
-    // Si el rol no es conocido o no tiene permisos definidos, mostrar todo (fallback seguro)
-    if (!normalizedRole || !knownRoles.includes(normalizedRole) || Object.keys(userPermisos).length === 0) {
-      return allResources;
+    // Bloqueo por defecto para roles sin permisos explícitos.
+    if (!normalizedRole || !knownRoles.includes(normalizedRole)) {
+      return [];
+    }
+
+    if (Object.keys(userPermisos).length === 0) {
+      return [];
     }
 
     return allResources.filter((resource) => {

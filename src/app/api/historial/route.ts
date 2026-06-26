@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdmin } from "../_utils/admin-guard";
+import { requireOperationPermission } from "../_utils/admin-guard";
 import { resolveTenantContext } from "../_utils/tenant-resolver";
 
 function getAdminClient() {
@@ -169,7 +169,7 @@ function extractPosNumber(text: string): number | null {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const adminCheck = await requireAdmin(request);
+    const adminCheck = await requireOperationPermission(request, "historial_eliminar");
     if (!adminCheck.ok) return adminCheck.response;
     const { tenantId } = await resolveTenantContext(request);
 

@@ -20,7 +20,7 @@ import {
   type TicketPromoConfig,
 } from "@utils/pos-ticket-template";
 import { getCatalogosArticulosLocal, mergeCatalogos, saveCatalogosArticulosLocal, type CatalogosArticulos } from "@/utils/articulos-catalogos";
-import { MODULES, type ModuleDefinition } from "@/constants/modules";
+import { MODULES, OPERATION_PERMISSIONS, type ModuleDefinition } from "@/constants/modules";
 import { ROLES } from "@/constants/roles";
 import ConfiguracionImpresoraPOS from "./ConfiguracionImpresoraPOS";
 import ConfiguracionImprsoraEtiquetas from "./ConfiguracionImprsoraEtiquetas";
@@ -234,7 +234,7 @@ export default function ConfiguracionPage() {
   const nodeDownloadUrl = "https://nodejs.org/en/download";
   const currentSiteOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
-  const modulos: ModuleDefinition[] = MODULES;
+  const modulos: ModuleDefinition[] = [...MODULES, ...OPERATION_PERMISSIONS];
 
   const roleKeys = Object.keys(ROLES);
   const roleLabels = roleKeys.reduce<Record<string, string>>((acc, key) => {
@@ -957,18 +957,26 @@ export default function ConfiguracionPage() {
           .eq("id", editingAdmin.id);
         messageApi.success("Administrador actualizado");
       } else {
-        await supabaseBrowserClient.auth.signUp({
-          email: values.email,
-          password: values.password,
-          options: {
-            data: {
+        const response = await fetch("/api/create-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: values.email,
+            password: values.password,
+            rol: values.rol,
+            user_metadata: {
               nombre_completo: values.nombre_completo,
-              rol: values.rol,
               identificacion: values.identificacion,
-              telefono: values.telefono
-            }
-          }
+              telefono: values.telefono,
+            },
+          }),
         });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || "No se pudo crear el administrador");
+        }
+
         messageApi.success("Administrador creado");
       }
       setModalAdminVisible(false);
