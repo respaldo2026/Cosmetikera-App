@@ -31,12 +31,70 @@ type TurnoCaja = {
   resumen?: Record<string, unknown>;
 };
 
+type ResumenCaja = {
+  base_apertura: number;
+  produccion_efectivo: number;
+  efectivo_esperado: number;
+  efectivo_contado?: number;
+  descuadre?: number;
+  ventas_total: number;
+  ventas_cantidad: number;
+  ventas_efectivo: number;
+  ventas_tarjeta: number;
+  ventas_transferencia: number;
+  ingresos_manuales_efectivo: number;
+  egresos_manuales_efectivo: number;
+};
+
 const BILLETES = [100000, 50000, 20000, 10000, 5000, 2000];
 const MONEDAS = [1000, 500, 200, 100, 50];
 
 const toNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const isVentasMovimiento = (row: { categoria?: unknown; concepto?: unknown }) => {
+  const categoria = String(row?.categoria || "").trim().toLowerCase();
+  const concepto = String(row?.concepto || "").trim().toLowerCase();
+  return categoria === "ventas" || concepto.startsWith("venta pos #");
+};
+
+const parseMetodoPago = (rawValue: unknown) => {
+  const raw = String(rawValue || "").trim().toLowerCase();
+  const resumen = {
+    efectivo: 0,
+    tarjeta: 0,
+    transferencia: 0,
+  };
+
+  if (!raw) return resumen;
+  if (raw === "efectivo") {
+    resumen.efectivo = 1;
+    return resumen;
+  }
+  if (raw === "tarjeta") {
+    resumen.tarjeta = 1;
+    return resumen;
+  }
+  if (raw === "transferencia") {
+    resumen.transferencia = 1;
+    return resumen;
+  }
+  if (!raw.startsWith("mixto|")) return resumen;
+
+  for (const fragmento of raw.split("|").slice(1)) {
+    const [metodo, monto] = fragmento.split(":");
+    const metodoKey = String(metodo || "").trim().toLowerCase();
+    const amount = toNumber(monto);
+    if (metodoKey === "efectivo") resumen.efectivo += amount;
+    if (metodoKey === "tarjeta") resumen.tarjeta += amount;
+    if (metodoKey === "transferencia") resumen.transferencia += amount;
+  }
+
+  return resumen;
 };
 
 const buildCountMap = (payload: unknown, denominas: number[]) => {
@@ -92,15 +150,17 @@ async function resumirMovimientoEfectivo(
 ) {
   const { data, error } = await supabase
     .from("movimientos_financieros")
-    .select("tipo,monto,metodo_pago")
+    .select("tipo,monto,metodo_pago,categoria,concepto")
     .eq("tenant_id", tenantId)
     .gte("created_at", openedAt)
-    .lte("created_at", closedAt)
-    .eq("metodo_pago", "efectivo");
+    .lte("created_at", closedAt);
 
   if (error) throw error;
 
-  const filas = data ?? [];
+  const filas = (data ?? []).filter((row) => {
+    const metodoPago = String(row?.metodo_pago || "").trim().toLowerCase();
+    return metodoPago === "efectivo" && !isVentasMovimiento(row);
+  });
   const ingresos = filas
     .filter((row) => String(row?.tipo || "").toLowerCase() === "ingreso")
     .reduce((acc, row) => acc + toNumber(row?.monto), 0);
@@ -109,9 +169,98 @@ async function resumirMovimientoEfectivo(
     .reduce((acc, row) => acc + toNumber(row?.monto), 0);
 
   return {
-    ingresos,
-    egresos,
-    producido: ingresos - egresos,
+    ingresos: roundMoney(ingresos),
+    egresos: roundMoney(egresos),
+  };
+}
+
+async function resumirVentasTurno(
+  supabase: ReturnType<typeof getAdminClient>,
+  tenantId: string,
+  openedAt: string,
+  closedAt: string,
+) {
+  const { data, error } = await supabase
+    .from("ventas")
+    .select("id,total,metodo_pago,fecha")
+    .eq("tenant_id", tenantId)
+    .gte("fecha", openedAt)
+    .lte("fecha", closedAt);
+
+  if (error) throw error;
+
+  const resumen = {
+    cantidad: 0,
+    total: 0,
+    efectivo: 0,
+    tarjeta: 0,
+    transferencia: 0,
+  };
+
+  for (const venta of data ?? []) {
+    const total = toNumber(venta?.total);
+    const metodoPago = String(venta?.metodo_pago || "").trim().toLowerCase();
+    const detalle = parseMetodoPago(metodoPago);
+
+    resumen.cantidad += 1;
+    resumen.total += total;
+
+    if (metodoPago === "efectivo") {
+      resumen.efectivo += total;
+      continue;
+    }
+
+    if (metodoPago === "tarjeta") {
+      resumen.tarjeta += total;
+      continue;
+    }
+
+    if (metodoPago === "transferencia") {
+      resumen.transferencia += total;
+      continue;
+    }
+
+    if (metodoPago.startsWith("mixto|")) {
+      resumen.efectivo += detalle.efectivo;
+      resumen.tarjeta += detalle.tarjeta;
+      resumen.transferencia += detalle.transferencia;
+    }
+  }
+
+  return {
+    cantidad: resumen.cantidad,
+    total: roundMoney(resumen.total),
+    efectivo: roundMoney(resumen.efectivo),
+    tarjeta: roundMoney(resumen.tarjeta),
+    transferencia: roundMoney(resumen.transferencia),
+  };
+}
+
+function buildResumenCaja(
+  turno: Pick<TurnoCaja, "base_apertura">,
+  ventas: Awaited<ReturnType<typeof resumirVentasTurno>>,
+  movimientos: Awaited<ReturnType<typeof resumirMovimientoEfectivo>>,
+  contado?: number,
+): ResumenCaja {
+  const baseApertura = roundMoney(Number(turno.base_apertura || 0));
+  const produccionEfectivo = roundMoney(ventas.efectivo + movimientos.ingresos - movimientos.egresos);
+  const efectivoEsperado = roundMoney(baseApertura + produccionEfectivo);
+  const efectivoContado = contado == null ? undefined : roundMoney(contado);
+  const descuadre = efectivoContado == null ? undefined : roundMoney(efectivoContado - efectivoEsperado);
+
+  return {
+    base_apertura: baseApertura,
+    produccion_efectivo: produccionEfectivo,
+    efectivo_esperado: efectivoEsperado,
+    efectivo_contado: efectivoContado,
+    descuadre,
+    ventas_total: ventas.total,
+    ventas_cantidad: ventas.cantidad,
+    ventas_efectivo: ventas.efectivo,
+    ventas_tarjeta: ventas.tarjeta,
+    ventas_transferencia: ventas.transferencia,
+    ingresos_manuales_efectivo: movimientos.ingresos,
+    egresos_manuales_efectivo: movimientos.egresos,
   };
 }
 
@@ -133,22 +282,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const resumen = await resumirMovimientoEfectivo(
-      supabase,
-      tenantId,
-      turnoAbierto.opened_at,
-      new Date().toISOString(),
-    );
+    const closedAt = new Date().toISOString();
+    const [ventas, movimientos] = await Promise.all([
+      resumirVentasTurno(
+        supabase,
+        tenantId,
+        turnoAbierto.opened_at,
+        closedAt,
+      ),
+      resumirMovimientoEfectivo(
+        supabase,
+        tenantId,
+        turnoAbierto.opened_at,
+        closedAt,
+      ),
+    ]);
+    const resumen = buildResumenCaja(turnoAbierto, ventas, movimientos);
 
     return NextResponse.json({
       currentTurno: turnoAbierto,
       lastClosedTurno: ultimoCierre,
       suggestedOpeningBase: Number(ultimoCierre?.efectivo_contado || 0),
-      resumen: {
-        base_apertura: Number(turnoAbierto.base_apertura || 0),
-        produccion_efectivo: resumen.producido,
-        efectivo_esperado: Number(turnoAbierto.base_apertura || 0) + resumen.producido,
-      },
+      resumen,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || "No se pudo consultar la caja" }, { status: 500 });
@@ -227,33 +382,39 @@ export async function POST(request: NextRequest) {
       const monedas = buildCountMap(body?.monedas, MONEDAS);
       const notasCierre = String(body?.notas_cierre || "").trim();
       const contado = sumCountMap(billetes) + sumCountMap(monedas);
-      const resumen = await resumirMovimientoEfectivo(
-        supabase,
-        tenantId,
-        turnoActual.opened_at,
-        new Date().toISOString(),
-      );
-      const efectivoEsperado = Number(turnoActual.base_apertura || 0) + resumen.producido;
-      const descuadre = contado - efectivoEsperado;
+      const closedAt = new Date().toISOString();
+      const [ventas, movimientos] = await Promise.all([
+        resumirVentasTurno(
+          supabase,
+          tenantId,
+          turnoActual.opened_at,
+          closedAt,
+        ),
+        resumirMovimientoEfectivo(
+          supabase,
+          tenantId,
+          turnoActual.opened_at,
+          closedAt,
+        ),
+      ]);
+      const resumen = buildResumenCaja(turnoActual, ventas, movimientos, contado);
+      const efectivoEsperado = Number(resumen.efectivo_esperado || 0);
+      const descuadre = Number(resumen.descuadre || 0);
 
       const { data, error } = await supabase
         .from("caja_turnos")
         .update({
           estado: "cerrado",
-          closed_at: new Date().toISOString(),
+          closed_at: closedAt,
           closed_by: permissionCheck.userId,
           billetes,
           monedas,
           efectivo_contado: contado,
-          producido_efectivo: resumen.producido,
+          producido_efectivo: resumen.produccion_efectivo,
           efectivo_esperado: efectivoEsperado,
           descuadre,
           notas_cierre: notasCierre || null,
-          resumen: {
-            ingresos_efectivo: resumen.ingresos,
-            egresos_efectivo: resumen.egresos,
-            producido_efectivo: resumen.producido,
-          },
+          resumen,
         })
         .eq("id", turnoActual.id)
         .select("*")
@@ -265,11 +426,7 @@ export async function POST(request: NextRequest) {
         success: true,
         turnoCerrado: data,
         resumen: {
-          base_apertura: Number(turnoActual.base_apertura || 0),
-          produccion_efectivo: resumen.producido,
-          efectivo_esperado: efectivoEsperado,
-          efectivo_contado: contado,
-          descuadre,
+          ...resumen,
           billetes,
           monedas,
         },

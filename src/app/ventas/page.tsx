@@ -85,11 +85,26 @@ type TurnoCaja = {
   billetes?: Record<string, number>;
   monedas?: Record<string, number>;
 };
+type ResumenCaja = {
+  base_apertura: number;
+  produccion_efectivo: number;
+  efectivo_esperado: number;
+  efectivo_contado?: number;
+  descuadre?: number;
+  ventas_total?: number;
+  ventas_cantidad?: number;
+  ventas_efectivo?: number;
+  ventas_tarjeta?: number;
+  ventas_transferencia?: number;
+  ingresos_manuales_efectivo?: number;
+  egresos_manuales_efectivo?: number;
+};
 
 type EstadoCajaResponse = {
   currentTurno: TurnoCaja | null;
   lastClosedTurno?: TurnoCaja | null;
   suggestedOpeningBase?: number;
+  resumen?: ResumenCaja | null;
   error?: string;
 };
 
@@ -265,6 +280,7 @@ export default function VentasPage() {
   const [restaurandoVentaId, setRestaurandoVentaId] = useState<string | null>(null);
   const [productoAgregadoReciente, setProductoAgregadoReciente] = useState<string | null>(null);
   const [turnoCaja, setTurnoCaja] = useState<TurnoCaja | null>(null);
+  const [resumenCaja, setResumenCaja] = useState<ResumenCaja | null>(null);
   const [ultimoCierreCaja, setUltimoCierreCaja] = useState<TurnoCaja | null>(null);
   const [baseSugeridaApertura, setBaseSugeridaApertura] = useState(0);
   const [cargandoCaja, setCargandoCaja] = useState(false);
@@ -298,6 +314,14 @@ export default function VentasPage() {
     () => sumarMapaDenominaciones(billetesApertura) + sumarMapaDenominaciones(monedasApertura),
     [billetesApertura, monedasApertura],
   );
+  const totalContadoCaja = useMemo(
+    () => sumarMapaDenominaciones(billetesContados) + sumarMapaDenominaciones(monedasContadas),
+    [billetesContados, monedasContadas],
+  );
+  const baseCaja = Number(resumenCaja?.base_apertura ?? turnoCaja?.base_apertura ?? 0);
+  const produccionCaja = Number(resumenCaja?.produccion_efectivo ?? turnoCaja?.producido_efectivo ?? 0);
+  const efectivoEsperadoCaja = Number(resumenCaja?.efectivo_esperado ?? turnoCaja?.efectivo_esperado ?? 0);
+  const descuadreCaja = totalContadoCaja - efectivoEsperadoCaja;
 
   const lanzarProcesosPOS = useCallback((ticket: DatosTicket, debeAbrirCajon: boolean, debeImprimir: boolean) => {
     const tareas: Promise<unknown>[] = [];
@@ -390,6 +414,7 @@ export default function VentasPage() {
     if (loadingUser) return;
     if (!user?.id) {
       setTurnoCaja(null);
+      setResumenCaja(null);
       setUltimoCierreCaja(null);
       setBaseSugeridaApertura(0);
       return;
@@ -403,11 +428,13 @@ export default function VentasPage() {
       const payload = (await response.json()) as EstadoCajaResponse;
       if (!response.ok) throw new Error(payload.error || "No se pudo consultar la caja");
       setTurnoCaja(payload.currentTurno || null);
+      setResumenCaja(payload.resumen || null);
       setUltimoCierreCaja(payload.lastClosedTurno || null);
       setBaseSugeridaApertura(Number(payload.suggestedOpeningBase || 0));
     } catch (error) {
       console.error("[Ventas] Error consultando turno de caja:", error);
       setTurnoCaja(null);
+      setResumenCaja(null);
       setUltimoCierreCaja(null);
       setBaseSugeridaApertura(0);
     } finally {
@@ -468,6 +495,7 @@ export default function VentasPage() {
       if (!response.ok) throw new Error(payload.error || "No se pudo abrir la caja");
 
       setTurnoCaja(payload.currentTurno || null);
+      setResumenCaja(payload.resumen || null);
       setAperturaVisible(false);
       setContadorAperturaVisible(false);
       message.success("Caja abierta correctamente");
@@ -531,6 +559,13 @@ export default function VentasPage() {
           <div class="summary">
             <div><strong>Base:</strong> ${formatCurrency(baseCaja)}</div>
             <div><strong>Producido:</strong> ${formatCurrency(produccionCaja)}</div>
+            <div><strong>Ventas:</strong> ${formatCurrency(Number(resumenCaja?.ventas_total || 0))}</div>
+            <div><strong>Tickets:</strong> ${Number(resumenCaja?.ventas_cantidad || 0)}</div>
+            <div><strong>Ventas efectivo:</strong> ${formatCurrency(Number(resumenCaja?.ventas_efectivo || 0))}</div>
+            <div><strong>Ventas tarjeta:</strong> ${formatCurrency(Number(resumenCaja?.ventas_tarjeta || 0))}</div>
+            <div><strong>Ventas transferencia:</strong> ${formatCurrency(Number(resumenCaja?.ventas_transferencia || 0))}</div>
+            <div><strong>Ingresos caja:</strong> ${formatCurrency(Number(resumenCaja?.ingresos_manuales_efectivo || 0))}</div>
+            <div><strong>Egresos caja:</strong> ${formatCurrency(Number(resumenCaja?.egresos_manuales_efectivo || 0))}</div>
             <div><strong>Esperado:</strong> ${formatCurrency(efectivoEsperadoCaja)}</div>
             <div><strong>Contado:</strong> ${formatCurrency(totalContadoCaja)}</div>
             <div><strong>Cuadre/Descuadre:</strong> ${formatCurrency(descuadreCaja)}</div>
@@ -556,15 +591,18 @@ export default function VentasPage() {
   }, [billetesContados, formCierre, message, monedasContadas, turnoCaja]);
 
   const abrirModalCierreCaja = useCallback(() => {
+  const abrirModalCierreCaja = useCallback(async () => {
     if (!turnoCaja) {
       message.warning("No hay una caja abierta para cerrar");
       return;
     }
 
+    await cargarTurnoCaja();
     setBilletesContados(crearMapaDenominaciones(BILLETES_CAJA));
     setMonedasContadas(crearMapaDenominaciones(MONEDAS_CAJA));
     formCierre.setFieldsValue({ notas_cierre: "" });
     setCierreVisible(true);
+    }, [cargarTurnoCaja, formCierre, message, turnoCaja]);
   }, [formCierre, message, turnoCaja]);
 
   const confirmarCierreCaja = useCallback(async () => {
@@ -590,6 +628,7 @@ export default function VentasPage() {
       if (!response.ok) throw new Error(payload.error || "No se pudo cerrar la caja");
 
       setTurnoCaja(payload.turnoCerrado || null);
+      setResumenCaja(payload.resumen || null);
       setCierreVisible(false);
       message.success("Caja cerrada correctamente");
     } catch (error: any) {
@@ -1157,6 +1196,7 @@ export default function VentasPage() {
       const ticketDatos = aplicarPlantillaTicketPOS(ticketBase, ticketTemplate);
 
       lanzarProcesosPOS(ticketDatos, metodoPago === "efectivo", imprimirTicket);
+      void cargarTurnoCaja();
       setModalPagoOpen(false);
       limpiarVenta();
       cargar();
