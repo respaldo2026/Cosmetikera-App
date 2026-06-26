@@ -13,6 +13,7 @@ import {
 } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
+import { getDefaultTenantSlug } from "@/utils/tenant/tenant-context";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -41,18 +42,65 @@ export default function ProveedoresPage() {
   const [editing, setEditing] = useState<Proveedor | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [tenantId, setTenantId] = useState<string | null>(null);
+
+  const readCookie = useCallback((cookieName: string) => {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.split(";").map((chunk) => chunk.trim()).find((chunk) => chunk.startsWith(`${cookieName}=`));
+    if (!match) return null;
+    return decodeURIComponent(match.split("=").slice(1).join("="));
+  }, []);
+
+  const cargarTenantActivo = useCallback(async () => {
+    const slug = readCookie("lc_tenant") || getDefaultTenantSlug();
+    const { data } = await supabaseBrowserClient
+      .from("tenants")
+      .select("id,slug")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (data?.id) {
+      setTenantId(data.id);
+      return;
+    }
+
+    const fallback = await supabaseBrowserClient
+      .from("tenants")
+      .select("id")
+      .eq("slug", getDefaultTenantSlug())
+      .maybeSingle();
+
+    setTenantId(fallback.data?.id || null);
+  }, [readCookie]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    const { data: rows } = await supabaseBrowserClient
-      .from("proveedores")
-      .select("*")
-      .order("nombre");
-    setData(rows || []);
-    setLoading(false);
-  }, []);
+    try {
+      if (!tenantId) {
+        setData([]);
+        return;
+      }
 
-  useEffect(() => { cargar(); }, [cargar]);
+      const { data: rows, error } = await supabaseBrowserClient
+        .from("proveedores")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("nombre");
+
+      if (error) throw error;
+      setData(rows || []);
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    void cargarTenantActivo();
+  }, [cargarTenantActivo]);
+
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
 
   const filtrado = data.filter((p) =>
     !search ||
@@ -73,12 +121,17 @@ export default function ProveedoresPage() {
     setSaving(true);
     try {
       const datosNormalizados = normalizarDatosFormulario(values);
+      if (!tenantId) {
+        throw new Error("No se pudo determinar el tenant activo");
+      }
+
+      const payload = { ...datosNormalizados, tenant_id: tenantId };
       if (editing) {
-        const { error } = await supabaseBrowserClient.from("proveedores").update(datosNormalizados).eq("id", editing.id);
+        const { error } = await supabaseBrowserClient.from("proveedores").update(payload).eq("id", editing.id).eq("tenant_id", tenantId);
         if (error) throw error;
         message.success("Proveedor actualizado");
       } else {
-        const { error } = await supabaseBrowserClient.from("proveedores").insert([datosNormalizados]);
+        const { error } = await supabaseBrowserClient.from("proveedores").insert([payload]);
         if (error) throw error;
         message.success("Proveedor creado");
       }
@@ -99,7 +152,7 @@ export default function ProveedoresPage() {
       okText: "Eliminar",
       cancelText: "Cancelar",
       onOk: async () => {
-        const { error } = await supabaseBrowserClient.from("proveedores").delete().eq("id", p.id);
+        const { error } = await supabaseBrowserClient.from("proveedores").delete().eq("id", p.id).eq("tenant_id", tenantId || "");
         if (error) { message.error(error.message); return; }
         message.success("Eliminado");
         cargar();

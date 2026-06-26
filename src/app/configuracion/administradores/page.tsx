@@ -80,20 +80,25 @@ export default function AdministradoresPage() {
         if (error) throw error;
         message.success("Administrador actualizado");
       } else {
-        // Crear usuario en auth primero
-        const { error } = await supabaseBrowserClient.auth.signUp({
-          email: datosNormalizados.email,
-          password: values.password,
-          options: {
-            data: {
+        const response = await fetch("/api/create-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: datosNormalizados.email,
+            password: values.password,
+            rol: datosNormalizados.rol,
+            user_metadata: {
               nombre_completo: datosNormalizados.nombre_completo,
-              rol: datosNormalizados.rol,
               identificacion: datosNormalizados.identificacion,
               telefono: datosNormalizados.telefono,
-            }
-          }
+            },
+          }),
         });
-        if (error) throw error;
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || "No se pudo crear el usuario");
+        }
         message.success("Administrador creado");
       }
 
@@ -237,8 +242,10 @@ export default function AdministradoresPage() {
           </Form.Item>
           <Form.Item name="rol" label="Rol" rules={[{ required: true }]}> 
             <Select placeholder="Selecciona un rol">
-              <Option value="admin">Administrador</Option>
-              <Option value="director">Director</Option>
+              <Option value="administrador">Administrador</Option>
+              <Option value="vendedor">Vendedor</Option>
+              <Option value="marketing">Marketing</Option>
+              <Option value="cliente">Cliente</Option>
             </Select>
           </Form.Item>
         </Form>
