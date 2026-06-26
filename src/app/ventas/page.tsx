@@ -400,6 +400,11 @@ export default function VentasPage() {
     }
 
     const fecha = dayjs().format("DD/MM/YYYY HH:mm");
+    const baseCaja = Number(turnoCaja.base_apertura || 0);
+    const produccionCaja = Number(turnoCaja.producido_efectivo || 0);
+    const efectivoEsperadoCaja = Number(turnoCaja.efectivo_esperado || 0);
+    const totalContadoCaja = sumarMapaDenominaciones(billetesContados) + sumarMapaDenominaciones(monedasContadas);
+    const descuadreCaja = totalContadoCaja - efectivoEsperadoCaja;
     const win = window.open("", "_blank", "width=420,height=700");
     if (!win) {
       message.warning("No se pudo abrir la vista de impresión");
