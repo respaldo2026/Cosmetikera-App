@@ -22,8 +22,10 @@ function resolveTenantFromRequest(request: NextRequest): string {
   const tenantFromCookie = request.cookies.get("lc_tenant")?.value?.trim();
   const tenantFromPath = extractTenantFromPathname(request.nextUrl.pathname);
   // Hardcodear fallback a "principal"
-  return normalizeTenantSlug(tenantFromHeader || tenantFromCookie || tenantFromPath || 'principal');
-}\n\nfunction getAdminClient(tenantSlug: string) {
+  return normalizeTenantSlug(tenantFromHeader || tenantFromCookie || tenantFromPath || "principal");
+}
+
+function getAdminClient(tenantSlug: string) {
   const _tenant = tenantSlug;
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
