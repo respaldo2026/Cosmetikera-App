@@ -209,7 +209,7 @@ function resolveRedirectByRole(rawRole: unknown): string {
   const role = normalizeRole(rawRole);
 
   if (role === "cliente") return "/club";
-  if (role === "vendedor") return "/dashboard/secretaria";
+  if (role === "vendedor") return "/ventas";
 
   return "/";
 }

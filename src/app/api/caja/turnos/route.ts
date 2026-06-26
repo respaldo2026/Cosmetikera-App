@@ -70,6 +70,20 @@ async function getCurrentTurno(supabase: ReturnType<typeof getAdminClient>, tena
   return data as TurnoCaja | null;
 }
 
+async function getLastClosedTurno(supabase: ReturnType<typeof getAdminClient>, tenantId: string) {
+  const { data, error } = await supabase
+    .from("caja_turnos")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("estado", "cerrado")
+    .order("closed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as TurnoCaja | null;
+}
+
 async function resumirMovimientoEfectivo(
   supabase: ReturnType<typeof getAdminClient>,
   tenantId: string,
@@ -109,9 +123,14 @@ export async function GET(request: NextRequest) {
     const { tenantId } = await resolveTenantContext(request);
     const supabase = getAdminClient();
     const turnoAbierto = await getCurrentTurno(supabase, tenantId);
+    const ultimoCierre = await getLastClosedTurno(supabase, tenantId);
 
     if (!turnoAbierto) {
-      return NextResponse.json({ currentTurno: null });
+      return NextResponse.json({
+        currentTurno: null,
+        lastClosedTurno: ultimoCierre,
+        suggestedOpeningBase: Number(ultimoCierre?.efectivo_contado || 0),
+      });
     }
 
     const resumen = await resumirMovimientoEfectivo(
@@ -123,6 +142,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       currentTurno: turnoAbierto,
+      lastClosedTurno: ultimoCierre,
+      suggestedOpeningBase: Number(ultimoCierre?.efectivo_contado || 0),
       resumen: {
         base_apertura: Number(turnoAbierto.base_apertura || 0),
         produccion_efectivo: resumen.producido,

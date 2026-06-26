@@ -8,7 +8,7 @@ import {
 } from "antd";
 import {
   ShoppingCartOutlined, UserOutlined, PlusOutlined,
-  MinusOutlined, DeleteOutlined, CheckOutlined, DollarOutlined,
+  MinusOutlined, DeleteOutlined, CheckOutlined, DollarOutlined, CalculatorOutlined,
   CreditCardOutlined, MobileOutlined, BarChartOutlined, TagsOutlined,
   GiftOutlined, CrownOutlined, ReloadOutlined, ExclamationCircleOutlined, PrinterOutlined,
 } from "@ant-design/icons";
@@ -84,6 +84,13 @@ type TurnoCaja = {
   descuadre: number;
   billetes?: Record<string, number>;
   monedas?: Record<string, number>;
+};
+
+type EstadoCajaResponse = {
+  currentTurno: TurnoCaja | null;
+  lastClosedTurno?: TurnoCaja | null;
+  suggestedOpeningBase?: number;
+  error?: string;
 };
 
 type ResponsableCaja = {
@@ -230,14 +237,20 @@ export default function VentasPage() {
   const [restaurandoVentaId, setRestaurandoVentaId] = useState<string | null>(null);
   const [productoAgregadoReciente, setProductoAgregadoReciente] = useState<string | null>(null);
   const [turnoCaja, setTurnoCaja] = useState<TurnoCaja | null>(null);
+  const [ultimoCierreCaja, setUltimoCierreCaja] = useState<TurnoCaja | null>(null);
+  const [baseSugeridaApertura, setBaseSugeridaApertura] = useState(0);
   const [cargandoCaja, setCargandoCaja] = useState(false);
   const [aperturaVisible, setAperturaVisible] = useState(false);
+  const [contadorAperturaVisible, setContadorAperturaVisible] = useState(false);
   const [cierreVisible, setCierreVisible] = useState(false);
   const [guardandoCierreCaja, setGuardandoCierreCaja] = useState(false);
   const [guardandoAperturaCaja, setGuardandoAperturaCaja] = useState(false);
   const [billetesContados, setBilletesContados] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
   const [monedasContadas, setMonedasContadas] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
+  const [billetesApertura, setBilletesApertura] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
+  const [monedasApertura, setMonedasApertura] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
   const [responsablesCaja, setResponsablesCaja] = useState<ResponsableCaja[]>([]);
+  const [aperturaAutoMostrada, setAperturaAutoMostrada] = useState(false);
 
   const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
   const [nuevoClienteForm] = Form.useForm();
@@ -247,11 +260,16 @@ export default function VentasPage() {
   const { reglas: reglasClub } = useClubConfig();
   const puedeAbrirCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_abrir");
   const puedeCerrarCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_cerrar");
+  const esRolVendedor = ["vendedor", "secretaria", "asesor"].includes(String(user?.rol || "").toLowerCase());
 
   const subtotalCarrito = carrito.reduce((s, i) => s + i.subtotal, 0);
   const descuentoVal = Math.round(subtotalCarrito * (descuento / 100));
   const descuentoVoucherClub = Math.min(voucherClub?.valueCop || 0, Math.max(0, subtotalCarrito - descuentoVal));
   const totalFinal = Math.max(0, subtotalCarrito - descuentoVal - descuentoVoucherClub);
+  const totalAperturaContado = useMemo(
+    () => sumarMapaDenominaciones(billetesApertura) + sumarMapaDenominaciones(monedasApertura),
+    [billetesApertura, monedasApertura],
+  );
 
   const lanzarProcesosPOS = useCallback((ticket: DatosTicket, debeAbrirCajon: boolean, debeImprimir: boolean) => {
     const tareas: Promise<unknown>[] = [];
@@ -338,12 +356,16 @@ export default function VentasPage() {
     setCargandoCaja(true);
     try {
       const response = await fetch("/api/caja/turnos");
-      const payload = await response.json();
+      const payload = (await response.json()) as EstadoCajaResponse;
       if (!response.ok) throw new Error(payload.error || "No se pudo consultar la caja");
       setTurnoCaja(payload.currentTurno || null);
+      setUltimoCierreCaja(payload.lastClosedTurno || null);
+      setBaseSugeridaApertura(Number(payload.suggestedOpeningBase || 0));
     } catch (error) {
       console.error("[Ventas] Error consultando turno de caja:", error);
       setTurnoCaja(null);
+      setUltimoCierreCaja(null);
+      setBaseSugeridaApertura(0);
     } finally {
       setCargandoCaja(false);
     }
@@ -353,14 +375,36 @@ export default function VentasPage() {
     void cargarTurnoCaja();
   }, [cargarTurnoCaja]);
 
-  const abrirModalApertura = useCallback(() => {
+  useEffect(() => {
+    if (cargandoCaja || turnoCaja || aperturaVisible || !puedeAbrirCaja || !esRolVendedor || aperturaAutoMostrada) return;
+    setAperturaAutoMostrada(true);
     formApertura.setFieldsValue({
-      base_apertura: 0,
-      notas_apertura: "",
+      base_apertura: baseSugeridaApertura,
+      notas_apertura: ultimoCierreCaja?.closed_at
+        ? `Base sugerida tomada del cierre anterior (${dayjs(ultimoCierreCaja.closed_at).format("DD/MM/YYYY HH:mm")})`
+        : "",
       opened_by: user?.id || undefined,
     });
     setAperturaVisible(true);
-  }, [formApertura, user?.id]);
+  }, [aperturaAutoMostrada, aperturaVisible, baseSugeridaApertura, cargandoCaja, esRolVendedor, formApertura, puedeAbrirCaja, turnoCaja, ultimoCierreCaja?.closed_at, user?.id]);
+
+  const abrirModalApertura = useCallback(() => {
+    setBilletesApertura(crearMapaDenominaciones(BILLETES_CAJA));
+    setMonedasApertura(crearMapaDenominaciones(MONEDAS_CAJA));
+    formApertura.setFieldsValue({
+      base_apertura: baseSugeridaApertura,
+      notas_apertura: ultimoCierreCaja?.closed_at
+        ? `Base sugerida tomada del cierre anterior (${dayjs(ultimoCierreCaja.closed_at).format("DD/MM/YYYY HH:mm")})`
+        : "",
+      opened_by: user?.id || undefined,
+    });
+    setAperturaVisible(true);
+  }, [baseSugeridaApertura, formApertura, ultimoCierreCaja?.closed_at, user?.id]);
+
+  const aplicarContadorApertura = useCallback(() => {
+    formApertura.setFieldValue("base_apertura", totalAperturaContado);
+    setContadorAperturaVisible(false);
+  }, [formApertura, totalAperturaContado]);
 
   const confirmarAperturaCaja = useCallback(async () => {
     try {
@@ -381,6 +425,7 @@ export default function VentasPage() {
 
       setTurnoCaja(payload.currentTurno || null);
       setAperturaVisible(false);
+      setContadorAperturaVisible(false);
       message.success("Caja abierta correctamente");
 
       if (permiteCajon) {
@@ -1675,7 +1720,7 @@ export default function VentasPage() {
                   ? "Consultando estado de caja..."
                   : turnoCaja
                     ? `Abierta desde ${dayjs(turnoCaja.opened_at).format("DD/MM/YYYY HH:mm")}`
-                    : "No hay una caja abierta en este momento."}
+                    : `No hay una caja abierta. Valor sugerido para dejar en caja: ${formatCurrency(baseSugeridaApertura)}.`}
               </Text>
             </Space>
           </Col>
@@ -1725,9 +1770,19 @@ export default function VentasPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Selecciona el responsable y la base inicial"
-          description="Al confirmar se registrará el turno y se abrirá el cajón si el dispositivo lo permite."
+          message="Selecciona el responsable y verifica el valor a dejar en caja"
+          description={`Al confirmar se registrará el turno y se abrirá el cajón si el dispositivo lo permite. Base sugerida del último cierre: ${formatCurrency(baseSugeridaApertura)}.`}
         />
+
+        {ultimoCierreCaja?.closed_at ? (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={`Último cierre: ${dayjs(ultimoCierreCaja.closed_at).format("DD/MM/YYYY HH:mm")}`}
+            description={`Valor contado en el cierre anterior: ${formatCurrency(ultimoCierreCaja.efectivo_contado)}. Usa el contador para verificar el dinero que dejas en caja.`}
+          />
+        ) : null}
 
         <Form form={formApertura} layout="vertical">
           <Form.Item
@@ -1752,19 +1807,102 @@ export default function VentasPage() {
             name="base_apertura"
             rules={[{ required: true, message: "Ingresa la base inicial" }]}
           >
-            <InputNumber
-              min={0}
-              style={{ width: "100%" }}
-              formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-              parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
-              placeholder="$0"
-            />
+            <Space.Compact style={{ width: "100%" }}>
+              <InputNumber
+                min={0}
+                style={{ width: "100%" }}
+                formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
+                placeholder="$0"
+              />
+              <Button icon={<CalculatorOutlined />} onClick={() => setContadorAperturaVisible(true)}>
+                Contador
+              </Button>
+            </Space.Compact>
           </Form.Item>
 
           <Form.Item label="Observaciones" name="notas_apertura">
             <Input.TextArea rows={3} placeholder="Ej: cambio inicial, observaciones del turno" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="Contador de billetes y monedas"
+        open={contadorAperturaVisible}
+        onCancel={() => setContadorAperturaVisible(false)}
+        onOk={aplicarContadorApertura}
+        okText="Usar este total"
+        cancelText="Cancelar"
+        width={760}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Verifica el dinero a dejar en caja"
+          description={`Referencia del cierre anterior: ${formatCurrency(baseSugeridaApertura)}.`}
+        />
+
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Card size="small" title="Billetes" styles={{ body: { padding: 12 } }}>
+              <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                {BILLETES_CAJA.map((denominacion) => (
+                  <Row key={`open-b-${denominacion}`} gutter={8} align="middle">
+                    <Col flex="120px">
+                      <Text>${denominacion.toLocaleString("es-CO")}</Text>
+                    </Col>
+                    <Col flex="auto">
+                      <InputNumber
+                        min={0}
+                        value={billetesApertura[String(denominacion)]}
+                        onChange={(value) =>
+                          setBilletesApertura((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }))
+                        }
+                        style={{ width: "100%" }}
+                      />
+                    </Col>
+                  </Row>
+                ))}
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card size="small" title="Monedas" styles={{ body: { padding: 12 } }}>
+              <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                {MONEDAS_CAJA.map((denominacion) => (
+                  <Row key={`open-m-${denominacion}`} gutter={8} align="middle">
+                    <Col flex="120px">
+                      <Text>${denominacion.toLocaleString("es-CO")}</Text>
+                    </Col>
+                    <Col flex="auto">
+                      <InputNumber
+                        min={0}
+                        value={monedasApertura[String(denominacion)]}
+                        onChange={(value) =>
+                          setMonedasApertura((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }))
+                        }
+                        style={{ width: "100%" }}
+                      />
+                    </Col>
+                  </Row>
+                ))}
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+
+        <Card size="small" style={{ marginTop: 12 }} styles={{ body: { padding: 12 } }}>
+          <Row justify="space-between">
+            <Text type="secondary">Total verificado</Text>
+            <Text strong>{formatCurrency(totalAperturaContado)}</Text>
+          </Row>
+          <Row justify="space-between">
+            <Text type="secondary">Referencia del último cierre</Text>
+            <Text strong>{formatCurrency(baseSugeridaApertura)}</Text>
+          </Row>
+        </Card>
       </Modal>
 
       <Modal

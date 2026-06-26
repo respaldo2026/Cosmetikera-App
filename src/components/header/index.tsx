@@ -50,7 +50,7 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
 
   const getPortalRoute = () => {
     if (currentUser?.rol === "secretaria") {
-      return "/dashboard/secretaria";
+      return "/ventas";
     }
     return null;
   };
