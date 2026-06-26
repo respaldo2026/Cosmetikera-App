@@ -22,7 +22,7 @@ self.addEventListener("push", (event) => {
     icon: payload.icon || "/icon.svg",
     badge: payload.badge || "/icon.svg",
     tag: payload.tag || "cosmetikera-promo",
-    data: payload.data || { url: "/club" },
+    data: payload.data || { url: "/acceso" },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -30,7 +30,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification?.data?.url || "/club";
+  const targetUrl = event.notification?.data?.url || "/acceso";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {

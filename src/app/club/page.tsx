@@ -49,6 +49,8 @@ import {
   getNivelDinamico,
 } from "@/hooks/useClubConfig";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useRouter } from "next/navigation";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -185,7 +187,36 @@ function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
   return output.buffer;
 }
 
+function normalizeRole(rawRole: unknown): string {
+  let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
+
+  if (["admin", "director", "administrativo"].includes(normalized)) {
+    normalized = "administrador";
+  }
+
+  if (["secretaria", "asesor"].includes(normalized)) {
+    normalized = "vendedor";
+  }
+
+  if (["estudiante", "egresado"].includes(normalized)) {
+    normalized = "cliente";
+  }
+
+  return normalized;
+}
+
+function resolveRedirectByRole(rawRole: unknown): string {
+  const role = normalizeRole(rawRole);
+
+  if (role === "cliente") return "/club";
+  if (role === "vendedor") return "/dashboard/secretaria";
+
+  return "/";
+}
+
 export default function ClubPage() {
+  const router = useRouter();
+  const { user, loading: loadingUser } = useCurrentUser();
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const screens = useBreakpoint();
@@ -214,6 +245,15 @@ export default function ClubPage() {
   const [whatsAppTargetNumber, setWhatsAppTargetNumber] = useState<string>(
     normalizeWhatsAppTarget(WHATSAPP_BOT_NUMBER_ENV)
   );
+
+  useEffect(() => {
+    if (loadingUser || !user) return;
+
+    const role = normalizeRole(user.rol);
+    if (role !== "cliente") {
+      router.replace(resolveRedirectByRole(user.rol));
+    }
+  }, [loadingUser, router, user]);
 
   useEffect(() => {
     let active = true;

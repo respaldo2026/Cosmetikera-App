@@ -2,6 +2,33 @@ import type { AuthProvider } from "@refinedev/core";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { devAuthUser, isDevAuthBypassEnabled } from "@/utils/auth/dev-bypass";
 
+function normalizeRole(rawRole: unknown): string {
+  let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
+
+  if (["admin", "director", "administrativo"].includes(normalized)) {
+    normalized = "administrador";
+  }
+
+  if (["secretaria", "asesor"].includes(normalized)) {
+    normalized = "vendedor";
+  }
+
+  if (["estudiante", "egresado"].includes(normalized)) {
+    normalized = "cliente";
+  }
+
+  return normalized;
+}
+
+function resolveRedirectByRole(rawRole: unknown): string {
+  const role = normalizeRole(rawRole);
+
+  if (role === "cliente") return "/club";
+  if (role === "vendedor") return "/dashboard/secretaria";
+
+  return "/";
+}
+
 async function getPerfilByIdOrEmail(userId?: string, userEmail?: string | null) {
   if (userId) {
     const { data: perfilById } = await supabaseBrowserClient
@@ -32,7 +59,7 @@ export const authProvider: AuthProvider = {
     if (isDevAuthBypassEnabled) {
       return {
         success: true,
-        redirectTo: "/",
+        redirectTo: resolveRedirectByRole(devAuthUser.rol),
       };
     }
 
@@ -75,20 +102,9 @@ export const authProvider: AuthProvider = {
         console.log("[AUTH] Login - Perfil Data:", perfil);
         console.log("[AUTH] Login - Perfil.rol:", perfil?.rol);
 
-        let redirectTo = "/";
-        
-        // If we can read the profile, use role-based redirect
-        if (!perfilError && perfil) {
-          if (perfil.rol === "secretaria") {
-            redirectTo = "/dashboard/secretaria";
-          } else if (perfil.rol === "admin" || perfil.rol === "director") {
-            redirectTo = "/";
-          } else if (perfil.rol === "administrativo") {
-            redirectTo = "/";
-          } else {
-            redirectTo = "/";
-          }
-        }
+        const redirectTo = !perfilError && perfil
+          ? resolveRedirectByRole(perfil.rol)
+          : "/";
 
         console.log("[AUTH] Final redirectTo:", redirectTo);
         return {

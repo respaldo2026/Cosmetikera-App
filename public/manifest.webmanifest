@@ -1,7 +1,7 @@
 {
-  "name": "Club La Cosmetikera",
+  "name": "La Cosmetikera",
   "short_name": "Cosmetikera",
-  "start_url": "/club",
+  "start_url": "/acceso",
   "scope": "/",
   "display": "standalone",
   "background_color": "#fff0f8",
