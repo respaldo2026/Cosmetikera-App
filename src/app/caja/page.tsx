@@ -99,6 +99,13 @@ interface ResumenCaja {
   descuadre?: number;
 }
 
+interface ResponsableCaja {
+  id: string;
+  nombre_completo: string;
+  rol?: string | null;
+  email?: string | null;
+}
+
 const crearMapaDenominaciones = (denominaciones: readonly Denominacion[]) =>
   denominaciones.reduce<Record<string, number>>((acc, denominacion) => {
     acc[String(denominacion)] = 0;
@@ -247,6 +254,7 @@ export default function CajaPage() {
   const [cierreVisible, setCierreVisible] = useState(false);
   const [billetesContados, setBilletesContados] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
   const [monedasContadas, setMonedasContadas] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
+  const [responsablesCaja, setResponsablesCaja] = useState<ResponsableCaja[]>([]);
 
   const puedeAbrirCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_abrir");
   const puedeCerrarCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_cerrar");
@@ -339,10 +347,28 @@ export default function CajaPage() {
     }
   }, []);
 
+  const cargarResponsablesCaja = useCallback(async () => {
+    try {
+      const { data, error } = await supabaseBrowserClient
+        .from("perfiles")
+        .select("id,nombre_completo,rol,email")
+        .eq("activo", true)
+        .in("rol", ["administrador", "admin", "director", "administrativo", "vendedor", "marketing"])
+        .order("nombre_completo");
+
+      if (error) throw error;
+      setResponsablesCaja((data || []) as ResponsableCaja[]);
+    } catch (error) {
+      console.error("Error cargando responsables de caja:", error);
+      setResponsablesCaja([]);
+    }
+  }, []);
+
   useEffect(() => {
     cargarClientes();
     cargarConfiguracion();
     cargarMediosPago();
+    cargarResponsablesCaja();
   }, [cargarClientes, cargarConfiguracion, cargarMediosPago]);
 
   useEffect(() => {
@@ -395,6 +421,7 @@ export default function CajaPage() {
     formApertura.setFieldsValue({
       base_apertura: 0,
       notas_apertura: "",
+      opened_by: user?.id || undefined,
     });
     setAperturaVisible(true);
   };
@@ -422,6 +449,7 @@ export default function CajaPage() {
           action: "open",
           base_apertura: values.base_apertura,
           notas_apertura: values.notas_apertura,
+          opened_by: values.opened_by,
         }),
       });
       const payload = await response.json();
@@ -1260,6 +1288,31 @@ export default function CajaPage() {
         </Space>
       </Card>
 
+      <Alert
+        style={{ marginBottom: 24 }}
+        type={turnoCaja ? "success" : "warning"}
+        showIcon
+        message={turnoCaja ? "Caja abierta" : "Caja cerrada"}
+        description={
+          turnoCaja
+            ? `Base ${formatCurrency(baseCaja)} · Esperado ${formatCurrency(efectivoEsperadoCaja)} · Cierra con el botón de cierre de caja.`
+            : "Antes de vender debes abrir la caja. Usa el botón Abrir caja para registrar base y responsable."
+        }
+        action={
+          <Space>
+            {turnoCaja ? (
+              <Button danger type="primary" onClick={abrirModalCierre} disabled={!puedeCerrarCaja}>
+                Cerrar caja
+              </Button>
+            ) : (
+              <Button type="primary" onClick={abrirModalApertura} disabled={!puedeAbrirCaja}>
+                Abrir caja
+              </Button>
+            )}
+          </Space>
+        }
+      />
+
       <Card style={{ marginBottom: 24 }}>
         <Row gutter={[16, 16]} align="middle">
           <Col xs={24} lg={16}>
@@ -1671,6 +1724,23 @@ export default function CajaPage() {
         />
 
         <Form form={formApertura} layout="vertical">
+          <Form.Item
+            label="Responsable de apertura"
+            name="opened_by"
+            rules={[{ required: true, message: "Selecciona quién abre la caja" }]}
+          >
+            <Select
+              showSearch
+              placeholder="Selecciona responsable"
+              optionFilterProp="children"
+              filterOption={(input, option) => String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+              options={responsablesCaja.map((resp) => ({
+                value: resp.id,
+                label: `${resp.nombre_completo}${resp.rol ? ` · ${resp.rol}` : ""}`,
+              }))}
+            />
+          </Form.Item>
+
           <Form.Item
             label="Base inicial"
             name="base_apertura"

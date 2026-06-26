@@ -147,7 +147,22 @@ export async function POST(request: NextRequest) {
 
       const baseApertura = Math.max(0, toNumber(body?.base_apertura));
       const notasApertura = String(body?.notas_apertura || "").trim();
-      const openedBy = permissionCheck.userId;
+      const requestedOpenedBy = String(body?.opened_by || permissionCheck.userId || "").trim();
+
+      const { data: responsable, error: responsableError } = await supabase
+        .from("perfiles")
+        .select("id")
+        .eq("id", requestedOpenedBy)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (responsableError) {
+        throw responsableError;
+      }
+
+      if (!responsable?.id) {
+        return NextResponse.json({ error: "El responsable seleccionado no pertenece al tenant" }, { status: 400 });
+      }
 
       const { data: existingOpen } = await supabase
         .from("caja_turnos")
@@ -164,7 +179,7 @@ export async function POST(request: NextRequest) {
         .from("caja_turnos")
         .insert({
           tenant_id: tenantId,
-          opened_by: openedBy,
+          opened_by: responsable.id,
           opened_at: new Date().toISOString(),
           estado: "abierto",
           base_apertura: baseApertura,
