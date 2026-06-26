@@ -684,6 +684,7 @@ const AppInner = ({ children }: { children: React.ReactNode }) => {
     if (!pathname) return false;
     return (
       pathname.startsWith("/login") ||
+      pathname.startsWith("/onboarding") ||
       pathname.startsWith("/register") ||
       pathname.startsWith("/auth") ||
       pathname.startsWith("/club")
