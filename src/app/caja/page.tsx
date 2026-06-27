@@ -493,10 +493,21 @@ export default function CajaPage() {
         throw new Error(payload?.error || "No se pudo cerrar la caja");
       }
 
-      setTurnoCaja(payload.turnoCerrado || null);
-      setResumenCaja(payload.resumen || null);
+      const turnoCerrado = payload.turnoCerrado || null;
+      const baseSugerida = Number(payload?.resumen?.efectivo_contado ?? turnoCerrado?.efectivo_contado ?? 0);
+
+      setTurnoCaja(null);
+      setResumenCaja(null);
       setCierreVisible(false);
       setConteoCierreFinalizado(false);
+      formApertura.setFieldsValue({
+        base_apertura: baseSugerida,
+        notas_apertura: turnoCerrado?.closed_at
+          ? `Base sugerida tomada del cierre anterior (${dayjs(turnoCerrado.closed_at).format("DD/MM/YYYY HH:mm")})`
+          : "",
+        opened_by: undefined,
+      });
+      setAperturaVisible(true);
       messageApi.success(
         `Cierre realizado. Cuadre: ${formatCurrency(payload?.resumen?.descuadre || 0)}`
       );

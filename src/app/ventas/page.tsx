@@ -640,17 +640,32 @@ export default function VentasPage() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "No se pudo cerrar la caja");
 
-      setTurnoCaja(payload.turnoCerrado || null);
-      setResumenCaja(payload.resumen || null);
+      const turnoCerrado = payload.turnoCerrado || null;
+      const baseSugerida = Number(payload?.resumen?.efectivo_contado ?? turnoCerrado?.efectivo_contado ?? 0);
+
+      setTurnoCaja(null);
+      setResumenCaja(null);
+      setUltimoCierreCaja(turnoCerrado);
+      setBaseSugeridaApertura(baseSugerida);
       setCierreVisible(false);
       setConteoCierreFinalizado(false);
+      setBilletesApertura(crearMapaDenominaciones(BILLETES_CAJA));
+      setMonedasApertura(crearMapaDenominaciones(MONEDAS_CAJA));
+      formApertura.setFieldsValue({
+        base_apertura: baseSugerida,
+        notas_apertura: turnoCerrado?.closed_at
+          ? `Base sugerida tomada del cierre anterior (${dayjs(turnoCerrado.closed_at).format("DD/MM/YYYY HH:mm")})`
+          : "",
+        opened_by: undefined,
+      });
+      setAperturaVisible(true);
       message.success("Caja cerrada correctamente");
     } catch (error: any) {
       message.error(error?.message || "No se pudo cerrar la caja");
     } finally {
       setGuardandoCierreCaja(false);
     }
-  }, [billetesContados, formCierre, message, monedasContadas, turnoCaja]);
+  }, [billetesApertura, billetesContados, formApertura, formCierre, message, monedasApertura, monedasContadas, turnoCaja]);
 
   useEffect(() => {
     if (!modalPagoOpen) return;
