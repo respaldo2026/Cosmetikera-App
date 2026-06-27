@@ -75,6 +75,8 @@ type Denominacion = (typeof BILLETES_CAJA)[number] | (typeof MONEDAS_CAJA)[numbe
 type TurnoCaja = {
   id: string;
   estado: "abierto" | "cerrado";
+  opened_by?: string | null;
+  closed_by?: string | null;
   opened_at: string;
   closed_at?: string | null;
   base_apertura: number;
@@ -318,6 +320,12 @@ export default function VentasPage() {
     () => sumarMapaDenominaciones(billetesContados) + sumarMapaDenominaciones(monedasContadas),
     [billetesContados, monedasContadas],
   );
+  const responsableTurno = responsablesCaja.find((resp) => resp.id === turnoCaja?.opened_by);
+  const responsableCierre = responsablesCaja.find((resp) => resp.id === turnoCaja?.closed_by) || (user?.id ? responsablesCaja.find((resp) => resp.id === user.id) : undefined);
+  const nombreResponsableTurno = responsableTurno?.nombre_completo || (turnoCaja?.opened_by === user?.id ? user?.email || "Responsable actual" : "No asignado");
+  const nombreResponsableCierre = responsableCierre?.nombre_completo || (user?.email ? user.email : "Pendiente de cierre");
+  const horaAperturaTurno = turnoCaja?.opened_at ? dayjs(turnoCaja.opened_at).format("DD/MM/YYYY HH:mm") : "-";
+  const horaCierreTurno = turnoCaja?.closed_at ? dayjs(turnoCaja.closed_at).format("DD/MM/YYYY HH:mm") : dayjs().format("DD/MM/YYYY HH:mm");
   const baseCaja = Number(resumenCaja?.base_apertura ?? turnoCaja?.base_apertura ?? 0);
   const produccionCaja = Number(resumenCaja?.produccion_efectivo ?? turnoCaja?.producido_efectivo ?? 0);
   const efectivoEsperadoCaja = Number(resumenCaja?.efectivo_esperado ?? turnoCaja?.efectivo_esperado ?? 0);
@@ -552,6 +560,10 @@ export default function VentasPage() {
           <h1>Cuadre de caja</h1>
           <div class="meta">Fecha de impresión: ${fecha} · Turno: ${turnoCaja.id}</div>
           <div class="summary">
+            <div><strong>Responsable turno:</strong> ${nombreResponsableTurno}</div>
+            <div><strong>Apertura:</strong> ${horaAperturaTurno}</div>
+            <div><strong>Cierra:</strong> ${nombreResponsableCierre}</div>
+            <div><strong>Hora cierre:</strong> ${horaCierreTurno}</div>
             <div><strong>Base:</strong> ${formatCurrency(baseCaja)}</div>
             <div><strong>Producido:</strong> ${formatCurrency(produccionCaja)}</div>
             <div><strong>Ventas:</strong> ${formatCurrency(Number(resumenCaja?.ventas_total || 0))}</div>
@@ -583,7 +595,7 @@ export default function VentasPage() {
     win.document.close();
     win.focus();
     win.print();
-  }, [baseCaja, billetesContados, descuadreCaja, efectivoEsperadoCaja, formCierre, message, monedasContadas, produccionCaja, resumenCaja, totalContadoCaja, turnoCaja]);
+  }, [baseCaja, billetesContados, descuadreCaja, efectivoEsperadoCaja, formCierre, horaAperturaTurno, horaCierreTurno, message, monedasContadas, nombreResponsableCierre, nombreResponsableTurno, produccionCaja, resumenCaja, totalContadoCaja, turnoCaja]);
 
   const abrirModalCierreCaja = useCallback(async () => {
     if (!turnoCaja) {
@@ -2008,6 +2020,25 @@ export default function VentasPage() {
             Cuenta el efectivo antes de cerrar. El sistema confrontará lo contado contra lo esperado.
           </Text>
         </div>
+
+        <Card size="small" style={{ marginBottom: 12 }} styles={{ body: { padding: 12 } }}>
+          <Row justify="space-between">
+            <Text type="secondary">Responsable del turno</Text>
+            <Text strong>{nombreResponsableTurno}</Text>
+          </Row>
+          <Row justify="space-between">
+            <Text type="secondary">Hora de apertura</Text>
+            <Text strong>{horaAperturaTurno}</Text>
+          </Row>
+          <Row justify="space-between">
+            <Text type="secondary">Cierra</Text>
+            <Text strong>{nombreResponsableCierre}</Text>
+          </Row>
+          <Row justify="space-between">
+            <Text type="secondary">Hora de cierre</Text>
+            <Text strong>{horaCierreTurno}</Text>
+          </Row>
+        </Card>
 
         <Row gutter={12}>
           <Col xs={24} md={12}>
