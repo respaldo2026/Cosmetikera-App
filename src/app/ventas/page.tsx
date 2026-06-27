@@ -603,12 +603,18 @@ export default function VentasPage() {
       return;
     }
 
+    if (permiteCajon) {
+      await abrirCajon().catch((error) => {
+        console.warn("[Ventas] No se pudo abrir cajón antes del cierre:", error);
+      });
+    }
+
     await cargarTurnoCaja();
     setBilletesContados(crearMapaDenominaciones(BILLETES_CAJA));
     setMonedasContadas(crearMapaDenominaciones(MONEDAS_CAJA));
     formCierre.setFieldsValue({ notas_cierre: "" });
     setCierreVisible(true);
-  }, [cargarTurnoCaja, formCierre, message, turnoCaja]);
+  }, [cargarTurnoCaja, formCierre, message, permiteCajon, turnoCaja]);
 
   const confirmarCierreCaja = useCallback(async () => {
     if (!turnoCaja) {
