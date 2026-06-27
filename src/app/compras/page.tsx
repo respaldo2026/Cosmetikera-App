@@ -119,6 +119,9 @@ export default function ComprasPage() {
   const [crearModalOpen, setCrearModalOpen]     = useState(false);
   const [codigoParaCrear, setCodigoParaCrear]   = useState("");
   const [guardandoArticulo, setGuardandoArticulo] = useState(false);
+  const [proveedorForm] = Form.useForm();
+  const [proveedorModalOpen, setProveedorModalOpen] = useState(false);
+  const [guardandoProveedor, setGuardandoProveedor] = useState(false);
 
   // — Modal editar compra histórica —
   const [editForm] = Form.useForm();
@@ -413,10 +416,13 @@ export default function ComprasPage() {
         })),
       };
 
-      const { error: errCompra } = await supabaseBrowserClient
-        .from("compras")
-        .insert([payload]);
-      if (errCompra) throw new Error(errCompra.message);
+      const response = await fetch("/api/compras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Error registrando compra");
 
       const itemsConId = carrito.filter(i => i.articulo_id);
       const etiquetasDraft: LabelDraftItem[] = itemsConId.map((item) => {
@@ -435,16 +441,6 @@ export default function ComprasPage() {
           sku,
         };
       });
-
-      for (const item of itemsConId) {
-        const artActual = articulos.find(a => a.id === item.articulo_id);
-        const nuevoStock = (artActual?.stock ?? 0) + item.cantidad;
-        await fetch(`/api/articulos?id=${item.articulo_id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stock: nuevoStock }),
-        });
-      }
 
       message.success(
         `Compra registrada — ${itemsConId.length} articulo(s) con stock actualizado`
@@ -490,8 +486,13 @@ export default function ComprasPage() {
       items: editItems,
     };
     try {
-      const { error } = await supabaseBrowserClient.from("compras").update(payload).eq("id", editando!.id);
-      if (error) throw error;
+      const response = await fetch(`/api/compras?id=${encodeURIComponent(editando!.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Error actualizando compra");
       message.success("Compra actualizada");
       setEditModalOpen(false);
       cargar();
@@ -508,7 +509,11 @@ export default function ComprasPage() {
       content: "Confirmas eliminar esta compra?",
       okType: "danger", okText: "Eliminar", cancelText: "Cancelar",
       onOk: async () => {
-        await supabaseBrowserClient.from("compras").delete().eq("id", c.id);
+        const response = await fetch(`/api/compras?id=${encodeURIComponent(c.id)}`, {
+          method: "DELETE",
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "No se pudo eliminar la compra");
         message.success("Eliminada");
         cargar();
       },
@@ -516,9 +521,47 @@ export default function ComprasPage() {
   };
 
   const cambiarEstado = async (c: Compra, estado: CompraEstado) => {
-    await supabaseBrowserClient.from("compras").update({ estado }).eq("id", c.id);
+    const response = await fetch(`/api/compras?id=${encodeURIComponent(c.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proveedor_id: c.proveedor_id || null,
+        proveedor_nombre: c.proveedor_nombre || "",
+        fecha: c.fecha,
+        estado,
+        notas: c.notas || null,
+        items: c.items || [],
+      }),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json.error || "No se pudo cambiar el estado");
     message.success(`Estado -> ${ESTADO_CONFIG[estado]?.label}`);
     cargar();
+  };
+
+  const handleCrearProveedor = async () => {
+    const values = await proveedorForm.validateFields();
+    setGuardandoProveedor(true);
+    try {
+      const response = await fetch("/api/proveedores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "No se pudo crear el proveedor");
+
+      const created = json.data as { id: string; nombre: string };
+      setProveedores((prev) => [...prev, created].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setProveedorId(created.id);
+      setProveedorModalOpen(false);
+      proveedorForm.resetFields();
+      message.success("Proveedor creado");
+    } catch (e: any) {
+      message.error(e?.message || "Error creando proveedor");
+    } finally {
+      setGuardandoProveedor(false);
+    }
   };
 
   // ── Columnas tabla ────────────────────────────────────────────────────────────
@@ -734,18 +777,23 @@ export default function ComprasPage() {
         <Row gutter={12} style={{ marginBottom: 16 }}>
           <Col span={14}>
             <Text strong style={{ display: "block", marginBottom: 4 }}>Proveedor</Text>
-            <Select
-              showSearch
-              placeholder="Seleccionar proveedor"
-              style={{ width: "100%" }}
-              value={proveedorId}
-              onChange={setProveedorId}
-              allowClear
-              filterOption={(input, opt) =>
-                (opt?.label as string || "").toLowerCase().includes(input.toLowerCase())
-              }
-              options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
-            />
+            <Space.Compact style={{ width: "100%" }}>
+              <Select
+                showSearch
+                placeholder="Seleccionar proveedor"
+                style={{ width: "100%" }}
+                value={proveedorId}
+                onChange={setProveedorId}
+                allowClear
+                filterOption={(input, opt) =>
+                  (opt?.label as string || "").toLowerCase().includes(input.toLowerCase())
+                }
+                options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
+              />
+              <Button icon={<PlusOutlined />} onClick={() => setProveedorModalOpen(true)}>
+                Nuevo
+              </Button>
+            </Space.Compact>
           </Col>
           <Col span={10}>
             <Text strong style={{ display: "block", marginBottom: 4 }}>Fecha</Text>
@@ -1031,6 +1079,61 @@ export default function ComprasPage() {
           </Row>
           <Form.Item name="categoria" label="Categoria">
             <Input placeholder="Ej: Cuidado capilar" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={
+          <Space>
+            <TruckOutlined style={{ color: "#096dd9" }} />
+            Nuevo proveedor
+          </Space>
+        }
+        open={proveedorModalOpen}
+        onCancel={() => {
+          setProveedorModalOpen(false);
+          proveedorForm.resetFields();
+        }}
+        onOk={handleCrearProveedor}
+        confirmLoading={guardandoProveedor}
+        okText="Crear proveedor"
+        cancelText="Cancelar"
+        width={520}
+      >
+        <Form form={proveedorForm} layout="vertical" style={{ marginTop: 12 }}>
+          <Form.Item name="nombre" label="Nombre del proveedor / empresa" rules={[{ required: true, message: "El nombre es obligatorio" }]}>
+            <Input placeholder="Ej: Distribuidora Beauty Colombia" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="contacto" label="Persona de contacto">
+                <Input placeholder="Nombre del vendedor" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="telefono" label="Teléfono / WhatsApp">
+                <Input placeholder="300 000 0000" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="email" label="Email">
+                <Input placeholder="ventas@proveedor.com" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="ciudad" label="Ciudad">
+                <Input placeholder="Bogotá, Medellín..." />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="productos" label="Líneas / productos">
+            <Input placeholder="Esmaltes, bases, maquillaje..." />
+          </Form.Item>
+          <Form.Item name="notas" label="Notas">
+            <Input.TextArea rows={2} placeholder="Condiciones, descuentos, observaciones..." />
           </Form.Item>
         </Form>
       </Modal>
