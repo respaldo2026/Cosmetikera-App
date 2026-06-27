@@ -55,7 +55,11 @@ export function marcarAgentePOSLocalHabilitado(enabled: boolean): void {
 }
 
 async function llamarAgentePOS<T = any>(ruta: string, payload: Record<string, any>): Promise<T> {
-  if (!agentePOSLocalHabilitado()) {
+  const bypassEnableCheck = Boolean(payload?.__bypassEnableCheck);
+  const requestPayload = { ...payload };
+  delete requestPayload.__bypassEnableCheck;
+
+  if (!bypassEnableCheck && !agentePOSLocalHabilitado()) {
     throw new Error("Agente POS local no habilitado en este navegador/PC");
   }
 
@@ -75,7 +79,7 @@ async function llamarAgentePOS<T = any>(ruta: string, payload: Record<string, an
       method: "POST",
       headers,
       signal: controller.signal,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
     });
 
     const data = await response.json().catch(() => ({}));
@@ -601,7 +605,7 @@ export async function imprimirTicketTermico(
   datos: DatosTicket,
   impresora?: string | null,
   ancho?: number,
-  opciones?: OpcionesImpresionPOS
+  opciones?: OpcionesImpresionPOS & { bypassAgentEnableCheck?: boolean }
 ): Promise<{ ok: boolean; error?: string }> {
   // Usar config de Supabase si no se pasan parámetros explícitos
   const cfg = await cargarConfigPOS();
@@ -616,6 +620,7 @@ export async function imprimirTicketTermico(
         printerName,
         raw: comandos.join(""),
         encoding: "cp1252",
+        __bypassEnableCheck: Boolean(opciones?.bypassAgentEnableCheck),
       });
 
       if (resp?.ok) {
@@ -697,7 +702,8 @@ export async function imprimirTicketTermico(
  * @param impresora Nombre de la impresora (null = primera disponible)
  */
 export async function abrirCajon(
-  impresora?: string | null
+  impresora?: string | null,
+  opciones?: { bypassAgentEnableCheck?: boolean }
 ): Promise<{ ok: boolean; error?: string }> {
   if (usarAgentePOS()) {
     try {
@@ -705,6 +711,7 @@ export async function abrirCajon(
       const printerName = impresora ?? cfg.printerName;
       const resp = await llamarAgentePOS<{ ok: boolean; error?: string }>("/drawer", {
         printerName,
+        __bypassEnableCheck: Boolean(opciones?.bypassAgentEnableCheck),
       });
       return resp?.ok ? { ok: true } : { ok: false, error: resp?.error ?? "No se pudo abrir el cajón" };
     } catch (e: any) {

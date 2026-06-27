@@ -157,7 +157,7 @@ export default function ConfiguracionImpresoraPOS({
         ticket,
         posPrinterName || null,
         posPrinterWidth,
-        { allowBrowserFallback: false }
+        { allowBrowserFallback: false, bypassAgentEnableCheck: true }
       );
       if (!result.ok) {
         if (usaAgenteLocal) {
@@ -188,7 +188,7 @@ export default function ConfiguracionImpresoraPOS({
     }
     setTestCajon(true);
     try {
-      const result = await abrirCajon(posPrinterName || null);
+      const result = await abrirCajon(posPrinterName || null, { bypassAgentEnableCheck: true });
       if (!result.ok) {
         if (usaAgenteLocal) {
           marcarAgentePOSLocalHabilitado(false);
