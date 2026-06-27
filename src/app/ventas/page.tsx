@@ -1299,8 +1299,8 @@ export default function VentasPage() {
         ) : articulosFiltrados.length === 0 ? (
           <Empty description="Sin resultados" style={{ padding: 24 }} />
         ) : (
-          <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #f0d6ff" }}>
-            {articulosFiltrados.slice(0, 8).map((art, idx) => {
+          <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #f0d6ff", maxHeight: isMobile ? 360 : 520, overflowY: "auto" }}>
+            {articulosFiltrados.map((art, idx) => {
               const enCarrito = carrito.find((i) => i.id === art.id);
               return (
                 <div
@@ -1313,7 +1313,7 @@ export default function VentasPage() {
                     display: "flex", alignItems: "center", gap: 12,
                     padding: "10px 14px",
                     background: enCarrito ? "#fce4f8" : idx % 2 === 0 ? "#fff" : "#fdf5ff",
-                    borderBottom: idx < Math.min(articulosFiltrados.length, 8) - 1 ? "1px solid #f0d6ff" : "none",
+                    borderBottom: idx < articulosFiltrados.length - 1 ? "1px solid #f0d6ff" : "none",
                     cursor: "pointer",
                     transition: "background 0.15s",
                     borderLeft: enCarrito ? "4px solid #d81b87" : "4px solid transparent",
