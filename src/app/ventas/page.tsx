@@ -289,6 +289,7 @@ export default function VentasPage() {
   const [aperturaVisible, setAperturaVisible] = useState(false);
   const [contadorAperturaVisible, setContadorAperturaVisible] = useState(false);
   const [cierreVisible, setCierreVisible] = useState(false);
+  const [conteoCierreFinalizado, setConteoCierreFinalizado] = useState(false);
   const [guardandoCierreCaja, setGuardandoCierreCaja] = useState(false);
   const [guardandoAperturaCaja, setGuardandoAperturaCaja] = useState(false);
   const [billetesContados, setBilletesContados] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
@@ -610,6 +611,7 @@ export default function VentasPage() {
     }
 
     await cargarTurnoCaja();
+    setConteoCierreFinalizado(false);
     setBilletesContados(crearMapaDenominaciones(BILLETES_CAJA));
     setMonedasContadas(crearMapaDenominaciones(MONEDAS_CAJA));
     formCierre.setFieldsValue({ notas_cierre: "" });
@@ -641,6 +643,7 @@ export default function VentasPage() {
       setTurnoCaja(payload.turnoCerrado || null);
       setResumenCaja(payload.resumen || null);
       setCierreVisible(false);
+      setConteoCierreFinalizado(false);
       message.success("Caja cerrada correctamente");
     } catch (error: any) {
       message.error(error?.message || "No se pudo cerrar la caja");
@@ -2003,16 +2006,25 @@ export default function VentasPage() {
       <Modal
         title="Cierre de caja"
         open={cierreVisible}
-        onCancel={() => setCierreVisible(false)}
+        onCancel={() => {
+          setCierreVisible(false);
+          setConteoCierreFinalizado(false);
+        }}
         onOk={confirmarCierreCaja}
         footer={[
+          <Button key="review" onClick={() => setConteoCierreFinalizado(true)} disabled={conteoCierreFinalizado}>
+            {conteoCierreFinalizado ? "Conteo finalizado" : "Finalizar conteo"}
+          </Button>,
           <Button key="print" icon={<PrinterOutlined />} onClick={imprimirCuadreCaja}>
             Imprimir cuadre
           </Button>,
-          <Button key="cancel" onClick={() => setCierreVisible(false)}>
+          <Button key="cancel" onClick={() => {
+            setCierreVisible(false);
+            setConteoCierreFinalizado(false);
+          }}>
             Cancelar
           </Button>,
-          <Button key="ok" type="primary" danger onClick={confirmarCierreCaja} loading={guardandoCierreCaja}>
+          <Button key="ok" type="primary" danger onClick={confirmarCierreCaja} loading={guardandoCierreCaja} disabled={!conteoCierreFinalizado}>
             Cerrar caja
           </Button>,
         ]}
@@ -2059,9 +2071,10 @@ export default function VentasPage() {
                       <InputNumber
                         min={0}
                         value={billetesContados[String(denominacion)]}
-                        onChange={(value) =>
-                          setBilletesContados((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }))
-                        }
+                        onChange={(value) => {
+                          setConteoCierreFinalizado(false);
+                          setBilletesContados((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }));
+                        }}
                         style={{ width: "100%" }}
                       />
                     </Col>
@@ -2082,9 +2095,10 @@ export default function VentasPage() {
                       <InputNumber
                         min={0}
                         value={monedasContadas[String(denominacion)]}
-                        onChange={(value) =>
-                          setMonedasContadas((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }))
-                        }
+                        onChange={(value) => {
+                          setConteoCierreFinalizado(false);
+                          setMonedasContadas((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }));
+                        }}
                         style={{ width: "100%" }}
                       />
                     </Col>
@@ -2100,16 +2114,24 @@ export default function VentasPage() {
             <Text type="secondary">Contado</Text>
             <Text strong>{formatCurrency(totalContadoCaja)}</Text>
           </Row>
-          <Row justify="space-between">
-            <Text type="secondary">Esperado</Text>
-            <Text strong>{formatCurrency(efectivoEsperadoCaja)}</Text>
-          </Row>
-          <Row justify="space-between">
-            <Text type="secondary">Descuadre</Text>
-            <Text strong style={{ color: descuadreCaja >= 0 ? "#389e0d" : "#cf1322" }}>
-              {formatCurrency(descuadreCaja)}
-            </Text>
-          </Row>
+          {conteoCierreFinalizado ? (
+            <>
+              <Row justify="space-between">
+                <Text type="secondary">Esperado</Text>
+                <Text strong>{formatCurrency(efectivoEsperadoCaja)}</Text>
+              </Row>
+              <Row justify="space-between">
+                <Text type="secondary">Descuadre</Text>
+                <Text strong style={{ color: descuadreCaja >= 0 ? "#389e0d" : "#cf1322" }}>
+                  {formatCurrency(descuadreCaja)}
+                </Text>
+              </Row>
+            </>
+          ) : (
+            <Row style={{ marginTop: 8 }}>
+              <Text type="secondary">Finaliza el conteo para revelar el esperado y el cuadre de caja.</Text>
+            </Row>
+          )}
         </Card>
       </Modal>
 

@@ -252,6 +252,7 @@ export default function CajaPage() {
   const [guardandoCaja, setGuardandoCaja] = useState(false);
   const [aperturaVisible, setAperturaVisible] = useState(false);
   const [cierreVisible, setCierreVisible] = useState(false);
+  const [conteoCierreFinalizado, setConteoCierreFinalizado] = useState(false);
   const [billetesContados, setBilletesContados] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
   const [monedasContadas, setMonedasContadas] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
   const [responsablesCaja, setResponsablesCaja] = useState<ResponsableCaja[]>([]);
@@ -432,6 +433,7 @@ export default function CajaPage() {
     }
 
     await cargarTurnoCaja();
+    setConteoCierreFinalizado(false);
     setBilletesContados(crearMapaDenominaciones(BILLETES_CAJA));
     setMonedasContadas(crearMapaDenominaciones(MONEDAS_CAJA));
     formCierre.setFieldsValue({ notas_cierre: "" });
@@ -494,6 +496,7 @@ export default function CajaPage() {
       setTurnoCaja(payload.turnoCerrado || null);
       setResumenCaja(payload.resumen || null);
       setCierreVisible(false);
+      setConteoCierreFinalizado(false);
       messageApi.success(
         `Cierre realizado. Cuadre: ${formatCurrency(payload?.resumen?.descuadre || 0)}`
       );
@@ -1764,43 +1767,69 @@ export default function CajaPage() {
       <Modal
         title="Cierre de caja"
         open={cierreVisible}
-        onCancel={() => setCierreVisible(false)}
+        onCancel={() => {
+          setCierreVisible(false);
+          setConteoCierreFinalizado(false);
+        }}
         onOk={confirmarCierreCaja}
-        confirmLoading={guardandoCaja}
-        okText="Cerrar caja"
-        cancelText="Cancelar"
+        footer={[
+          <Button key="review" onClick={() => setConteoCierreFinalizado(true)} disabled={conteoCierreFinalizado}>
+            {conteoCierreFinalizado ? "Conteo finalizado" : "Finalizar conteo"}
+          </Button>,
+          <Button key="cancel" onClick={() => {
+            setCierreVisible(false);
+            setConteoCierreFinalizado(false);
+          }}>
+            Cancelar
+          </Button>,
+          <Button key="ok" type="primary" danger onClick={confirmarCierreCaja} loading={guardandoCaja} disabled={!conteoCierreFinalizado}>
+            Cerrar caja
+          </Button>,
+        ]}
         width={980}
       >
-        <Alert
-          type={descuadreCaja === 0 ? "success" : "warning"}
-          showIcon
-          style={{ marginBottom: 16 }}
-          message={
-            descuadreCaja === 0
-              ? "Cuadre exacto"
-              : `${descuadreCaja > 0 ? "Sobra" : "Falta"} ${formatCurrency(Math.abs(descuadreCaja))}`
-          }
-          description={
-            <span>
-              Base: {formatCurrency(baseCaja)} · Producido: {formatCurrency(produccionCaja)} · Esperado: {formatCurrency(efectivoEsperadoCaja)}
-            </span>
-          }
-        />
+        {conteoCierreFinalizado ? (
+          <>
+            <Alert
+              type={descuadreCaja === 0 ? "success" : "warning"}
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={
+                descuadreCaja === 0
+                  ? "Cuadre exacto"
+                  : `${descuadreCaja > 0 ? "Sobra" : "Falta"} ${formatCurrency(Math.abs(descuadreCaja))}`
+              }
+              description={
+                <span>
+                  Base: {formatCurrency(baseCaja)} · Producido: {formatCurrency(produccionCaja)} · Esperado: {formatCurrency(efectivoEsperadoCaja)}
+                </span>
+              }
+            />
 
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col xs={12} md={6}>
-            <Statistic title="Base" value={baseCaja} precision={0} prefix="$" />
-          </Col>
-          <Col xs={12} md={6}>
-            <Statistic title="Producido" value={produccionCaja} precision={0} prefix="$" />
-          </Col>
-          <Col xs={12} md={6}>
-            <Statistic title="Esperado" value={efectivoEsperadoCaja} precision={0} prefix="$" />
-          </Col>
-          <Col xs={12} md={6}>
-            <Statistic title="Contado" value={totalContadoCaja} precision={0} prefix="$" />
-          </Col>
-        </Row>
+            <Row gutter={16} style={{ marginBottom: 16 }}>
+              <Col xs={12} md={6}>
+                <Statistic title="Base" value={baseCaja} precision={0} prefix="$" />
+              </Col>
+              <Col xs={12} md={6}>
+                <Statistic title="Producido" value={produccionCaja} precision={0} prefix="$" />
+              </Col>
+              <Col xs={12} md={6}>
+                <Statistic title="Esperado" value={efectivoEsperadoCaja} precision={0} prefix="$" />
+              </Col>
+              <Col xs={12} md={6}>
+                <Statistic title="Contado" value={totalContadoCaja} precision={0} prefix="$" />
+              </Col>
+            </Row>
+          </>
+        ) : (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Conteo en curso"
+            description="Cuenta el dinero primero. El sistema solo revelará el esperado y el cuadre cuando finalices el conteo."
+          />
+        )}
 
         <Row gutter={16}>
           <Col xs={24} md={12}>
@@ -1821,12 +1850,13 @@ export default function CajaPage() {
                         <InputNumber
                           min={0}
                           value={valor}
-                          onChange={(nextValue) =>
+                          onChange={(nextValue) => {
+                            setConteoCierreFinalizado(false);
                             setBilletesContados((prev) => ({
                               ...prev,
                               [String(denominacion)]: Number(nextValue || 0),
-                            }))
-                          }
+                            }));
+                          }}
                           style={{ width: 120 }}
                         />
                       </Col>
@@ -1855,12 +1885,13 @@ export default function CajaPage() {
                         <InputNumber
                           min={0}
                           value={valor}
-                          onChange={(nextValue) =>
+                          onChange={(nextValue) => {
+                            setConteoCierreFinalizado(false);
                             setMonedasContadas((prev) => ({
                               ...prev,
                               [String(denominacion)]: Number(nextValue || 0),
-                            }))
-                          }
+                            }));
+                          }}
                           style={{ width: 120 }}
                         />
                       </Col>
