@@ -1593,15 +1593,55 @@ export default function VentasPage() {
 
   const panelCarrito = (
     <Card
-      style={{ borderRadius: 12, height: "100%", display: "flex", flexDirection: "column" }}
+      style={{ borderRadius: 12, height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}
       styles={{ body: { padding: 10, display: "flex", flexDirection: "column", height: "100%" } }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+      {!cajaOperativa ? (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 5,
+            background: "rgba(255, 247, 230, 0.86)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 320,
+              textAlign: "center",
+              background: "#fff",
+              border: "2px solid #ffd666",
+              borderRadius: 16,
+              padding: "18px 16px",
+              boxShadow: "0 12px 30px rgba(250, 173, 20, 0.22)",
+            }}
+          >
+            <ExclamationCircleOutlined style={{ fontSize: 34, color: "#d48806", marginBottom: 10 }} />
+            <Text strong style={{ display: "block", fontSize: 18, color: "#ad6800", marginBottom: 8 }}>
+              Caja cerrada
+            </Text>
+            <Text type="secondary" style={{ display: "block", fontSize: 13, marginBottom: 14 }}>
+              Debes hacer apertura de caja para habilitar carrito, búsqueda de productos y facturación.
+            </Text>
+            <Button type="primary" onClick={abrirModalApertura} disabled={!puedeAbrirCaja}>
+              Abrir caja ahora
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", opacity: cajaOperativa ? 1 : 0.42, pointerEvents: cajaOperativa ? "auto" : "none" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <Text strong style={{ fontSize: 14, color: "#7a1b6f" }}>📦 Carrito</Text>
         <Tag color="magenta" style={{ fontSize: 11, marginRight: 0 }}>
           {carrito.length} item{carrito.length === 1 ? "" : "s"}
         </Tag>
-      </div>
+        </div>
 
       {!clienteId && carrito.length > 0 && (
         <Tag color="warning" style={{ fontSize: 10, marginBottom: 8, width: "fit-content" }}>
@@ -1917,6 +1957,7 @@ export default function VentasPage() {
           </Card>
         )}
       </Space>
+      </div>
     </Card>
   );
 
