@@ -4,6 +4,7 @@ import { authProviderServer } from "../../providers/auth-provider/auth-provider.
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import Link from "next/link";
+import { Alert, Button } from "antd";
 import { shouldRedirectToTenantOnboarding } from "@/utils/tenant/server-onboarding";
 
 type LoginPageProps = {
@@ -36,6 +37,23 @@ export default async function Login({ searchParams }: LoginPageProps) {
   return (
     <LoginLanding audience={isClubAudience ? "club" : "admin"}>
       <div style={{ display: "grid", gap: 12 }}>
+        {!isClubAudience ? (
+          <Alert
+            type="info"
+            showIcon
+            message="¿Es tu primera vez?"
+            description={
+              <div style={{ display: "grid", gap: 10 }}>
+                <span>Si esta tienda es nueva y todavía no tiene usuarios, primero debes crearla.</span>
+                <Link href="/onboarding">
+                  <Button type="primary" block>
+                    Crear tienda nueva
+                  </Button>
+                </Link>
+              </div>
+            }
+          />
+        ) : null}
         <AuthPage type="login" audience={isClubAudience ? "club" : "admin"} />
         {!isClubAudience ? (
           <p style={{ textAlign: "center", margin: 0, fontSize: 13 }}>
