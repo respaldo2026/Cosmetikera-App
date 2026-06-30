@@ -9,7 +9,7 @@ import type { Breakpoint } from "antd/es/_util/responsiveObserver";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { normalizarDatosFormulario } from "@utils/form-normalizer";
 import { qzConectar, qzActivo, listarImpresoras, invalidarConfigPOS } from "@utils/pos-hardware";
-import { DEFAULT_LABEL_TEMPLATE, type LabelTemplateConfig } from "@/utils/label-agent";
+import { DEFAULT_LABEL_TEMPLATE, normalizeLabelTemplateConfig, type LabelTemplateConfig } from "@/utils/label-agent";
 import {
   DEFAULT_TICKET_FIELDS,
   DEFAULT_TICKET_PROMO_CONFIG,
@@ -59,14 +59,21 @@ const extractTicketPromoFromConfig = (raw: unknown): TicketPromoConfig => {
   return normalizarTicketPromoConfig(source.promo_config);
 };
 
+const extractLabelTemplateFromConfig = (raw: unknown): LabelTemplateConfig => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return normalizeLabelTemplateConfig(source.label_template_config as Partial<LabelTemplateConfig> | null | undefined);
+};
+
 const buildTicketCamposPayload = (
   ticketFields: typeof DEFAULT_TICKET_FIELDS,
   catalogosArticulos: CatalogosArticulos,
   ticketPromoConfig: TicketPromoConfig,
+  labelTemplateConfig: LabelTemplateConfig,
 ) => ({
   ...ticketFields,
   catalogos_articulos: mergeCatalogos(catalogosArticulos),
   promo_config: normalizarTicketPromoConfig(ticketPromoConfig),
+  label_template_config: normalizeLabelTemplateConfig(labelTemplateConfig),
 });
 
 // Interfaces
@@ -132,6 +139,7 @@ export default function ConfiguracionPage() {
 
   const [ticketFields, setTicketFields] = useState(DEFAULT_TICKET_FIELDS);
   const [ticketPromoConfig, setTicketPromoConfig] = useState<TicketPromoConfig>(DEFAULT_TICKET_PROMO_CONFIG);
+  const [labelTemplateConfig, setLabelTemplateConfig] = useState<LabelTemplateConfig>(DEFAULT_LABEL_TEMPLATE);
 
   const resolveTenantId = useCallback(async (): Promise<string | null> => {
     const { data, error } = await supabaseBrowserClient.rpc("effective_tenant_id");
@@ -391,7 +399,7 @@ export default function ConfiguracionPage() {
         throw configError;
       }
 
-      const payloadTicketCampos = buildTicketCamposPayload(ticketFields, nextCatalogos, ticketPromoConfig);
+      const payloadTicketCampos = buildTicketCamposPayload(ticketFields, nextCatalogos, ticketPromoConfig, labelTemplateConfig);
 
       if (configRow?.id) {
         const { error: updateError } = await supabaseBrowserClient
@@ -417,7 +425,7 @@ export default function ConfiguracionPage() {
       console.error("Error guardando catálogos en Supabase:", error);
       messageApi.error("No se pudieron sincronizar los catálogos en Supabase");
     }
-  }, [messageApi, resolveTenantId, ticketFields, ticketPromoConfig]);
+  }, [labelTemplateConfig, messageApi, resolveTenantId, ticketFields, ticketPromoConfig]);
 
   // ==================== FUNCIONES POS / IMPRESORA ====================
   const conectarQZ = async () => {
@@ -700,6 +708,7 @@ export default function ConfiguracionPage() {
           const ticketCamposRaw = data.ticket_campos;
           setTicketFields(extractTicketFieldsFromConfig(ticketCamposRaw));
           setTicketPromoConfig(extractTicketPromoFromConfig(ticketCamposRaw));
+          setLabelTemplateConfig(extractLabelTemplateFromConfig(ticketCamposRaw));
 
           const catalogosSupabase = extractCatalogosFromConfig(ticketCamposRaw);
           const localCatalogos = getCatalogosArticulosLocal();
@@ -833,7 +842,7 @@ export default function ConfiguracionPage() {
 
       const datosNormalizados = normalizarDatosFormulario({
         ...valuesSinId,
-        ticket_campos: buildTicketCamposPayload(ticketFields, catalogosArticulos, ticketPromoConfig),
+        ticket_campos: buildTicketCamposPayload(ticketFields, catalogosArticulos, ticketPromoConfig, labelTemplateConfig),
       });
 
       const tenantId = await resolveTenantId();
@@ -1801,6 +1810,50 @@ export default function ConfiguracionPage() {
       <div style={{ marginTop: 16 }}>
         <ConfiguracionImprsoraEtiquetas
           formAcademia={formAcademia}
+          initialPrinterName={String(formAcademia.getFieldValue("pos_printer_name") || "")}
+          initialLabelTemplateConfig={labelTemplateConfig}
+          onSaveRequest={async ({ pos_label_printer_name, labelTemplateConfig: nextLabelTemplateConfig }) => {
+            const tenantId = await resolveTenantId();
+            if (!tenantId) {
+              throw new Error("No se pudo resolver el tenant activo para guardar etiquetas");
+            }
+
+            let idParaGuardar = isValidUUID(configuracionId) ? configuracionId : null;
+
+            if (!idParaGuardar) {
+              const { data: configs, error: loadError } = await supabaseBrowserClient
+                .from("configuracion")
+                .select("id")
+                .order("updated_at", { ascending: false, nullsFirst: false })
+                .order("created_at", { ascending: false, nullsFirst: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (loadError && loadError.code !== "PGRST116") {
+                throw loadError;
+              }
+
+              const existingId = configs?.id ?? null;
+              idParaGuardar = isValidUUID(existingId) ? existingId : generateUUID();
+              setConfiguracionId(idParaGuardar);
+            }
+
+            const payloadTicketCampos = buildTicketCamposPayload(ticketFields, catalogosArticulos, ticketPromoConfig, nextLabelTemplateConfig);
+
+            const { error } = await supabaseBrowserClient
+              .from("configuracion")
+              .upsert({
+                id: idParaGuardar,
+                tenant_id: tenantId,
+                pos_printer_name: String(pos_label_printer_name || "").trim() || null,
+                ticket_campos: payloadTicketCampos,
+              });
+
+            if (error) throw error;
+
+            setLabelTemplateConfig(normalizeLabelTemplateConfig(nextLabelTemplateConfig));
+            formAcademia.setFieldValue("pos_printer_name", String(pos_label_printer_name || "").trim());
+          }}
         />
       </div>
     </div>

@@ -151,7 +151,7 @@ const POS_AGENT_URL = (process.env.NEXT_PUBLIC_POS_AGENT_URL ?? "http://127.0.0.
 const POS_AGENT_TIMEOUT_MS = 12000;
 const POS_AGENT_TOKEN = process.env.NEXT_PUBLIC_POS_AGENT_TOKEN ?? "";
 
-function normalizeTemplate(raw: Partial<LabelTemplateConfig> | null | undefined): LabelTemplateConfig {
+export function normalizeLabelTemplateConfig(raw: Partial<LabelTemplateConfig> | null | undefined): LabelTemplateConfig {
   const src = raw ?? {};
   const asNumber = (value: unknown, fallback: number, min: number, max: number) => {
     const n = Number(value);
@@ -258,14 +258,14 @@ export function getLabelTemplateConfig(): LabelTemplateConfig {
   try {
     const raw = window.localStorage.getItem(LABEL_TEMPLATE_STORAGE_KEY);
     if (!raw) return DEFAULT_LABEL_TEMPLATE;
-    return normalizeTemplate(JSON.parse(raw) as Partial<LabelTemplateConfig>);
+    return normalizeLabelTemplateConfig(JSON.parse(raw) as Partial<LabelTemplateConfig>);
   } catch {
     return DEFAULT_LABEL_TEMPLATE;
   }
 }
 
 export function saveLabelTemplateConfig(config: Partial<LabelTemplateConfig>): LabelTemplateConfig {
-  const normalized = normalizeTemplate(config);
+  const normalized = normalizeLabelTemplateConfig(config);
   if (typeof window !== "undefined") {
     window.localStorage.setItem(LABEL_TEMPLATE_STORAGE_KEY, JSON.stringify(normalized));
   }

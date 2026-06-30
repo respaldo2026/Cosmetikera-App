@@ -19,11 +19,13 @@ import {
 } from "antd";
 import { ReloadOutlined, TagsOutlined, UploadOutlined } from "@ant-design/icons";
 import { supabaseBrowserClient } from "@utils/supabase/client";
-import { listLabelPrinters, printPriceLabels, DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, saveLabelTemplateConfig, type LabelTemplateConfig, type LabelTextAlign } from "@/utils/label-agent";
+import { listLabelPrinters, printPriceLabels, DEFAULT_LABEL_TEMPLATE, getLabelTemplateConfig, normalizeLabelTemplateConfig, saveLabelTemplateConfig, LABEL_TEMPLATE_STORAGE_KEY, type LabelTemplateConfig, type LabelTextAlign } from "@/utils/label-agent";
 import { Rnd } from "react-rnd";
 
 interface ConfiguracionImprsoraEtiquetasProps {
   formAcademia: any;
+  initialPrinterName?: string;
+  initialLabelTemplateConfig?: LabelTemplateConfig;
   onSaveRequest?: (data: { pos_label_printer_name: string; labelTemplateConfig: LabelTemplateConfig }) => Promise<void>;
 }
 
@@ -42,6 +44,8 @@ const TEXT_ALIGN_OPTIONS: Array<{ label: string; value: LabelTextAlign }> = [
 
 export default function ConfiguracionImprsoraEtiquetas({
   formAcademia,
+  initialPrinterName,
+  initialLabelTemplateConfig,
   onSaveRequest,
 }: ConfiguracionImprsoraEtiquetasProps) {
   const [messageApi, contextHolder] = message.useMessage();
@@ -87,15 +91,21 @@ export default function ConfiguracionImprsoraEtiquetas({
       if (typeof window !== "undefined") {
         storedPrinter = window.localStorage.getItem(LABEL_PRINTER_STORAGE_KEY) ?? "";
         setPosLabelPrinterName(storedPrinter);
-        setLabelTemplateConfig(getLabelTemplateConfig());
+        const hasStoredTemplate = Boolean(window.localStorage.getItem(LABEL_TEMPLATE_STORAGE_KEY));
+        setLabelTemplateConfig(hasStoredTemplate ? getLabelTemplateConfig() : normalizeLabelTemplateConfig(initialLabelTemplateConfig));
         labelTemplateReadyRef.current = true;
       }
 
+      if (!storedPrinter && initialPrinterName) {
+        storedPrinter = String(initialPrinterName).trim();
+        setPosLabelPrinterName(storedPrinter);
+      }
+
       // Fallback: intentar desde Supabase si no hay en localStorage
-      if (!storedPrinter) {
+      if (!storedPrinter || (!initialLabelTemplateConfig && typeof window !== "undefined" && !window.localStorage.getItem(LABEL_TEMPLATE_STORAGE_KEY))) {
         const { data } = await supabaseBrowserClient
           .from("configuracion")
-          .select("pos_printer_name")
+          .select("pos_printer_name, ticket_campos")
           .order("updated_at", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false, nullsFirst: false })
           .limit(1)
@@ -103,6 +113,10 @@ export default function ConfiguracionImprsoraEtiquetas({
         if (data?.pos_printer_name) {
           setPosLabelPrinterName(data.pos_printer_name);
           storedPrinter = data.pos_printer_name;
+        }
+        if (data?.ticket_campos && typeof data.ticket_campos === "object") {
+          const nextTemplate = normalizeLabelTemplateConfig((data.ticket_campos as Record<string, unknown>).label_template_config as Partial<LabelTemplateConfig> | null | undefined);
+          setLabelTemplateConfig(nextTemplate);
         }
       }
 
