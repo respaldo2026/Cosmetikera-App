@@ -13,7 +13,6 @@ import {
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@hooks/useCurrentUser";
-import { LoginLanding } from "@components/auth-page/LoginLanding";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -29,6 +28,13 @@ export default function VistaRapidaPage() {
   const { user, loading: userLoading } = useCurrentUser();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (userLoading) return;
+    if (!user) {
+      router.replace("/login");
+    }
+  }, [router, user, userLoading]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -77,7 +83,9 @@ export default function VistaRapidaPage() {
     return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><Spin size="large" /></div>;
   }
 
-  if (!user) return <LoginLanding />;
+  if (!user) {
+    return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><Spin size="large" tip="Redirigiendo al acceso..." /></div>;
+  }
 
   if (loading) {
     return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 400 }}><Spin size="large" tip="Cargando..." /></div>;
