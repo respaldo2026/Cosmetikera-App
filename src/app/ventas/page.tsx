@@ -29,10 +29,16 @@ import { useRouter } from "next/navigation";
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+const normalizeSearchText = (value: unknown) =>
+  typeof value === "string"
+    ? value.toLowerCase().trim().normalize("NFD").replace(/\p{Mn}/gu, "")
+    : "";
+
 type Articulo = {
   id: string; nombre: string; precio_venta: number;
   stock: number; categoria?: string; marca?: string; imagen_url?: string;
   referencia?: string; codigo_barras?: string; codigo_secundario?: string;
+  descripcion?: string; proveedor?: string; tamano?: string; empaque?: string;
 };
 type CarritoItem = Articulo & { cantidad: number; subtotal: number };
 type Cliente = { id: string; nombre_completo: string; cedula?: string; telefono?: string; puntos_fidelidad?: number; nivel_fidelidad?: string; fecha_nacimiento?: string; total_compras?: number; rol?: string; activo?: boolean };
@@ -866,10 +872,21 @@ export default function VentasPage() {
       articulos.map((articulo) => ({
         articulo,
         exactKeys: [articulo.id, articulo.referencia, articulo.codigo_barras, articulo.codigo_secundario]
-          .map((value) => String(value || "").trim().toLowerCase())
+          .map((value) => normalizeSearchText(value))
           .filter(Boolean),
-        prefixFields: [articulo.nombre, articulo.marca, articulo.referencia, articulo.codigo_secundario, articulo.codigo_barras]
-          .map((value) => String(value || "").trim().toLowerCase())
+        prefixFields: [
+          articulo.nombre,
+          articulo.marca,
+          articulo.referencia,
+          articulo.codigo_secundario,
+          articulo.codigo_barras,
+          articulo.descripcion,
+          articulo.proveedor,
+          articulo.tamano,
+          articulo.empaque,
+          articulo.categoria,
+        ]
+          .map((value) => normalizeSearchText(value))
           .filter(Boolean),
         searchBlob: [
           articulo.nombre,
@@ -878,15 +895,19 @@ export default function VentasPage() {
           articulo.codigo_barras,
           articulo.codigo_secundario,
           articulo.categoria,
+          articulo.descripcion,
+          articulo.proveedor,
+          articulo.tamano,
+          articulo.empaque,
         ]
-          .map((value) => String(value || "").trim().toLowerCase())
+          .map((value) => normalizeSearchText(value))
           .filter(Boolean)
           .join(" "),
       })),
     [articulos]
   );
 
-  const searchNormalizado = useMemo(() => search.toLowerCase().trim(), [search]);
+  const searchNormalizado = useMemo(() => normalizeSearchText(search), [search]);
 
   const searchTokens = useMemo(
     () => searchNormalizado.split(/\s+/).filter(Boolean),
@@ -1305,9 +1326,8 @@ export default function VentasPage() {
 
   // Buscar artículo por código al escanear
   const buscarPorCodigo = useCallback((codigo: string) => {
-    const normalizar = (value?: string | null) => String(value || "").trim().toLowerCase();
     const cleanedCodigo = codigo.trim();
-    const normalizedCodigo = normalizar(cleanedCodigo);
+    const normalizedCodigo = normalizeSearchText(cleanedCodigo);
     const art = codigoArticuloIndex.get(normalizedCodigo);
     if (art) {
       agregarAlCarrito(art);
@@ -1316,13 +1336,17 @@ export default function VentasPage() {
     } else {
       // Si no hay match exacto, priorizar búsqueda parcial por nombre/marca/códigos
       // para no interrumpir la operación con modal cuando el usuario aún está escribiendo.
-      const query = cleanedCodigo.toLowerCase();
+      const query = normalizeSearchText(cleanedCodigo);
       const coincidenciasParciales = articulos.some((item) =>
-        item.nombre.toLowerCase().includes(query) ||
-        String(item.marca || "").toLowerCase().includes(query) ||
-        String(item.referencia || "").toLowerCase().includes(query) ||
-        String(item.codigo_barras || "").toLowerCase().includes(query) ||
-        String(item.codigo_secundario || "").toLowerCase().includes(query)
+        normalizeSearchText(item.nombre).includes(query) ||
+        normalizeSearchText(item.marca).includes(query) ||
+        normalizeSearchText(item.referencia).includes(query) ||
+        normalizeSearchText(item.codigo_barras).includes(query) ||
+        normalizeSearchText(item.codigo_secundario).includes(query) ||
+        normalizeSearchText(item.descripcion).includes(query) ||
+        normalizeSearchText(item.proveedor).includes(query) ||
+        normalizeSearchText(item.tamano).includes(query) ||
+        normalizeSearchText(item.empaque).includes(query)
       );
 
       setSearch(cleanedCodigo);
