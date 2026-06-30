@@ -67,6 +67,7 @@ type VentaAparcada = {
 
 const VENTAS_APARCADAS_STORAGE_KEY = "pos_ventas_aparcadas_ventas_v1";
 const MAX_VENTAS_APARCADAS = 20;
+const MAX_PRODUCTOS_BUSQUEDA_VISIBLES = 80;
 const BILLETES_CAJA = [100000, 50000, 20000, 10000, 5000, 2000] as const;
 const MONEDAS_CAJA = [1000, 500, 200, 100, 50] as const;
 
@@ -862,25 +863,46 @@ export default function VentasPage() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const articulosFiltrados = useMemo(() =>
-    articulos.filter((a) => {
-      // Dividir en tokens para búsqueda por palabras independiente del orden
-      const tokens = deferredSearch.toLowerCase().trim().split(/\s+/).filter(Boolean);
-      const hayBusqueda = tokens.length > 0;
-      const campos = [
-        a.nombre,
-        a.marca,
-        a.referencia,
-        a.codigo_barras,
-        a.codigo_secundario,
-        a.categoria,
-      ].map((v) => (v || "").toLowerCase());
-      const matchSearch = !hayBusqueda ||
-        tokens.every((token) => campos.some((campo) => campo.includes(token)));
-      const matchCat = !filtroCategoria || a.categoria === filtroCategoria;
-      return matchSearch && matchCat;
-    }),
-    [articulos, deferredSearch, filtroCategoria]
+  const articulosBusqueda = useMemo(
+    () =>
+      articulos.map((articulo) => ({
+        articulo,
+        searchBlob: [
+          articulo.nombre,
+          articulo.marca,
+          articulo.referencia,
+          articulo.codigo_barras,
+          articulo.codigo_secundario,
+          articulo.categoria,
+        ]
+          .map((value) => String(value || "").trim().toLowerCase())
+          .filter(Boolean)
+          .join(" "),
+      })),
+    [articulos]
+  );
+
+  const searchTokens = useMemo(
+    () => deferredSearch.toLowerCase().trim().split(/\s+/).filter(Boolean),
+    [deferredSearch]
+  );
+
+  const articulosFiltrados = useMemo(
+    () =>
+      articulosBusqueda
+        .filter(({ articulo, searchBlob }) => {
+          const hayBusqueda = searchTokens.length > 0;
+          const matchSearch = !hayBusqueda || searchTokens.every((token) => searchBlob.includes(token));
+          const matchCat = !filtroCategoria || articulo.categoria === filtroCategoria;
+          return matchSearch && matchCat;
+        })
+        .map(({ articulo }) => articulo),
+    [articulosBusqueda, filtroCategoria, searchTokens]
+  );
+
+  const articulosFiltradosVisibles = useMemo(
+    () => articulosFiltrados.slice(0, MAX_PRODUCTOS_BUSQUEDA_VISIBLES),
+    [articulosFiltrados]
   );
 
   const codigoArticuloIndex = useMemo(() => {
@@ -1316,15 +1338,23 @@ export default function VentasPage() {
         />
       </div>
 
-      {/* Resultados solo cuando hay 3+ caracteres */}
-      {search.trim().length >= 3 && (
+      {(search.trim().length > 0 || Boolean(filtroCategoria)) && (
         loading ? (
           <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
         ) : articulosFiltrados.length === 0 ? (
           <Empty description="Sin resultados" style={{ padding: 24 }} />
         ) : (
-          <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #f0d6ff", maxHeight: isMobile ? 360 : 520, overflowY: "auto" }}>
-            {articulosFiltrados.map((art, idx) => {
+          <div>
+            {articulosFiltrados.length > MAX_PRODUCTOS_BUSQUEDA_VISIBLES && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`Mostrando ${articulosFiltradosVisibles.length} de ${articulosFiltrados.length} productos para mantener la búsqueda rápida.`}
+              />
+            )}
+            <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #f0d6ff", maxHeight: isMobile ? 360 : 520, overflowY: "auto" }}>
+            {articulosFiltradosVisibles.map((art, idx) => {
               const enCarrito = carrito.find((i) => i.id === art.id);
               return (
                 <div
@@ -1337,7 +1367,7 @@ export default function VentasPage() {
                     display: "flex", alignItems: "center", gap: 12,
                     padding: "10px 14px",
                     background: enCarrito ? "#fce4f8" : idx % 2 === 0 ? "#fff" : "#fdf5ff",
-                    borderBottom: idx < articulosFiltrados.length - 1 ? "1px solid #f0d6ff" : "none",
+                    borderBottom: idx < articulosFiltradosVisibles.length - 1 ? "1px solid #f0d6ff" : "none",
                     cursor: "pointer",
                     transition: "background 0.15s",
                     borderLeft: enCarrito ? "4px solid #d81b87" : "4px solid transparent",
@@ -1369,6 +1399,7 @@ export default function VentasPage() {
                 </div>
               );
             })}
+            </div>
           </div>
         )
       )}
@@ -1391,11 +1422,6 @@ export default function VentasPage() {
         </div>
       )}
 
-      {search.trim().length > 0 && search.trim().length < 3 && (
-        <div style={{ textAlign: "center", padding: "16px 0" }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>Escribe al menos 3 caracteres para buscar...</Text>
-        </div>
-      )}
     </div>
   );
 
