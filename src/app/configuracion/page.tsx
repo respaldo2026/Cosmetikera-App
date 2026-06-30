@@ -235,9 +235,6 @@ export default function ConfiguracionPage() {
   const posAgentDownloadUrl =
     process.env.NEXT_PUBLIC_POS_AGENT_DOWNLOAD_URL ??
     "https://github.com/newsocialmedia20-create/Cosmetikera_App/archive/refs/heads/main.zip";
-  const posAgentInstallerBatUrl =
-    process.env.NEXT_PUBLIC_POS_AGENT_INSTALLER_BAT_URL ??
-    "https://raw.githubusercontent.com/newsocialmedia20-create/Cosmetikera_App/main/pos-agent/instalar-caja.bat";
   const posAgentRepoUrl = "https://github.com/newsocialmedia20-create/Cosmetikera_App/tree/main/pos-agent";
   const nodeDownloadUrl = "https://nodejs.org/en/download";
   const currentSiteOrigin = typeof window !== "undefined" ? window.location.origin : "";
@@ -1737,11 +1734,8 @@ export default function ConfiguracionPage() {
             description={
               <Space direction="vertical" size={10} style={{ width: "100%" }}>
                 <Space wrap>
-                  <a href={posAgentInstallerBatUrl} target="_blank" rel="noopener noreferrer">
-                    <Button type="primary" icon={<DownloadOutlined />}>Descargar instalador 1 clic (.bat)</Button>
-                  </a>
                   <a href={posAgentDownloadUrl} target="_blank" rel="noopener noreferrer">
-                    <Button icon={<DownloadOutlined />}>Descargar paquete completo (ZIP)</Button>
+                    <Button type="primary" icon={<DownloadOutlined />}>Descargar paquete completo (ZIP)</Button>
                   </a>
                   <a href={posAgentRepoUrl} target="_blank" rel="noopener noreferrer">
                     <Button icon={<ShopOutlined />}>Ver carpeta pos-agent</Button>
@@ -1750,7 +1744,8 @@ export default function ConfiguracionPage() {
 
                 <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
                   <li>Descarga y extrae el paquete completo en el PC de caja.</li>
-                  <li>Entra a la carpeta pos-agent.</li>
+                  <li>No ejecutes el .bat dentro del ZIP comprimido.</li>
+                  <li>Entra a la carpeta pos-agent ya extraída.</li>
                   <li>
                     Si no tienes Node.js LTS, instálalo desde
                     <a href={nodeDownloadUrl} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4 }}>
@@ -1758,9 +1753,9 @@ export default function ConfiguracionPage() {
                     </a>
                     .
                   </li>
-                  <li>Ejecuta instalar-caja.bat como Administrador (instala y deja el agente iniciado).</li>
+                  <li>Ejecuta instalar-caja.bat como Administrador.</li>
                   <li>Valida en el navegador del mismo PC: http://127.0.0.1:17891/health.</li>
-                  <li>En esta app, configura impresora POS y etiquetas y ejecuta las pruebas.</li>
+                  <li>Luego en esta app configura impresora POS y etiquetas y ejecuta las pruebas.</li>
                 </ol>
 
                 <div style={{ fontSize: 12, color: "#555" }}>

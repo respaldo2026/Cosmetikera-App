@@ -8,6 +8,20 @@ echo   La Cosmetikera - Instalador Caja
 echo ==========================================
 echo.
 
+if not exist "%~dp0setup-windows.ps1" (
+  echo ERROR: Este instalador no puede ejecutarse solo ni desde dentro del ZIP.
+  echo.
+  echo Debes hacer esto:
+  echo 1. Extrae el paquete completo en una carpeta normal.
+  echo 2. Entra a la carpeta extraida.
+  echo 3. Ejecuta otra vez instalar-caja.bat.
+  echo.
+  echo Si descargaste solo este archivo .bat, vuelve y descarga el paquete completo.
+  echo.
+  pause
+  exit /b 1
+)
+
 :: Relanzar como administrador si hace falta
 net session >nul 2>&1
 if %errorlevel% neq 0 (
