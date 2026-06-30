@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card, Button, Typography, Space, Input, Select, Tag, App, Spin, Alert,
   Row, Col, Statistic, Divider, Grid, Tooltip, Avatar, Badge,
@@ -67,7 +67,7 @@ type VentaAparcada = {
 
 const VENTAS_APARCADAS_STORAGE_KEY = "pos_ventas_aparcadas_ventas_v1";
 const MAX_VENTAS_APARCADAS = 20;
-const MAX_PRODUCTOS_BUSQUEDA_VISIBLES = 80;
+const MAX_PRODUCTOS_BUSQUEDA_VISIBLES = 24;
 const BILLETES_CAJA = [100000, 50000, 20000, 10000, 5000, 2000] as const;
 const MONEDAS_CAJA = [1000, 500, 200, 100, 50] as const;
 
@@ -697,8 +697,6 @@ export default function VentasPage() {
     }
   }, []);
 
-  const deferredSearch = useDeferredValue(search);
-
   const clientesBusqueda = useMemo(
     () => clientes.map((c) => ({
       ...c,
@@ -867,6 +865,12 @@ export default function VentasPage() {
     () =>
       articulos.map((articulo) => ({
         articulo,
+        exactKeys: [articulo.id, articulo.referencia, articulo.codigo_barras, articulo.codigo_secundario]
+          .map((value) => String(value || "").trim().toLowerCase())
+          .filter(Boolean),
+        prefixFields: [articulo.nombre, articulo.marca, articulo.referencia, articulo.codigo_secundario, articulo.codigo_barras]
+          .map((value) => String(value || "").trim().toLowerCase())
+          .filter(Boolean),
         searchBlob: [
           articulo.nombre,
           articulo.marca,
@@ -882,27 +886,65 @@ export default function VentasPage() {
     [articulos]
   );
 
+  const searchNormalizado = useMemo(() => search.toLowerCase().trim(), [search]);
+
   const searchTokens = useMemo(
-    () => deferredSearch.toLowerCase().trim().split(/\s+/).filter(Boolean),
-    [deferredSearch]
+    () => searchNormalizado.split(/\s+/).filter(Boolean),
+    [searchNormalizado]
   );
 
   const articulosFiltrados = useMemo(
-    () =>
-      articulosBusqueda
-        .filter(({ articulo, searchBlob }) => {
-          const hayBusqueda = searchTokens.length > 0;
-          const matchSearch = !hayBusqueda || searchTokens.every((token) => searchBlob.includes(token));
-          const matchCat = !filtroCategoria || articulo.categoria === filtroCategoria;
-          return matchSearch && matchCat;
-        })
-        .map(({ articulo }) => articulo),
-    [articulosBusqueda, filtroCategoria, searchTokens]
+    () => {
+      if (!searchTokens.length && !filtroCategoria) {
+        return [] as Articulo[];
+      }
+
+      const exactos: Articulo[] = [];
+      const prefijos: Articulo[] = [];
+      const parciales: Articulo[] = [];
+
+      for (const { articulo, exactKeys, prefixFields, searchBlob } of articulosBusqueda) {
+        if (filtroCategoria && articulo.categoria !== filtroCategoria) {
+          continue;
+        }
+
+        if (!searchTokens.length) {
+          prefijos.push(articulo);
+          if (prefijos.length >= MAX_PRODUCTOS_BUSQUEDA_VISIBLES) {
+            break;
+          }
+          continue;
+        }
+
+        if (searchTokens.length === 1 && exactKeys.includes(searchNormalizado)) {
+          exactos.push(articulo);
+          continue;
+        }
+
+        if (!searchTokens.every((token) => searchBlob.includes(token))) {
+          continue;
+        }
+
+        const esPrefijo = prefixFields.some((field) => field.startsWith(searchNormalizado));
+        if (esPrefijo) {
+          prefijos.push(articulo);
+        } else {
+          parciales.push(articulo);
+        }
+
+        if (exactos.length + prefijos.length + parciales.length >= MAX_PRODUCTOS_BUSQUEDA_VISIBLES) {
+          break;
+        }
+      }
+
+      return [...exactos, ...prefijos, ...parciales].slice(0, MAX_PRODUCTOS_BUSQUEDA_VISIBLES);
+    },
+    [articulosBusqueda, filtroCategoria, searchNormalizado, searchTokens]
   );
 
-  const articulosFiltradosVisibles = useMemo(
-    () => articulosFiltrados.slice(0, MAX_PRODUCTOS_BUSQUEDA_VISIBLES),
-    [articulosFiltrados]
+  const cantidadesCarrito = useMemo(
+    () => new Map(carrito.map((item) => [item.id, item.cantidad])),
+    [carrito]
   );
 
   const codigoArticuloIndex = useMemo(() => {
@@ -1344,18 +1386,9 @@ export default function VentasPage() {
         ) : articulosFiltrados.length === 0 ? (
           <Empty description="Sin resultados" style={{ padding: 24 }} />
         ) : (
-          <div>
-            {articulosFiltrados.length > MAX_PRODUCTOS_BUSQUEDA_VISIBLES && (
-              <Alert
-                type="info"
-                showIcon
-                style={{ marginBottom: 12 }}
-                message={`Mostrando ${articulosFiltradosVisibles.length} de ${articulosFiltrados.length} productos para mantener la búsqueda rápida.`}
-              />
-            )}
-            <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #f0d6ff", maxHeight: isMobile ? 360 : 520, overflowY: "auto" }}>
-            {articulosFiltradosVisibles.map((art, idx) => {
-              const enCarrito = carrito.find((i) => i.id === art.id);
+          <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #f0d6ff", maxHeight: isMobile ? 360 : 520, overflowY: "auto" }}>
+            {articulosFiltrados.map((art, idx) => {
+              const cantidadEnCarrito = cantidadesCarrito.get(art.id) || 0;
               return (
                 <div
                   key={art.id}
@@ -1366,11 +1399,11 @@ export default function VentasPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 12,
                     padding: "10px 14px",
-                    background: enCarrito ? "#fce4f8" : idx % 2 === 0 ? "#fff" : "#fdf5ff",
-                    borderBottom: idx < articulosFiltradosVisibles.length - 1 ? "1px solid #f0d6ff" : "none",
+                    background: cantidadEnCarrito > 0 ? "#fce4f8" : idx % 2 === 0 ? "#fff" : "#fdf5ff",
+                    borderBottom: idx < articulosFiltrados.length - 1 ? "1px solid #f0d6ff" : "none",
                     cursor: "pointer",
                     transition: "background 0.15s",
-                    borderLeft: enCarrito ? "4px solid #d81b87" : "4px solid transparent",
+                    borderLeft: cantidadEnCarrito > 0 ? "4px solid #d81b87" : "4px solid transparent",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1391,15 +1424,14 @@ export default function VentasPage() {
                       Stock: {Number(art.stock || 0)}
                     </Text>
                   </div>
-                  {enCarrito ? (
-                    <Badge count={enCarrito.cantidad} style={{ background: "#d81b87" }} />
+                  {cantidadEnCarrito > 0 ? (
+                    <Badge count={cantidadEnCarrito} style={{ background: "#d81b87" }} />
                   ) : (
                     <PlusOutlined style={{ color: "#d81b87", fontSize: 16 }} />
                   )}
                 </div>
               );
             })}
-            </div>
           </div>
         )
       )}
