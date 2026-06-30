@@ -182,6 +182,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { error: configError } = await supabaseAdmin.from("configuracion").insert({
+      tenant_id: tenantData.id,
+      nombre_academia: payload.storeName,
+      ciudad: "Colombia",
+      pais: "Colombia",
+      moneda: "COP",
+      simbolo_moneda: "$",
+      ticket_campos: {
+        logo: true,
+        nombreAcademia: true,
+        ruc: true,
+        direccion: true,
+        telefono: true,
+        email: true,
+        fecha: true,
+        concepto: true,
+        monto: true,
+        nota: true,
+        pie: true,
+        titulo: true,
+      },
+    });
+
+    if (configError) {
+      return NextResponse.json(
+        {
+          success: true,
+          warning: `Tienda creada, pero configuración inicial incompleta: ${configError.message}`,
+          data: {
+            tenantId: tenantData.id,
+            tenantSlug: tenantData.slug,
+            loginUrl: "/login",
+          },
+        },
+        { status: 201 },
+      );
+    }
+
     const response = NextResponse.json(
       {
         success: true,

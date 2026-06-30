@@ -2,6 +2,17 @@ import type { AuthProvider } from "@refinedev/core";
 import { supabaseBrowserClient } from "@utils/supabase/client";
 import { devAuthUser, isDevAuthBypassEnabled } from "@/utils/auth/dev-bypass";
 
+function setTenantCookie(tenantSlug: string | null) {
+  if (typeof document === "undefined") return;
+
+  if (!tenantSlug) {
+    document.cookie = "lc_tenant=; Path=/; Max-Age=0; SameSite=Lax";
+    return;
+  }
+
+  document.cookie = `lc_tenant=${tenantSlug}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+}
+
 function normalizeRole(rawRole: unknown): string {
   let normalized = typeof rawRole === "string" ? rawRole.toLowerCase() : "";
 
@@ -54,6 +65,48 @@ async function getPerfilByIdOrEmail(userId?: string, userEmail?: string | null) 
   return perfilesByEmail[0] || null;
 }
 
+async function getDefaultTenantSlugForUser(userId: string) {
+  const { data: membershipByDefault } = await supabaseBrowserClient
+    .from("tenant_memberships")
+    .select("tenant_id")
+    .eq("user_id", userId)
+    .eq("is_default", true)
+    .maybeSingle();
+
+  const tenantId = membershipByDefault?.tenant_id
+    ? String(membershipByDefault.tenant_id)
+    : null;
+
+  const resolvedTenantId = tenantId
+    ? tenantId
+    : await (async () => {
+        const { data: firstMembership } = await supabaseBrowserClient
+          .from("tenant_memberships")
+          .select("tenant_id")
+          .eq("user_id", userId)
+          .limit(1)
+          .maybeSingle();
+
+        return firstMembership?.tenant_id ? String(firstMembership.tenant_id) : null;
+      })();
+
+  if (!resolvedTenantId) return null;
+
+  const { data: tenant } = await supabaseBrowserClient
+    .from("tenants")
+    .select("slug")
+    .eq("id", resolvedTenantId)
+    .maybeSingle();
+
+  return tenant?.slug ? String(tenant.slug) : null;
+}
+
+async function syncTenantCookieForUser(userId: string) {
+  const tenantSlug = await getDefaultTenantSlugForUser(userId);
+  setTenantCookie(tenantSlug);
+  return tenantSlug;
+}
+
 export const authProvider: AuthProvider = {
   login: async ({ email, password }) => {
     if (isDevAuthBypassEnabled) {
@@ -88,6 +141,7 @@ export const authProvider: AuthProvider = {
 
         if (perfilError || !perfil || !perfilEmail || perfilEmail !== authEmail) {
           await supabaseBrowserClient.auth.signOut();
+          setTenantCookie(null);
           return {
             success: false,
             error: {
@@ -96,6 +150,8 @@ export const authProvider: AuthProvider = {
             },
           };
         }
+
+        await syncTenantCookieForUser(data.user.id);
 
         console.log("[AUTH] Login - User ID:", data.user.id);
         console.log("[AUTH] Login - Perfil Error:", perfilError);
@@ -150,6 +206,8 @@ export const authProvider: AuthProvider = {
       };
     }
 
+    setTenantCookie(null);
+
     return {
       success: true,
       redirectTo: "/login",
@@ -164,68 +222,40 @@ export const authProvider: AuthProvider = {
     }
 
     try {
-      // 🚀 DESARROLLO TEMPORAL: Todas las rutas son públicas excepto /club
-      // Después del desarrollo inicial, restaurar a autenticación requerida en todas partes
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-      const isClubPage = currentPath.startsWith('/club');
-
       const { data: { session }, error } = await supabaseBrowserClient.auth.getSession();
       
       if (error) {
         console.error("Auth Check Error:", error);
-        // Si hay error y estamos en /club, denegar acceso
-        if (isClubPage) {
-          return {
-            authenticated: false,
-            redirectTo: "/login?from=club",
-            logout: true,
-          };
-        }
-        // Si hay error pero no estamos en /club, permitir acceso
         return {
-          authenticated: true,
+          authenticated: false,
+          redirectTo: "/login",
+          logout: true,
         };
       }
 
       if (session) {
+        await syncTenantCookieForUser(session.user.id);
         return {
           authenticated: true,
         };
       }
 
-      // Sin sesión: solo requerir autenticación en /club
-      if (isClubPage) {
-        return {
-          authenticated: false,
-          redirectTo: "/login?from=club",
-          logout: true,
-        };
-      }
-
-      // En cualquier otra ruta, permitir acceso sin autenticación
       return {
-        authenticated: true,
+        authenticated: false,
+        redirectTo: "/login",
+        logout: true,
       };
     } catch (error: any) {
       console.error("Auth Check Exception:", error);
-      
-      // Si hay error y estamos en /club, denegar
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-      if (currentPath.startsWith('/club')) {
-        return {
-          authenticated: false,
-          redirectTo: "/login?from=club",
-          logout: true,
-          error: {
-            name: "CheckError",
-            message: error?.message || "Error al verificar sesión",
-          },
-        };
-      }
 
-      // En otras rutas, permitir acceso incluso con error
       return {
-        authenticated: true,
+        authenticated: false,
+        redirectTo: "/login",
+        logout: true,
+        error: {
+          name: "CheckError",
+          message: error?.message || "Error al verificar sesión",
+        },
       };
     }
   },
