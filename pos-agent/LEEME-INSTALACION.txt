@@ -1,0 +1,40 @@
+LA COSMETIKERA POS AGENT - INSTALACION EN PC DEL CLIENTE
+
+Este paquete se instala en el computador donde van conectadas las impresoras o el cajon monedero.
+
+REQUISITOS
+- Windows
+- Conexion a internet durante la instalacion
+- Node.js LTS si el instalador no logra ponerlo automaticamente
+
+INSTALACION RECOMENDADA
+1. Copia esta carpeta completa al PC del cliente.
+2. Haz clic derecho sobre instalar-caja.bat.
+3. Ejecuta como administrador si Windows lo solicita.
+4. Espera el mensaje final: LISTO: Agente activo en puerto 17891.
+
+QUE HACE EL INSTALADOR
+- Instala dependencias del agente.
+- Intenta registrar el autoarranque de Windows.
+- Si Windows bloquea la tarea programada, crea autoarranque en la carpeta Inicio del usuario.
+- Arranca el agente local en http://127.0.0.1:17891
+
+COMO VALIDAR
+1. Abre el navegador en el PC del cliente.
+2. Visita http://127.0.0.1:17891/health
+3. Debe responder con ok=true.
+
+SI NO IMPRIME
+- Verifica que la impresora este instalada en Windows.
+- Abre la app web y entra a Configuracion > Impresora POS o Etiquetas.
+- Usa Detectar impresoras.
+- Haz una impresion de prueba.
+
+ARCHIVOS IMPORTANTES
+- instalar-caja.bat : instalacion 1 clic
+- start-agent.bat : arranque manual del agente
+- uninstall-startup-task.ps1 : quita autoarranque
+- uninstall-windows-service.ps1 : quita servicio si se instalo como servicio
+
+NOTA
+Este agente debe instalarse en cada PC fisico que vaya a imprimir o abrir el cajon.

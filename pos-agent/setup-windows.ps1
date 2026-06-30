@@ -103,11 +103,17 @@ if (Test-IsAdministrator) {
     Write-Warning "[POS-AGENT] Falló instalación como servicio. Se usará tarea programada."
     Write-Warning ("[POS-AGENT] Motivo: " + $_.Exception.Message)
     powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
+    if ($LASTEXITCODE -ne 0) {
+      throw "La instalación de autoarranque devolvió código $LASTEXITCODE"
+    }
     Start-AgentProcess
   }
 } else {
   Write-Warning "[POS-AGENT] Sin permisos de administrador. Se instalará como tarea programada."
   powershell -ExecutionPolicy Bypass -File (Join-Path $agentDir "install-startup-task.ps1") -NodePath $nodePath -TaskName $TaskName
+  if ($LASTEXITCODE -ne 0) {
+    throw "La instalación de autoarranque devolvió código $LASTEXITCODE"
+  }
   Start-AgentProcess
 }
 
