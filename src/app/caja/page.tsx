@@ -30,6 +30,7 @@ import {
   PrinterOutlined,
   ShoppingCartOutlined,
   CheckCircleOutlined,
+  CalculatorOutlined,
   CreditCardOutlined,
   BankOutlined,
   WalletOutlined,
@@ -97,6 +98,14 @@ interface ResumenCaja {
   efectivo_esperado: number;
   efectivo_contado?: number;
   descuadre?: number;
+}
+
+interface EstadoCajaResponse {
+  currentTurno: TurnoCaja | null;
+  lastClosedTurno?: TurnoCaja | null;
+  suggestedOpeningBase?: number;
+  resumen?: ResumenCaja | null;
+  error?: string;
 }
 
 interface ResponsableCaja {
@@ -248,13 +257,18 @@ export default function CajaPage() {
   const [filtroVentasAparcadas, setFiltroVentasAparcadas] = useState("");
   const [turnoCaja, setTurnoCaja] = useState<TurnoCaja | null>(null);
   const [resumenCaja, setResumenCaja] = useState<ResumenCaja | null>(null);
+  const [ultimoCierreCaja, setUltimoCierreCaja] = useState<TurnoCaja | null>(null);
+  const [baseSugeridaApertura, setBaseSugeridaApertura] = useState(0);
   const [cargandoCaja, setCargandoCaja] = useState(false);
   const [guardandoCaja, setGuardandoCaja] = useState(false);
   const [aperturaVisible, setAperturaVisible] = useState(false);
+  const [contadorAperturaVisible, setContadorAperturaVisible] = useState(false);
   const [cierreVisible, setCierreVisible] = useState(false);
   const [conteoCierreFinalizado, setConteoCierreFinalizado] = useState(false);
   const [billetesContados, setBilletesContados] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
   const [monedasContadas, setMonedasContadas] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
+  const [billetesApertura, setBilletesApertura] = useState<Record<string, number>>(crearMapaDenominaciones(BILLETES_CAJA));
+  const [monedasApertura, setMonedasApertura] = useState<Record<string, number>>(crearMapaDenominaciones(MONEDAS_CAJA));
   const [responsablesCaja, setResponsablesCaja] = useState<ResponsableCaja[]>([]);
 
   const puedeAbrirCaja = user?.rol === "administrador" || tienePermiso(user?.rol, "caja_abrir");
@@ -390,17 +404,21 @@ export default function CajaPage() {
     try {
       setCargandoCaja(true);
       const response = await fetch("/api/caja/turnos");
-      const payload = await response.json();
+      const payload = await response.json() as EstadoCajaResponse;
       if (!response.ok) {
         throw new Error(payload?.error || "No se pudo cargar la caja");
       }
 
       setTurnoCaja(payload.currentTurno || null);
       setResumenCaja(payload.resumen || null);
+      setUltimoCierreCaja(payload.lastClosedTurno || null);
+      setBaseSugeridaApertura(Number(payload.suggestedOpeningBase || 0));
     } catch (error: any) {
       console.error("Error cargando turno de caja:", error);
       setTurnoCaja(null);
       setResumenCaja(null);
+      setUltimoCierreCaja(null);
+      setBaseSugeridaApertura(0);
     } finally {
       setCargandoCaja(false);
     }
@@ -412,6 +430,10 @@ export default function CajaPage() {
 
   const totalBilletesContados = useMemo(() => sumarMapaDenominaciones(billetesContados), [billetesContados]);
   const totalMonedasContadas = useMemo(() => sumarMapaDenominaciones(monedasContadas), [monedasContadas]);
+  const totalAperturaContado = useMemo(
+    () => sumarMapaDenominaciones(billetesApertura) + sumarMapaDenominaciones(monedasApertura),
+    [billetesApertura, monedasApertura],
+  );
   const totalContadoCaja = totalBilletesContados + totalMonedasContadas;
   const efectivoEsperadoCaja = Number(resumenCaja?.efectivo_esperado ?? turnoCaja?.efectivo_esperado ?? 0);
   const produccionCaja = Number(resumenCaja?.produccion_efectivo ?? turnoCaja?.producido_efectivo ?? 0);
@@ -419,13 +441,22 @@ export default function CajaPage() {
   const descuadreCaja = totalContadoCaja - efectivoEsperadoCaja;
 
   const abrirModalApertura = () => {
+    setBilletesApertura(crearMapaDenominaciones(BILLETES_CAJA));
+    setMonedasApertura(crearMapaDenominaciones(MONEDAS_CAJA));
     formApertura.setFieldsValue({
-      base_apertura: 0,
-      notas_apertura: "",
+      base_apertura: baseSugeridaApertura,
+      notas_apertura: ultimoCierreCaja?.closed_at
+        ? `Base sugerida tomada del cierre anterior (${dayjs(ultimoCierreCaja.closed_at).format("DD/MM/YYYY HH:mm")})`
+        : "",
       opened_by: user?.id || undefined,
     });
     setAperturaVisible(true);
   };
+
+  const aplicarContadorApertura = useCallback(() => {
+    formApertura.setFieldValue("base_apertura", totalAperturaContado);
+    setContadorAperturaVisible(false);
+  }, [formApertura, totalAperturaContado]);
 
   const abrirModalCierre = async () => {
     if (permiteCajon) {
@@ -498,8 +529,12 @@ export default function CajaPage() {
 
       setTurnoCaja(null);
       setResumenCaja(null);
+      setUltimoCierreCaja(turnoCerrado);
+      setBaseSugeridaApertura(baseSugerida);
       setCierreVisible(false);
       setConteoCierreFinalizado(false);
+      setBilletesApertura(crearMapaDenominaciones(BILLETES_CAJA));
+      setMonedasApertura(crearMapaDenominaciones(MONEDAS_CAJA));
       formApertura.setFieldsValue({
         base_apertura: baseSugerida,
         notas_apertura: turnoCerrado?.closed_at
@@ -1733,9 +1768,19 @@ export default function CajaPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Define la base inicial antes de empezar a vender"
-          description="Al confirmar, se guardará el turno y se abrirá el cajón si el dispositivo lo permite."
+          message="Selecciona el responsable y verifica el valor a dejar en caja"
+          description={`Al confirmar se registrará el turno y se abrirá el cajón si el dispositivo lo permite. Base sugerida del último cierre: ${formatCurrency(baseSugeridaApertura)}.`}
         />
+
+        {ultimoCierreCaja?.closed_at ? (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={`Último cierre: ${dayjs(ultimoCierreCaja.closed_at).format("DD/MM/YYYY HH:mm")}`}
+            description={`Valor contado en el cierre anterior: ${formatCurrency(ultimoCierreCaja.efectivo_contado)}. Usa el contador para verificar el dinero que dejas en caja.`}
+          />
+        ) : null}
 
         <Form form={formApertura} layout="vertical">
           <Form.Item
@@ -1757,22 +1802,105 @@ export default function CajaPage() {
 
           <Form.Item
             label="Base inicial"
-            name="base_apertura"
-            rules={[{ required: true, message: "Ingresa la base inicial" }]}
           >
-            <InputNumber
-              min={0}
-              style={{ width: "100%" }}
-              formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-              parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
-              placeholder="$0"
-            />
+            <Space.Compact style={{ width: "100%" }}>
+              <Form.Item name="base_apertura" noStyle rules={[{ required: true, message: "Ingresa la base inicial" }]}>
+                <InputNumber
+                  min={0}
+                  style={{ width: "100%" }}
+                  formatter={(value) => `$${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                  parser={((value: string | undefined) => Number(String(value ?? "").replace(/\$/g, "").replace(/,/g, ""))) as any}
+                  placeholder="$0"
+                />
+              </Form.Item>
+              <Button icon={<CalculatorOutlined />} onClick={() => setContadorAperturaVisible(true)}>
+                Contador
+              </Button>
+            </Space.Compact>
           </Form.Item>
 
           <Form.Item label="Observaciones" name="notas_apertura">
             <Input.TextArea rows={3} placeholder="Ej: cambio inicial, observaciones del turno" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="Contador de billetes y monedas"
+        open={contadorAperturaVisible}
+        onCancel={() => setContadorAperturaVisible(false)}
+        onOk={aplicarContadorApertura}
+        okText="Usar este total"
+        cancelText="Cancelar"
+        width={760}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Verifica el dinero a dejar en caja"
+          description={`Referencia del cierre anterior: ${formatCurrency(baseSugeridaApertura)}.`}
+        />
+
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Card size="small" title="Billetes" styles={{ body: { padding: 12 } }}>
+              <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                {BILLETES_CAJA.map((denominacion) => (
+                  <Row key={`open-b-${denominacion}`} gutter={8} align="middle">
+                    <Col flex="120px">
+                      <Text>${denominacion.toLocaleString("es-CO")}</Text>
+                    </Col>
+                    <Col flex="auto">
+                      <InputNumber
+                        min={0}
+                        value={billetesApertura[String(denominacion)]}
+                        onChange={(value) =>
+                          setBilletesApertura((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }))
+                        }
+                        style={{ width: "100%" }}
+                      />
+                    </Col>
+                  </Row>
+                ))}
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card size="small" title="Monedas" styles={{ body: { padding: 12 } }}>
+              <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                {MONEDAS_CAJA.map((denominacion) => (
+                  <Row key={`open-m-${denominacion}`} gutter={8} align="middle">
+                    <Col flex="120px">
+                      <Text>${denominacion.toLocaleString("es-CO")}</Text>
+                    </Col>
+                    <Col flex="auto">
+                      <InputNumber
+                        min={0}
+                        value={monedasApertura[String(denominacion)]}
+                        onChange={(value) =>
+                          setMonedasApertura((prev) => ({ ...prev, [String(denominacion)]: Number(value || 0) }))
+                        }
+                        style={{ width: "100%" }}
+                      />
+                    </Col>
+                  </Row>
+                ))}
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+
+        <Card size="small" style={{ marginTop: 12 }} styles={{ body: { padding: 12 } }}>
+          <Row justify="space-between">
+            <Text type="secondary">Total verificado</Text>
+            <Text strong>{formatCurrency(totalAperturaContado)}</Text>
+          </Row>
+          <Row justify="space-between">
+            <Text type="secondary">Referencia del último cierre</Text>
+            <Text strong>{formatCurrency(baseSugeridaApertura)}</Text>
+          </Row>
+        </Card>
       </Modal>
 
       <Modal
@@ -1799,6 +1927,21 @@ export default function CajaPage() {
         ]}
         width={980}
       >
+        <Card size="small" style={{ marginBottom: 16 }} styles={{ body: { padding: 12 } }}>
+          <Row justify="space-between">
+            <Text type="secondary">Responsable del turno</Text>
+            <Text strong>{responsablesCaja.find((resp) => resp.id === (turnoCaja as any)?.opened_by)?.nombre_completo || user?.email || "No asignado"}</Text>
+          </Row>
+          <Row justify="space-between">
+            <Text type="secondary">Hora de apertura</Text>
+            <Text strong>{turnoCaja?.opened_at ? dayjs(turnoCaja.opened_at).format("DD/MM/YYYY HH:mm") : "-"}</Text>
+          </Row>
+          <Row justify="space-between">
+            <Text type="secondary">Hora estimada de cierre</Text>
+            <Text strong>{dayjs().format("DD/MM/YYYY HH:mm")}</Text>
+          </Row>
+        </Card>
+
         {conteoCierreFinalizado ? (
           <>
             <Alert
@@ -1837,8 +1980,8 @@ export default function CajaPage() {
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Conteo en curso"
-            description="Cuenta el dinero primero. El sistema solo revelará el esperado y el cuadre cuando finalices el conteo."
+            message="Paso 1: cuenta el dinero físico"
+            description="Primero cuenta billetes y monedas. Luego pulsa 'Finalizar conteo' para que el sistema revele el esperado y puedas confirmar el cierre."
           />
         )}
 

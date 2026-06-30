@@ -264,9 +264,29 @@ function buildResumenCaja(
   };
 }
 
+async function requireCajaReadPermission(request: NextRequest) {
+  const openPermission = await requireOperationPermission(request, "caja_abrir");
+  if (openPermission.ok) return openPermission;
+
+  const openStatus = openPermission.response.status;
+  if (openStatus === 401 || openStatus >= 500) {
+    return openPermission;
+  }
+
+  const closePermission = await requireOperationPermission(request, "caja_cerrar");
+  if (closePermission.ok) return closePermission;
+
+  const closeStatus = closePermission.response.status;
+  if (closeStatus === 401 || closeStatus >= 500) {
+    return closePermission;
+  }
+
+  return openPermission;
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const permissionCheck = await requireOperationPermission(request, "caja_abrir");
+    const permissionCheck = await requireCajaReadPermission(request);
     if (!permissionCheck.ok) return permissionCheck.response;
 
     const { tenantId } = await resolveTenantContext(request);
