@@ -34,6 +34,59 @@ const normalizeSearchText = (value: unknown) =>
     ? value.toLowerCase().trim().normalize("NFD").replace(/\p{Mn}/gu, "")
     : "";
 
+const tokenizeSearchText = (value: unknown) =>
+  normalizeSearchText(value).split(/\s+/).filter(Boolean);
+
+const levenshteinDistance = (left: string, right: string) => {
+  if (left === right) return 0;
+  if (!left.length) return right.length;
+  if (!right.length) return left.length;
+
+  const matrix = Array.from({ length: left.length + 1 }, () => new Array<number>(right.length + 1).fill(0));
+
+  for (let row = 0; row <= left.length; row += 1) {
+    const currentRow = matrix[row];
+    if (currentRow) currentRow[0] = row;
+  }
+
+  const firstRow = matrix[0];
+  if (firstRow) {
+    for (let col = 0; col <= right.length; col += 1) {
+      firstRow[col] = col;
+    }
+  }
+
+  for (let row = 1; row <= left.length; row += 1) {
+    for (let col = 1; col <= right.length; col += 1) {
+      const cost = left[row - 1] === right[col - 1] ? 0 : 1;
+      const currentRow = matrix[row];
+      const previousRow = matrix[row - 1];
+      if (!currentRow || !previousRow) continue;
+      const previousCell = previousRow[col] ?? Number.MAX_SAFE_INTEGER;
+      const leftCell = currentRow[col - 1] ?? Number.MAX_SAFE_INTEGER;
+      const diagonalCell = previousRow[col - 1] ?? Number.MAX_SAFE_INTEGER;
+
+      currentRow[col] = Math.min(
+        previousCell + 1,
+        leftCell + 1,
+        diagonalCell + cost,
+      );
+    }
+  }
+
+  return matrix[left.length]?.[right.length] ?? Math.max(left.length, right.length);
+};
+
+const matchesApproxToken = (queryToken: string, candidateWord: string) => {
+  if (!queryToken || !candidateWord) return false;
+  if (candidateWord.includes(queryToken) || queryToken.includes(candidateWord)) return true;
+  if (queryToken.length < 4 || candidateWord.length < 4) return false;
+
+  const distance = levenshteinDistance(queryToken, candidateWord);
+  if (queryToken.length >= 8 || candidateWord.length >= 8) return distance <= 2;
+  return distance <= 1;
+};
+
 type Articulo = {
   id: string; nombre: string; precio_venta: number;
   stock: number; categoria?: string; marca?: string; imagen_url?: string;
@@ -874,7 +927,7 @@ export default function VentasPage() {
         exactKeys: [articulo.id, articulo.referencia, articulo.codigo_barras, articulo.codigo_secundario]
           .map((value) => normalizeSearchText(value))
           .filter(Boolean),
-        prefixFields: [
+        rankedFields: [
           articulo.nombre,
           articulo.marca,
           articulo.referencia,
@@ -903,6 +956,18 @@ export default function VentasPage() {
           .map((value) => normalizeSearchText(value))
           .filter(Boolean)
           .join(" "),
+        searchWords: [
+          articulo.nombre,
+          articulo.marca,
+          articulo.referencia,
+          articulo.codigo_barras,
+          articulo.codigo_secundario,
+          articulo.categoria,
+          articulo.descripcion,
+          articulo.proveedor,
+          articulo.tamano,
+          articulo.empaque,
+        ].flatMap((value) => tokenizeSearchText(value)),
       })),
     [articulos]
   );
@@ -920,45 +985,63 @@ export default function VentasPage() {
         return [] as Articulo[];
       }
 
-      const exactos: Articulo[] = [];
-      const prefijos: Articulo[] = [];
-      const parciales: Articulo[] = [];
+      const ranked: Array<{ articulo: Articulo; score: number }> = [];
 
-      for (const { articulo, exactKeys, prefixFields, searchBlob } of articulosBusqueda) {
+      for (const { articulo, exactKeys, rankedFields, searchBlob, searchWords } of articulosBusqueda) {
         if (filtroCategoria && articulo.categoria !== filtroCategoria) {
           continue;
         }
 
         if (!searchTokens.length) {
-          prefijos.push(articulo);
-          if (prefijos.length >= MAX_PRODUCTOS_BUSQUEDA_VISIBLES) {
-            break;
-          }
+          ranked.push({ articulo, score: 1 });
           continue;
         }
+
+        let score = 0;
 
         if (searchTokens.length === 1 && exactKeys.includes(searchNormalizado)) {
-          exactos.push(articulo);
+          score += 1000;
+        }
+
+        const phraseStarts = rankedFields.some((field) => field.startsWith(searchNormalizado));
+        const phraseIncludes = rankedFields.some((field) => field.includes(searchNormalizado));
+
+        if (phraseStarts) score += 700;
+        else if (phraseIncludes) score += 550;
+        else if (searchBlob.includes(searchNormalizado)) score += 450;
+
+        let allTokensMatched = true;
+        let approxMatches = 0;
+
+        for (const token of searchTokens) {
+          const exactTokenMatch = searchWords.some((word) => word.includes(token));
+          const approxTokenMatch = exactTokenMatch || searchWords.some((word) => matchesApproxToken(token, word));
+
+          if (!approxTokenMatch) {
+            allTokensMatched = false;
+            break;
+          }
+
+          if (!exactTokenMatch) {
+            approxMatches += 1;
+          }
+        }
+
+        if (!allTokensMatched) {
           continue;
         }
 
-        if (!searchTokens.every((token) => searchBlob.includes(token))) {
-          continue;
-        }
+        const firstToken = searchTokens[0] || "";
+        score += Math.max(0, 300 - approxMatches * 40);
+        score += Math.max(0, 120 - searchBlob.indexOf(firstToken) * 0.5);
 
-        const esPrefijo = prefixFields.some((field) => field.startsWith(searchNormalizado));
-        if (esPrefijo) {
-          prefijos.push(articulo);
-        } else {
-          parciales.push(articulo);
-        }
-
-        if (exactos.length + prefijos.length + parciales.length >= MAX_PRODUCTOS_BUSQUEDA_VISIBLES) {
-          break;
-        }
+        ranked.push({ articulo, score });
       }
 
-      return [...exactos, ...prefijos, ...parciales].slice(0, MAX_PRODUCTOS_BUSQUEDA_VISIBLES);
+      return ranked
+        .sort((left, right) => right.score - left.score || left.articulo.nombre.localeCompare(right.articulo.nombre))
+        .slice(0, MAX_PRODUCTOS_BUSQUEDA_VISIBLES)
+        .map(({ articulo }) => articulo);
     },
     [articulosBusqueda, filtroCategoria, searchNormalizado, searchTokens]
   );
