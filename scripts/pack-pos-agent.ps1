@@ -14,5 +14,16 @@ if (Test-Path $zipPath) {
   Remove-Item $zipPath -Force
 }
 
-Compress-Archive -Path (Join-Path $agentDir "*") -DestinationPath $zipPath -Force
+$stagingDir = Join-Path $distDir "_pos-agent-package"
+if (Test-Path $stagingDir) {
+  Remove-Item $stagingDir -Recurse -Force
+}
+
+$packageRoot = Join-Path $stagingDir "la-cosmetikera-pos-agent"
+New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
+Copy-Item -Path (Join-Path $agentDir "*") -Destination $packageRoot -Recurse -Force
+
+Compress-Archive -Path $packageRoot -DestinationPath $zipPath -Force
+
+Remove-Item $stagingDir -Recurse -Force
 Write-Output "Paquete generado: $zipPath"

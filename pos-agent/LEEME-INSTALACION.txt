@@ -8,10 +8,12 @@ REQUISITOS
 - Node.js LTS si el instalador no logra ponerlo automaticamente
 
 INSTALACION RECOMENDADA
-1. Copia esta carpeta completa al PC del cliente.
-2. Haz clic derecho sobre instalar-caja.bat.
-3. Ejecuta como administrador si Windows lo solicita.
-4. Espera el mensaje final: LISTO: Agente activo en puerto 17891.
+1. Copia el archivo ZIP al PC del cliente.
+2. Extrae el ZIP completo en una carpeta normal.
+3. Abre la carpeta extraida la-cosmetikera-pos-agent.
+4. Haz clic derecho sobre instalar-caja.bat.
+5. Ejecuta como administrador si Windows lo solicita.
+6. Espera el mensaje final: LISTO: Agente activo en puerto 17891.
 
 QUE HACE EL INSTALADOR
 - Instala dependencias del agente.
@@ -23,6 +25,10 @@ COMO VALIDAR
 1. Abre el navegador en el PC del cliente.
 2. Visita http://127.0.0.1:17891/health
 3. Debe responder con ok=true.
+
+IMPORTANTE
+- No ejecutes instalar-caja.bat desde dentro del ZIP sin extraer.
+- No descargues solo el archivo .bat; debe ir junto con setup-windows.ps1 y el resto del paquete.
 
 SI NO IMPRIME
 - Verifica que la impresora este instalada en Windows.
