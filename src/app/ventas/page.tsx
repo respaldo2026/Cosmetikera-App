@@ -391,6 +391,7 @@ export default function VentasPage() {
   const produccionCaja = Number(resumenCaja?.produccion_efectivo ?? turnoCaja?.producido_efectivo ?? 0);
   const efectivoEsperadoCaja = Number(resumenCaja?.efectivo_esperado ?? turnoCaja?.efectivo_esperado ?? 0);
   const descuadreCaja = totalContadoCaja - efectivoEsperadoCaja;
+  const cajaOperativa = Boolean(turnoCaja);
 
   const lanzarProcesosPOS = useCallback((ticket: DatosTicket, debeAbrirCajon: boolean, debeImprimir: boolean) => {
     const tareas: Promise<unknown>[] = [];
@@ -1073,6 +1074,11 @@ export default function VentasPage() {
   const categorias = [...new Set(articulos.map((a) => a.categoria).filter(Boolean))];
 
   const agregarAlCarrito = (art: Articulo) => {
+    if (!cajaOperativa) {
+      message.warning("Debes abrir la caja antes de agregar productos o facturar");
+      return;
+    }
+
     setProductoAgregadoReciente(art.id);
     setCarrito((prev) => {
       const existe = prev.find((i) => i.id === art.id);
@@ -1453,6 +1459,11 @@ export default function VentasPage() {
   }, [codigoArticuloIndex, articulos, message, modal, router]);
 
   const handleCobrar = () => {
+    if (!cajaOperativa) {
+      message.warning("Debes abrir la caja antes de facturar");
+      return;
+    }
+
     if (!clienteId && carrito.length > 0) {
       modal.confirm({
         title: "¿Vender sin cliente?",
@@ -1484,8 +1495,24 @@ export default function VentasPage() {
           placeholder="🔍 Escanear o buscar por nombre, marca, referencia o código..."
           conCamara
           size="large"
+          disabled={!cajaOperativa}
         />
       </div>
+
+      {!cajaOperativa ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{
+            marginBottom: 16,
+            borderRadius: 14,
+            border: "2px solid #ffd666",
+            boxShadow: "0 10px 24px rgba(250, 173, 20, 0.18)",
+          }}
+          message="Debes hacer apertura de caja antes de facturar"
+          description={`La búsqueda de productos, el agregado al carrito y el cobro quedan bloqueados hasta abrir caja. Usa el botón \"Abrir caja\" para continuar. Base sugerida actual: ${formatCurrency(baseSugeridaApertura)}.`}
+        />
+      ) : null}
 
       {(search.trim().length > 0 || Boolean(filtroCategoria)) && (
         loading ? (
@@ -1548,15 +1575,15 @@ export default function VentasPage() {
         <div style={{
           marginTop: 40, textAlign: "center",
           padding: "32px 24px",
-          background: "linear-gradient(135deg,#fce4f8,#f0d6ff)",
+          background: cajaOperativa ? "linear-gradient(135deg,#fce4f8,#f0d6ff)" : "linear-gradient(135deg,#fff7e6,#ffe7ba)",
           borderRadius: 16,
         }}>
-          <BarcodeOutlined style={{ fontSize: 56, color: "#d81b87", opacity: 0.4, display: "block", marginBottom: 12 }} />
-          <Text style={{ fontSize: 15, color: "#9c27b0", fontWeight: 600, display: "block" }}>
-            Escanea el código de barras
+          <BarcodeOutlined style={{ fontSize: 56, color: cajaOperativa ? "#d81b87" : "#d48806", opacity: 0.4, display: "block", marginBottom: 12 }} />
+          <Text style={{ fontSize: 15, color: cajaOperativa ? "#9c27b0" : "#ad6800", fontWeight: 600, display: "block" }}>
+            {cajaOperativa ? "Escanea el código de barras" : "Primero debes abrir caja"}
           </Text>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            o escribe el nombre del producto para buscarlo
+            {cajaOperativa ? "o escribe el nombre del producto para buscarlo" : "La facturación se activará cuando registres la apertura de caja"}
           </Text>
         </div>
       )}
@@ -1840,7 +1867,7 @@ export default function VentasPage() {
           size="large"
           block
           icon={<CheckOutlined />}
-          disabled={carrito.length === 0}
+          disabled={carrito.length === 0 || !cajaOperativa}
           onClick={handleCobrar}
           style={{ background: "linear-gradient(90deg,#d81b87,#9c27b0)", border: "none", height: 44 }}
         >
