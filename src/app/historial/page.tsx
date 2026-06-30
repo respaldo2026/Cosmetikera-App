@@ -937,6 +937,17 @@ export default function HistorialPage() {
 
   const mostrarSeccionGraficas = mostrarGraficas || hayFiltrosActivos;
 
+  const limpiarFiltros = useCallback(() => {
+    setPeriodo("hoy");
+    setRango(null);
+    setDiaFiltro(null);
+    setMesFiltro(null);
+    setAnioFiltro(null);
+    setTipoFiltro("venta");
+    setDireccionFiltro(undefined);
+    setSearch("");
+  }, []);
+
   const exportarPDF = useCallback(async () => {
     if (salesStats.totalVentas === 0) {
       message.warning("No hay ventas en el filtro actual para generar el informe.");
@@ -1155,152 +1166,171 @@ export default function HistorialPage() {
 
   const filtrosCard = (
     <Card style={{ marginBottom: 12, borderRadius: 10 }} styles={{ body: { padding: "12px 14px" } }}>
-      <Row gutter={[12, 12]}>
-        <Col xs={24} xl={10}>
+      <Space direction="vertical" size={12} style={{ width: "100%" }}>
+        <div>
+          <Text strong style={{ display: "block", marginBottom: 8 }}>Buscar en el historial</Text>
           <Input
-            placeholder="Buscar por cliente, proveedor, concepto, codigo o referencia"
+            placeholder="Cliente, proveedor, concepto, código o referencia"
             prefix={<SearchOutlined />}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             allowClear
           />
-        </Col>
-        <Col xs={24} sm={8} xl={4}>
-          <Select
-            placeholder="Tipo de operacion"
-            allowClear
-            style={{ width: "100%" }}
-            value={tipoFiltro}
-            onChange={(value) => setTipoFiltro(value)}
-            options={Object.entries(TIPO_META).map(([value, meta]) => ({ value, label: meta.label }))}
-          />
-        </Col>
-        <Col xs={24} sm={8} xl={4}>
-          <Select
-            placeholder="Direccion"
-            allowClear
-            style={{ width: "100%" }}
-            value={direccionFiltro}
-            onChange={(value) => setDireccionFiltro(value)}
-            options={[
-              { value: "entrada", label: "Entrada" },
-              { value: "salida", label: "Salida" },
-              { value: "neutral", label: "Neutral" },
-            ]}
-          />
-        </Col>
-        <Col xs={24} sm={8} xl={6}>
-          <Segmented
-            block
-            value={periodo}
-            onChange={(value) => setPeriodo(value as PeriodoRapido)}
-            options={[
-              { label: "Hoy", value: "hoy" },
-              { label: "Semana", value: "semana" },
-              { label: "Mes", value: "mes" },
-              { label: "Año", value: "anio" },
-              { label: "Periodo", value: "personalizado" },
-              { label: "Todo", value: "todo" },
-            ]}
-          />
-        </Col>
-        <Col xs={24} sm={8} xl={4}>
-          <DatePicker
-            style={{ width: "100%" }}
-            format="DD/MM/YYYY"
-            placeholder="Dia exacto"
-            value={diaFiltro}
-            onChange={(value) => setDiaFiltro(value)}
-            allowClear
-          />
-        </Col>
-        <Col xs={24} sm={8} xl={4}>
-          <DatePicker
-            style={{ width: "100%" }}
-            picker="month"
-            format="MM/YYYY"
-            placeholder="Mes exacto"
-            value={mesFiltro}
-            onChange={(value) => setMesFiltro(value)}
-            allowClear
-          />
-        </Col>
-        <Col xs={24} sm={8} xl={3}>
-          <Select
-            placeholder="Año"
-            allowClear
-            style={{ width: "100%" }}
-            value={anioFiltro}
-            onChange={(value) => setAnioFiltro(value)}
-            options={yearOptions}
-          />
-        </Col>
-        {periodo === "personalizado" ? (
-          <Col xs={24} xl={10}>
-            <RangePicker
-              style={{ width: "100%" }}
-              format="DD/MM/YYYY"
-              placeholder={["Desde", "Hasta"]}
-              value={rango as [Dayjs, Dayjs] | null}
-              onChange={(dates) => setRango(dates as [Dayjs, Dayjs] | null)}
-            />
-          </Col>
-        ) : null}
-      </Row>
-      <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
-        <Button onClick={() => setMostrarGraficas((current) => !current)}>
-          {mostrarSeccionGraficas ? "Ocultar gráficas" : "Mostrar gráficas"}
-        </Button>
-        <Segmented
-          value={vistaFilas}
-          onChange={(value) => setVistaFilas(value as "resumida" | "detallada")}
-          options={[
-            { label: "Vista resumida", value: "resumida" },
-            { label: "Vista detallada", value: "detallada" },
-          ]}
-        />
-        <Button
-          onClick={() => {
-            setPeriodo("hoy");
-            setRango(null);
-            setDiaFiltro(null);
-            setMesFiltro(null);
-            setAnioFiltro(null);
-            setTipoFiltro("venta");
-            setDireccionFiltro(undefined);
-            setSearch("");
+        </div>
+
+        <div
+          style={{
+            padding: 12,
+            border: "1px solid #f0f0f0",
+            borderRadius: 10,
+            background: "#fafafa",
           }}
         >
-          Limpiar filtros
-        </Button>
+          <Text strong style={{ display: "block", marginBottom: 10 }}>Filtros</Text>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12} xl={6}>
+              <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Tipo</Text>
+              <Select
+                placeholder="Todas las operaciones"
+                allowClear
+                style={{ width: "100%" }}
+                value={tipoFiltro}
+                onChange={(value) => setTipoFiltro(value)}
+                options={Object.entries(TIPO_META).map(([value, meta]) => ({ value, label: meta.label }))}
+              />
+            </Col>
+            <Col xs={24} sm={12} xl={6}>
+              <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Dirección</Text>
+              <Select
+                placeholder="Todas"
+                allowClear
+                style={{ width: "100%" }}
+                value={direccionFiltro}
+                onChange={(value) => setDireccionFiltro(value)}
+                options={[
+                  { value: "entrada", label: "Entrada" },
+                  { value: "salida", label: "Salida" },
+                  { value: "neutral", label: "Neutral" },
+                ]}
+              />
+            </Col>
+            <Col xs={24} xl={12}>
+              <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Periodo rápido</Text>
+              <Segmented
+                block
+                value={periodo}
+                onChange={(value) => setPeriodo(value as PeriodoRapido)}
+                options={[
+                  { label: "Hoy", value: "hoy" },
+                  { label: "Semana", value: "semana" },
+                  { label: "Mes", value: "mes" },
+                  { label: "Año", value: "anio" },
+                  { label: "Rango", value: "personalizado" },
+                  { label: "Todo", value: "todo" },
+                ]}
+              />
+            </Col>
+            <Col xs={24} sm={8} xl={6}>
+              <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Día exacto</Text>
+              <DatePicker
+                style={{ width: "100%" }}
+                format="DD/MM/YYYY"
+                placeholder="Selecciona un día"
+                value={diaFiltro}
+                onChange={(value) => setDiaFiltro(value)}
+                allowClear
+              />
+            </Col>
+            <Col xs={24} sm={8} xl={6}>
+              <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Mes exacto</Text>
+              <DatePicker
+                style={{ width: "100%" }}
+                picker="month"
+                format="MM/YYYY"
+                placeholder="Selecciona un mes"
+                value={mesFiltro}
+                onChange={(value) => setMesFiltro(value)}
+                allowClear
+              />
+            </Col>
+            <Col xs={24} sm={8} xl={4}>
+              <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Año exacto</Text>
+              <Select
+                placeholder="Año"
+                allowClear
+                style={{ width: "100%" }}
+                value={anioFiltro}
+                onChange={(value) => setAnioFiltro(value)}
+                options={yearOptions}
+              />
+            </Col>
+            {periodo === "personalizado" ? (
+              <Col xs={24} xl={8}>
+                <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>Rango personalizado</Text>
+                <RangePicker
+                  style={{ width: "100%" }}
+                  format="DD/MM/YYYY"
+                  placeholder={["Desde", "Hasta"]}
+                  value={rango as [Dayjs, Dayjs] | null}
+                  onChange={(dates) => setRango(dates as [Dayjs, Dayjs] | null)}
+                />
+              </Col>
+            ) : null}
+          </Row>
+        </div>
+
+        <Row gutter={[12, 12]} align="middle">
+          <Col xs={24} xl={14}>
+            <Space size={[8, 8]} wrap>
+              <Button onClick={() => setMostrarGraficas((current) => !current)}>
+                {mostrarSeccionGraficas ? "Ocultar gráficas" : "Mostrar gráficas"}
+              </Button>
+              <Segmented
+                value={vistaFilas}
+                onChange={(value) => setVistaFilas(value as "resumida" | "detallada")}
+                options={[
+                  { label: "Vista resumida", value: "resumida" },
+                  { label: "Vista detallada", value: "detallada" },
+                ]}
+              />
+              <Button onClick={limpiarFiltros}>Limpiar filtros</Button>
+            </Space>
+          </Col>
+          <Col xs={24} xl={10}>
+            <Space size={[8, 8]} wrap style={{ justifyContent: isMobile ? "flex-start" : "flex-end", width: "100%" }}>
+              <Button
+                size="small"
+                onClick={() => setSelectedOperacionKeys(operacionesTabla.map((op) => op.key))}
+                disabled={operacionesTabla.length === 0}
+              >
+                Seleccionar visibles ({operacionesTabla.length})
+              </Button>
+              <Button size="small" onClick={() => setSelectedOperacionKeys([])} disabled={selectedCount === 0}>
+                Limpiar selección
+              </Button>
+              {isAdmin ? (
+                <Button size="small" danger onClick={eliminarOperacionesSeleccionadas} disabled={selectedCount === 0}>
+                  Eliminar seleccionadas
+                </Button>
+              ) : null}
+              {selectedCount > 0 ? <Tag color="blue">{selectedCount} seleccionadas</Tag> : null}
+            </Space>
+          </Col>
+        </Row>
+
+        <Space size={[8, 8]} wrap>
+          <Tag color="magenta">Ventas: {stats.resumen.ventas}</Tag>
+          <Tag color="blue">Compras: {stats.resumen.compras}</Tag>
+          <Tag color="geekblue">Caja: {stats.resumen.movimientos}</Tag>
+          <Tag color="gold">Puntos: {stats.resumen.puntos}</Tag>
+          <Tag color="purple">Vouchers: {stats.resumen.vouchers}</Tag>
+        </Space>
+
         {!hayFiltrosActivos ? (
-          <Text type="secondary">Vista inicial: ventas del día. Cambia los filtros para explorar más datos.</Text>
-        ) : null}
-      </Space>
-      <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
-        <Button
-          size="small"
-          onClick={() => setSelectedOperacionKeys(operacionesTabla.map((op) => op.key))}
-          disabled={operacionesTabla.length === 0}
-        >
-          Seleccionar filtradas ({operacionesTabla.length})
-        </Button>
-        <Button size="small" onClick={() => setSelectedOperacionKeys([])} disabled={selectedCount === 0}>
-          Deseleccionar todo
-        </Button>
-        {isAdmin ? (
-          <Button size="small" danger onClick={eliminarOperacionesSeleccionadas} disabled={selectedCount === 0}>
-            Eliminar seleccionadas
-          </Button>
-        ) : null}
-        {selectedCount > 0 ? <Tag color="blue">{selectedCount} seleccionado(s)</Tag> : null}
-      </Space>
-      <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
-        <Tag color="magenta">Ventas: {stats.resumen.ventas}</Tag>
-        <Tag color="blue">Compras: {stats.resumen.compras}</Tag>
-        <Tag color="geekblue">Caja: {stats.resumen.movimientos}</Tag>
-        <Tag color="gold">Puntos: {stats.resumen.puntos}</Tag>
-        <Tag color="purple">Vouchers: {stats.resumen.vouchers}</Tag>
+          <Text type="secondary">Vista inicial: ventas del día. Usa búsqueda o filtros solo cuando necesites profundizar.</Text>
+        ) : (
+          <Text type="secondary">Filtros activos: {filtrosResumen}</Text>
+        )}
       </Space>
     </Card>
   );
