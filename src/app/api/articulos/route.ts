@@ -95,6 +95,35 @@ function getAdminClient() {
   );
 }
 
+async function listAllArticulosByTenant(supabase: ReturnType<typeof getAdminClient>, tenantId: string) {
+  const pageSize = 1000;
+  const allRows: Record<string, unknown>[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from("articulos")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .order("nombre")
+      .range(from, to);
+
+    if (error) throw error;
+
+    const batch = (data || []) as Record<string, unknown>[];
+    allRows.push(...batch);
+
+    if (batch.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
+  }
+
+  return allRows;
+}
+
 // GET /api/articulos — lista todos los artículos
 export async function GET(request: NextRequest) {
   try {
@@ -112,16 +141,7 @@ export async function GET(request: NextRequest) {
 
     const { tenantId } = tenantContext;
     const supabase = getAdminClient();
-    const { data, error } = await supabase
-      .from("articulos")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .order("nombre");
-
-    if (error) {
-      console.error("[GET /api/articulos] Query error:", error);
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    const data = await listAllArticulosByTenant(supabase, tenantId);
 
     return NextResponse.json({ data });
   } catch (err) {
