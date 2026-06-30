@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
-import { extractTenantFromPathname, normalizeTenantSlug } from "@/utils/tenant/tenant-context";
+import { extractTenantFromHostname, extractTenantFromPathname, getDefaultTenantSlug, normalizeTenantSlug } from "@/utils/tenant/tenant-context";
 
 export type TenantContext = {
   tenantSlug: string;
@@ -23,8 +23,8 @@ export function resolveTenantSlugFromRequest(request: NextRequest): string {
   const fromHeader = request.headers.get("x-tenant")?.trim();
   const fromCookie = request.cookies.get("lc_tenant")?.value?.trim();
   const fromPath = extractTenantFromPathname(request.nextUrl.pathname);
-  // Hardcodear fallback a "principal" (mejor que depender de env vars)
-  return normalizeTenantSlug(fromHeader || fromCookie || fromPath || 'principal');
+  const fromHost = extractTenantFromHostname(request.headers.get("x-forwarded-host")?.trim() || request.headers.get("host")?.trim());
+  return normalizeTenantSlug(fromHeader || fromPath || fromHost || fromCookie || getDefaultTenantSlug());
 }
 
 export async function resolveTenantContext(request: NextRequest): Promise<TenantContext> {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Form, Input, Typography, message } from "antd";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { normalizeTenantSlug } from "@/utils/tenant/tenant-context";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -22,6 +23,13 @@ export default function OnboardingPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const requestedTenantSlug = normalizeTenantSlug(searchParams.get("tenantSlug"));
+    if (!requestedTenantSlug || requestedTenantSlug === "default") return;
+    form.setFieldsValue({ tenantSlug: requestedTenantSlug });
+  }, [form, searchParams]);
 
   const slugPreview = useMemo(() => {
     const current = String(form.getFieldValue("tenantSlug") || "")

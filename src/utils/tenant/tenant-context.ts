@@ -16,6 +16,37 @@ export function getDefaultTenantSlug(): string {
   );
 }
 
+export function getAppBaseHostname(): string | null {
+  const rawUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "";
+  if (!rawUrl) return null;
+
+  try {
+    return new URL(rawUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export function extractTenantFromHostname(hostname?: string | null): string | null {
+  const rawHost = String(hostname ?? "")
+    .trim()
+    .toLowerCase()
+    .split(":")[0] || "";
+
+  if (!rawHost || rawHost === "localhost" || rawHost === "127.0.0.1" || rawHost === "www") {
+    return null;
+  }
+
+  const baseHostname = getAppBaseHostname();
+  if (!baseHostname || rawHost === baseHostname || !rawHost.endsWith(`.${baseHostname}`)) {
+    return null;
+  }
+
+  const subdomain = rawHost.slice(0, -(baseHostname.length + 1)).split(".")[0] || "";
+  const normalized = normalizeTenantSlug(subdomain);
+  return normalized === "default" ? null : normalized;
+}
+
 export function extractTenantFromPathname(pathname?: string | null): string | null {
   const path = String(pathname ?? "").trim();
   const match = path.match(TENANT_PATH_REGEX);
