@@ -61,6 +61,21 @@ export default function ConfiguracionImprsoraEtiquetas({
   const [savingEtiquetas, setSavingEtiquetas] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
+  const applyColumnPreset = useCallback((columns: 2 | 3) => {
+    setLabelTemplateConfig((prev) => {
+      const labelWidthMm = Number(prev.labelWidthMm || DEFAULT_LABEL_TEMPLATE.labelWidthMm);
+      const marginLeftMm = Number(prev.marginLeftMm || DEFAULT_LABEL_TEMPLATE.marginLeftMm);
+      const gapHorizontalMm = Number(prev.gapHorizontalMm || DEFAULT_LABEL_TEMPLATE.gapHorizontalMm);
+      const pageWidthMm = marginLeftMm + columns * labelWidthMm + Math.max(0, columns - 1) * gapHorizontalMm;
+
+      return {
+        ...prev,
+        columns,
+        pageWidthMm: Number(pageWidthMm.toFixed(1)),
+      };
+    });
+  }, []);
+
   // Cargar configuración al montar
   useEffect(() => {
     cargarConfigEtiquetas();
@@ -941,7 +956,10 @@ export default function ConfiguracionImprsoraEtiquetas({
             <Button onClick={() => setLabelTemplateConfig(DEFAULT_LABEL_TEMPLATE)} icon={<ReloadOutlined />}>
               Restaurar medidas por defecto
             </Button>
-            <Button onClick={() => setLabelTemplateConfig((prev) => ({ ...prev, columns: 3 }))}>
+            <Button onClick={() => applyColumnPreset(2)}>
+              Usar 2 etiquetas por fila
+            </Button>
+            <Button onClick={() => applyColumnPreset(3)}>
               Usar 3 etiquetas por fila
             </Button>
           </Space>
